@@ -1,0 +1,1 @@
+{ "servers": { "binance-mcp-server": { "type": "stdio", "command": "mcpserver", "args": ["--config", "/opt/mcpserver/config.toml"] } } }

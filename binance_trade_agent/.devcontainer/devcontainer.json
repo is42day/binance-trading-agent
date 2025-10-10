@@ -1,0 +1,24 @@
+{
+    "name": "Binance Trading Agent DevContainer",
+    "build": {
+        "dockerfile": "../Dockerfile",
+        "context": ".."
+    },
+    "appPort": [8080],
+    "remoteEnv": {
+        "PYTHONPATH": "/app"
+    },
+    "postCreateCommand": "pip install --upgrade pip && pip install -r requirements.txt",
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "terminal.integrated.env.linux": {
+                    "PYTHONUNBUFFERED": "1"
+                }
+            }
+        }
+    },
+    "mounts": [
+        "source=${localWorkspaceFolder}/.env.example,target=/app/.env,type=bind,consistency=cached"
+    ]
+}

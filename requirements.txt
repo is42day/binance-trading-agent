@@ -1,0 +1,7 @@
+langchain==0.1.19
+python-binance==1.0.19
+supervisor==4.2.5
+pytest==8.4.2
+anyio==4.11.0
+mcp-server-git
+# Add any additional dependencies below
