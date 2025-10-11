@@ -42,10 +42,11 @@ class TradingOrchestrator:
         
         # Setup logging
         self.logger = logging.getLogger(__name__)
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(name)s - %(levelname)s - [%(correlation_id)s] %(message)s'
-        )
+        if not logging.getLogger().handlers:
+            logging.basicConfig(
+                level=logging.INFO,
+                format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            )
         
         # Trade history
         self.trade_decisions: List[TradeDecision] = []

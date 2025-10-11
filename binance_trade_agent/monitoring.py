@@ -205,7 +205,7 @@ class StructuredLogger:
     def _setup_formatter(self):
         """Setup structured log formatter"""
         formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - [%(correlation_id)s] %(message)s'
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
         
         # Add console handler if not exists

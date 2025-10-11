@@ -139,12 +139,13 @@ python binance_trade_agent/mcp_client.py
 
 ### Web UI Dashboard
 ```bash
-# Install Streamlit if not already installed
+# Option 1: Using Docker (recommended)
+./deploy.sh development
+# Web UI automatically available at http://localhost:8501
+
+# Option 2: Manual installation
 pip install streamlit
-
-# Run the web dashboard
 streamlit run binance_trade_agent/web_ui.py
-
 # Access at http://localhost:8501
 ```
 

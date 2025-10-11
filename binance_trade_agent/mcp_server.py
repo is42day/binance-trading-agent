@@ -33,7 +33,7 @@ class EnhancedTradingMCPServer:
         self.risk_agent = EnhancedRiskManagementAgent()
         self.execution_agent = TradeExecutionAgent()
         self.orchestrator = TradingOrchestrator()
-        self.portfolio = PortfolioManager("mcp_portfolio.db")
+        self.portfolio = PortfolioManager("/app/data/mcp_portfolio.db")
         
         self.logger = monitoring.get_logger('mcp_server')
         

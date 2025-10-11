@@ -17,6 +17,12 @@ A comprehensive automated trading system for Binance with advanced risk manageme
 
 3. **Run the System:**
    ```bash
+   # Using Docker (recommended)
+   ./deploy.sh development
+   # Web UI will be available at http://localhost:8501
+   # MCP server at http://localhost:8080
+
+   # Or run components separately:
    # Start MCP server
    python binance_trade_agent/mcp_server.py
 

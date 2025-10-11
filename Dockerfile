@@ -47,7 +47,7 @@ RUN mkdir -p /app/logs && chown trading:trading /app/logs
 RUN touch /app/supervisord.log && chown trading:trading /app/supervisord.log && chmod 666 /app/supervisord.log
 
 # Expose ports
-EXPOSE 8080 9090
+EXPOSE 8080 9090 8501
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

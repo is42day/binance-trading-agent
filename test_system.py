@@ -127,7 +127,7 @@ def test_quick_functionality():
         signal_agent = SignalAgent()
         risk_agent = EnhancedRiskManagementAgent()
         execution_agent = TradeExecutionAgent()
-        portfolio = PortfolioManager("test_portfolio.db")
+        portfolio = PortfolioManager("/app/data/test_portfolio.db")
         
         print("✅ All agents initialized successfully")
         
