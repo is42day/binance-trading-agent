@@ -1,7 +1,7 @@
 # Makefile for Binance Trading Agent (Docker workflow)
 
 IMAGE_NAME=binance-agent
-ENV_FILE=binance_trade_agent/.env.example
+ENV_FILE=binance_trade_agent/.env
 PORT=8080
 
 build:
