@@ -1,4 +1,3 @@
-
 import os
 from binance.client import Client
 from binance.exceptions import BinanceAPIException
@@ -9,14 +8,12 @@ class BinanceAPIClient:
     API keys are read from environment variables.
     """
 
-
     def __init__(self):
         api_key = os.getenv('BINANCE_API_KEY')
         api_secret = os.getenv('BINANCE_API_SECRET')
         if not api_key or not api_secret:
             raise ValueError("Missing BINANCE_API_KEY or BINANCE_API_SECRET in environment!")
         self.client = Client(api_key, api_secret)
-
 
     def get_latest_price(self, symbol: str) -> float:
         try:
@@ -80,14 +77,9 @@ class BinanceAPIClient:
             return None
 
     def cancel_order(self, symbol: str, order_id: int):
-        """
-        Cancel an open order.
-        """
         try:
             result = self.client.cancel_order(symbol=symbol, orderId=order_id)
             return result
         except BinanceAPIException as ex:
             print(f"Binance API error: {ex}")
             return None
-
-

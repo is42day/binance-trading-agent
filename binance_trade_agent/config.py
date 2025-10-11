@@ -1,4 +1,3 @@
-# binance_trade_agent/config.py
 import os
 
 BINANCE_API_KEY = os.getenv('BINANCE_API_KEY')
