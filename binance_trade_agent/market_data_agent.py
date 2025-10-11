@@ -35,6 +35,26 @@ class MarketDataAgent:
         """
         return self.fetch_price(symbol)
 
+    def fetch_ohlcv(self, symbol: str, interval: str = '1h', limit: int = 100):
+        """
+        Fetch OHLCV (candlestick) data for technical analysis.
+        Returns list of dictionaries with 'open', 'high', 'low', 'close', 'volume' keys.
+        """
+        klines = self.client.get_klines(symbol, interval, limit)
+        
+        ohlcv_data = []
+        for kline in klines:
+            ohlcv_data.append({
+                'timestamp': int(kline[0]),
+                'open': float(kline[1]),
+                'high': float(kline[2]),
+                'low': float(kline[3]),
+                'close': float(kline[4]),
+                'volume': float(kline[5])
+            })
+        
+        return ohlcv_data
+
 # Example usage (for manual/debug test, not run in production agent loop):
 if __name__ == "__main__":
     agent = MarketDataAgent()

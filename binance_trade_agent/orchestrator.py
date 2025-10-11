@@ -12,6 +12,7 @@ from .market_data_agent import MarketDataAgent
 from .signal_agent import SignalAgent
 from .risk_management_agent import RiskManagementAgent
 from .trade_execution_agent import TradeExecutionAgent
+from .config import config
 
 
 @dataclass
@@ -36,7 +37,7 @@ class TradingOrchestrator:
     
     def __init__(self):
         self.market_agent = MarketDataAgent()
-        self.signal_agent = SignalAgent()
+        self.signal_agent = SignalAgent(market_data_agent=self.market_agent)
         self.risk_agent = RiskManagementAgent()
         self.execution_agent = TradeExecutionAgent()
         
@@ -279,7 +280,7 @@ async def demo_orchestration():
     # Execute single workflow
     decision = await orchestrator.execute_trading_workflow(
         symbol="BTCUSDT",
-        quantity=0.001
+        quantity=config.get_default_quantity("BTCUSDT")
     )
     
     print(f"\nTrade Decision:")

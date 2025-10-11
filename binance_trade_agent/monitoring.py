@@ -14,6 +14,8 @@ import threading
 from collections import defaultdict, deque
 import statistics
 
+from .config import config
+
 
 @dataclass
 class MetricEvent:
@@ -388,7 +390,7 @@ class MonitoringSystem:
         api_error_rate = (api_errors / total_api_calls) if total_api_calls > 0 else 0
         
         return {
-            'status': 'healthy' if error_rate < 0.1 and api_error_rate < 0.05 else 'degraded',
+            'status': 'healthy' if error_rate < config.monitoring_error_rate_threshold and api_error_rate < config.monitoring_api_error_rate_threshold else 'degraded',
             'uptime_seconds': uptime,
             'trade_error_rate': error_rate,
             'api_error_rate': api_error_rate,

@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from enum import Enum
 import json
 
+from .config import config
+
 
 class RiskLevel(Enum):
     """Risk severity levels"""
@@ -53,41 +55,43 @@ class EnhancedRiskManagementAgent:
     
     def __init__(self, config_file: Optional[str] = None):
         self.logger = logging.getLogger(__name__)
-        
-        # Default risk configuration
+
+        # Load risk configuration from config system
+        risk_config = config.get_risk_config()
+
         self.config = {
             # Position sizing rules
-            'max_position_per_symbol': 0.05,  # 5% of portfolio per symbol
-            'max_total_exposure': 0.8,        # 80% total portfolio exposure
-            'max_single_trade_size': 0.02,    # 2% of portfolio per trade
-            
+            'max_position_per_symbol': risk_config['max_position_per_symbol'],
+            'max_total_exposure': risk_config['max_total_exposure'],
+            'max_single_trade_size': risk_config['max_single_trade_size'],
+
             # Stop-loss and take-profit
-            'default_stop_loss_pct': 0.02,    # 2% stop-loss
-            'default_take_profit_pct': 0.06,  # 6% take-profit (3:1 ratio)
+            'default_stop_loss_pct': risk_config['default_stop_loss_pct'],
+            'default_take_profit_pct': risk_config['default_take_profit_pct'],
             'trailing_stop_enabled': True,
-            'trailing_stop_pct': 0.01,        # 1% trailing stop
-            
+            'trailing_stop_pct': risk_config['trailing_stop_pct'],
+
             # Drawdown protection
-            'max_daily_drawdown': 0.05,       # 5% daily drawdown limit
-            'max_total_drawdown': 0.15,       # 15% total drawdown limit
+            'max_daily_drawdown': risk_config['max_daily_drawdown'],
+            'max_total_drawdown': risk_config['max_total_drawdown'],
             'drawdown_pause_hours': 24,       # Pause trading for 24h after max drawdown
-            
+
             # Frequency controls
             'max_trades_per_hour': 10,
             'max_trades_per_day': 50,
             'min_time_between_trades': 60,     # 60 seconds minimum between trades
-            
+
             # Symbol-specific rules
             'symbol_rules': {
-                'BTCUSDT': {'max_position': 0.1, 'volatility_multiplier': 1.0},
-                'ETHUSDT': {'max_position': 0.08, 'volatility_multiplier': 1.2},
+                symbol: config.get_symbol_risk_config(symbol)
+                for symbol in ['BTCUSDT', 'ETHUSDT']
             },
-            
+
             # Market conditions
-            'volatility_threshold': 0.05,     # 5% volatility threshold
+            'volatility_threshold': risk_config['volatility_threshold'],
             'market_hours_only': False,       # Trade 24/7 for crypto
             'news_impact_pause': False,       # Pause during high-impact news
-            
+
             # Emergency controls
             'emergency_stop': False,          # Emergency stop all trading
             'max_consecutive_losses': 5,      # Stop after 5 consecutive losses

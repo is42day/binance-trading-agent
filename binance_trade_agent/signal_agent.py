@@ -4,27 +4,72 @@ SignalAgent: Computes trading signals (BUY/SELL/HOLD) from OHLCV candlestick dat
 Supports RSI and MACD, with stubs for additional indicators.
 """
 import math
+from .config import config
 
 class SignalAgent:
-    def __init__(self, rsi_overbought=70, rsi_oversold=30, macd_signal_window=9):
+    def __init__(self, market_data_agent=None, rsi_overbought=None, rsi_oversold=None, macd_signal_window=None):
         """
         Initialize SignalAgent with indicator thresholds.
         Args:
+            market_data_agent: MarketDataAgent instance for fetching OHLCV data
             rsi_overbought (float): RSI value above which market is considered overbought.
             rsi_oversold (float): RSI value below which market is considered oversold.
             macd_signal_window (int): Window for MACD signal line.
         """
-        self.rsi_overbought = rsi_overbought
-        self.rsi_oversold = rsi_oversold
-        self.macd_signal_window = macd_signal_window
+        self.market_agent = market_data_agent
+        # Use config values if not explicitly provided
+        self.rsi_overbought = rsi_overbought or config.signal_rsi_overbought
+        self.rsi_oversold = rsi_oversold or config.signal_rsi_oversold
+        self.macd_signal_window = macd_signal_window or config.signal_macd_signal_window
 
     def generate_signal(self, symbol: str) -> dict:
         """
-        Generate a trading signal for the given symbol.
-        Replace this stub with your actual signal logic.
+        Generate a trading signal for the given symbol using technical indicators.
         """
-        # Example stub: always return 'buy' with 80% confidence
-        return {"signal": "buy", "confidence": 0.8}
+        if not self.market_agent:
+            # Fallback to demo mode if no market data agent provided
+            return {"signal": "buy", "confidence": 0.8}
+        
+        try:
+            # Fetch OHLCV data for technical analysis
+            ohlcv_data = self.market_agent.fetch_ohlcv(symbol, interval='1h', limit=50)
+            
+            if not ohlcv_data or len(ohlcv_data) < 20:
+                # Not enough data for reliable signals
+                return {"signal": "hold", "confidence": 0.5}
+            
+            # Use RSI for primary signal (more reliable for shorter timeframes)
+            rsi_signal = self.compute_signal(ohlcv_data, indicator='rsi')
+            
+            # Use MACD for confirmation
+            macd_signal = self.compute_signal(ohlcv_data, indicator='macd')
+            
+            # Combine signals: require both indicators to agree for strong signals
+            if rsi_signal['signal'] == macd_signal['signal']:
+                # Both indicators agree
+                combined_confidence = (rsi_signal['confidence'] + macd_signal['confidence']) / 2
+                return {
+                    "signal": rsi_signal['signal'].lower(),
+                    "confidence": min(combined_confidence, 0.95),  # Cap at 95%
+                    "indicators": {
+                        "rsi": rsi_signal,
+                        "macd": macd_signal
+                    }
+                }
+            else:
+                # Indicators disagree - hold position
+                return {
+                    "signal": "hold",
+                    "confidence": 0.6,
+                    "indicators": {
+                        "rsi": rsi_signal,
+                        "macd": macd_signal
+                    }
+                }
+                
+        except Exception as e:
+            # On any error, fall back to hold signal
+            return {"signal": "hold", "confidence": 0.5}
 
     def compute_rsi(self, closes, period=14):
         """

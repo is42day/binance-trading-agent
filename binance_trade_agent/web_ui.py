@@ -98,21 +98,22 @@ def get_portfolio_data():
         portfolio = components['portfolio']
         stats = portfolio.get_portfolio_stats()
         positions = portfolio.get_all_positions()
-        recent_trades = portfolio.get_recent_trades(limit=10)
+        recent_trades = portfolio.get_trade_history(limit=10)
         
         return {
             "total_value": stats.get('total_value', 0),
             "total_pnl": stats.get('total_pnl', 0),
-            "total_pnl_percent": stats.get('total_pnl_percent', 0),
+            "total_pnl_percent": (stats.get('total_pnl', 0) / max(stats.get('total_value', 0) - stats.get('total_pnl', 0), 1)) * 100,
             "open_positions": len(positions),
-            "total_trades": stats.get('total_trades', 0),
+            "total_trades": stats.get('number_of_trades', 0),
             "positions": [
                 {
                     "symbol": pos.symbol,
                     "quantity": pos.quantity,
                     "average_price": pos.average_price,
-                    "current_value": pos.current_value
-                } for pos in positions
+                    "current_value": pos.market_value,
+                    "unrealized_pnl": pos.unrealized_pnl
+                } for pos in positions.values()
             ],
             "recent_trades": [
                 {
@@ -120,7 +121,8 @@ def get_portfolio_data():
                     "side": trade.side,
                     "quantity": trade.quantity,
                     "price": trade.price,
-                    "timestamp": trade.timestamp.isoformat()
+                    "timestamp": trade.timestamp.isoformat(),
+                    "pnl": trade.pnl or 0
                 } for trade in recent_trades
             ]
         }
@@ -132,7 +134,8 @@ def get_market_data(symbol: str):
     try:
         market_agent = components['market_agent']
         price = market_agent.get_latest_price(symbol)
-        return {"price": price, "change_24h": 0.0}  # Mock change for now
+        # TODO: Implement real 24h change calculation using historical data
+        return {"price": price, "change_24h": 0.0}  # Placeholder - needs real implementation
     except Exception as e:
         return {"error": str(e)}
 
