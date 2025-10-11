@@ -1,33 +1,66 @@
-FROM python:3.10-slim
+FROM python:3.10-slim AS builder
 
-WORKDIR /app
-
-# Install OS-level dependencies
+# Install build dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
-    unzip \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy and install MCP server setup script
-RUN pip install --upgrade pip && pip install mcp-server-git
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy Python dependencies
+# Copy and install Python dependencies
 COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt
 
-# Ensure pytest is installed for testing
-RUN pip install pytest
+FROM python:3.10-slim AS production
 
-# Copy rest of your application code
-COPY . .
+# Create non-root user for security
+RUN groupadd -r trading && useradd -r -g trading trading
 
-# Expose MCP server port (change as needed, default 8080)
-EXPOSE 8080
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Start both MCP server and Python app using supervisord
+# Install supervisor for process management
 RUN pip install supervisor
-COPY supervisord.conf /app/supervisord.conf
 
+# Set working directory
+WORKDIR /app
+
+# Create data directory for SQLite databases
+RUN mkdir -p /app/data && chown trading:trading /app/data
+
+# Copy application code
+COPY --chown=trading:trading . .
+
+# Copy configuration files
+COPY --chown=trading:trading supervisord.conf /app/supervisord.conf
+
+# Create logs directory
+RUN mkdir -p /app/logs && chown trading:trading /app/logs
+
+# Pre-create supervisord log file and set permissions
+RUN touch /app/supervisord.log && chown trading:trading /app/supervisord.log && chmod 666 /app/supervisord.log
+
+# Expose ports
+EXPOSE 8080 9090
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:8080/health')" || exit 1
+
+# Switch to non-root user
+USER trading
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV BINANCE_API_URL=https://testnet.binance.vision
+ENV MCP_SERVER_PORT=8080
+ENV LOG_LEVEL=INFO
+
+# Default command
 CMD ["supervisord", "-c", "/app/supervisord.conf"]

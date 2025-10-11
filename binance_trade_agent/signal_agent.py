@@ -18,6 +18,14 @@ class SignalAgent:
         self.rsi_oversold = rsi_oversold
         self.macd_signal_window = macd_signal_window
 
+    def generate_signal(self, symbol: str) -> dict:
+        """
+        Generate a trading signal for the given symbol.
+        Replace this stub with your actual signal logic.
+        """
+        # Example stub: always return 'buy' with 80% confidence
+        return {"signal": "buy", "confidence": 0.8}
+
     def compute_rsi(self, closes, period=14):
         """
         Compute RSI from closing prices.

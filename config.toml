@@ -1,0 +1,23 @@
+[mcpServers.trading-agent]
+command = "python"
+args = ["/app/binance_trade_agent/mcp_server.py"]
+
+[[tools]]
+name = "get_market_data"
+description = "Get latest price and order book data for a symbol"
+
+[[tools]]
+name = "compute_trading_signal"
+description = "Compute trading signals (BUY/SELL/HOLD) using RSI or MACD indicators"
+
+[[tools]]
+name = "validate_trade"
+description = "Validate a trade against risk management rules"
+
+[[tools]]
+name = "place_order"
+description = "Place a market or limit order on Binance testnet"
+
+[[tools]]
+name = "get_account_balance"
+description = "Get account balance for a specific asset"

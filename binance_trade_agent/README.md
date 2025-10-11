@@ -1,4 +1,332 @@
-# Binance Trade Agent - LangChain, MCP, Binance
+# Binance Trading Agent - Comprehensive Trading System
+
+A production-ready automated trading system for Binance with advanced risk management, portfolio tracking, monitoring, and MCP integration.
+
+## 🚀 Features
+
+### Core Trading Components
+- **Market Data Agent**: Real-time price feeds and order book data from Binance API
+- **Signal Agent**: Technical analysis with RSI, MACD, and custom indicators
+- **Risk Management Agent**: Advanced risk controls with position sizing, stop-loss, and drawdown protection
+- **Trade Execution Agent**: Automated order placement with error handling
+- **Orchestrator**: Complete workflow management from signal generation to execution
+
+### Advanced Features
+- **Portfolio Management**: SQLite-backed position tracking with P&L calculations
+- **Enhanced Risk Controls**: 
+  - Stop-loss/take-profit automation
+  - Position sizing limits
+  - Maximum drawdown protection
+  - Trading frequency controls
+  - Symbol-specific rules
+- **Structured Logging & Monitoring**: 
+  - Correlation ID tracking
+  - Performance metrics collection
+  - System health monitoring
+  - Optional Prometheus integration
+- **Command Line Interface**: Interactive CLI for testing and manual trading
+- **MCP Integration**: Model Context Protocol server exposing all trading functionality
+- **Web UI**: Streamlit-based dashboard for portfolio management, trading, and monitoring
+
+## 📁 Project Structure
+
+```
+binance_trade_agent/
+├── __init__.py                 # Package initialization
+├── binance_client.py          # Binance API wrapper
+├── market_data_agent.py       # Market data retrieval
+├── signal_agent.py            # Technical analysis & signals
+├── risk_management_agent.py   # Enhanced risk management
+├── trade_execution_agent.py   # Order execution
+├── orchestrator.py            # Workflow orchestration
+├── portfolio_manager.py       # Portfolio tracking & P&L
+├── monitoring.py              # Logging & metrics system
+├── cli.py                     # Command line interface
+├── mcp_server.py              # MCP server implementation
+├── mcp_client.py              # MCP client for testing
+├── web_ui.py                  # Streamlit web dashboard
+├── demo.py                    # Quick demonstration
+├── config.py                  # Configuration management
+├── utils.py                   # Utility functions
+└── tests/                     # Comprehensive test suite
+    ├── test_agent_flow.py     # Integration tests
+    ├── test_binance_client.py # API client tests
+    ├── test_market_data_agent.py
+    ├── test_signal_agent.py
+    ├── test_mcp_integration.py
+    └── ...
+```
+
+## 🛠️ Installation & Setup
+
+### 1. Environment Setup
+```bash
+# Clone and navigate to project
+cd binance-trading-agent
+
+# Build and run Docker container
+make run
+make attach
+
+# Or install dependencies locally
+pip install -r requirements.txt
+```
+
+### 2. Configuration
+Create `.env` file with your Binance testnet credentials:
+```env
+BINANCE_API_KEY=your_testnet_api_key
+BINANCE_SECRET_KEY=your_testnet_secret_key
+BINANCE_TESTNET=true
+```
+
+### 3. Quick Start
+```python
+# In Docker container
+python binance_trade_agent/demo.py
+
+# Or run interactive CLI
+python binance_trade_agent/cli.py
+```
+
+## 🎮 Usage Examples
+
+### Command Line Interface
+```bash
+# Start interactive CLI
+python binance_trade_agent/cli.py
+
+# Available commands:
+(trading) buy BTCUSDT 0.001      # Place buy order
+(trading) sell BTCUSDT 0.001     # Place sell order
+(trading) status                 # System status
+(trading) portfolio              # Portfolio summary
+(trading) positions              # Current positions
+(trading) trades                 # Trade history
+(trading) signals BTCUSDT        # Get trading signals
+(trading) risk BTCUSDT buy 0.001 50000  # Test risk management
+(trading) market BTCUSDT         # Market data
+(trading) metrics                # Performance metrics
+(trading) logs                   # Recent logs
+(trading) emergency on           # Emergency stop
+```
+
+### Python API
+```python
+from binance_trade_agent.orchestrator import TradingOrchestrator
+from binance_trade_agent.portfolio_manager import PortfolioManager
+
+# Initialize components
+orchestrator = TradingOrchestrator()
+portfolio = PortfolioManager()
+
+# Execute trading workflow
+decision = await orchestrator.execute_trading_workflow("BTCUSDT", 0.001)
+
+# Check portfolio
+stats = portfolio.get_portfolio_stats()
+positions = portfolio.get_all_positions()
+```
+
+### MCP Server Integration
+```python
+# Start MCP server
+python binance_trade_agent/mcp_server.py
+
+# Or use client
+python binance_trade_agent/mcp_client.py
+```
+
+### Web UI Dashboard
+```bash
+# Install Streamlit if not already installed
+pip install streamlit
+
+# Run the web dashboard
+streamlit run binance_trade_agent/web_ui.py
+
+# Access at http://localhost:8501
+```
+
+The web UI provides:
+- **Portfolio Overview**: Live positions, P&L, and allocation charts
+- **Market Data**: Real-time prices, order book, and trading pairs
+- **Trade Execution**: Buy/sell forms with risk validation
+- **Signals & Risk**: Latest signals and risk management status
+- **Logs & Monitoring**: System health and performance metrics
+- **Advanced Controls**: Emergency stop and system management
+
+## 🔒 Risk Management Features
+
+### Position Sizing
+- Maximum position per symbol (default: 5% of portfolio)
+- Maximum single trade size (default: 2% of portfolio)
+- Total portfolio exposure limits (default: 80%)
+
+### Stop-Loss & Take-Profit
+- Automatic stop-loss calculation (default: 2%)
+- Take-profit targets (default: 6% for 3:1 ratio)
+- Trailing stop support
+
+### Drawdown Protection
+- Maximum daily drawdown limits (default: 5%)
+- Maximum total drawdown limits (default: 15%)
+- Automatic trading pause after drawdown breaches
+
+### Frequency Controls
+- Maximum trades per hour/day
+- Minimum time between trades
+- Consecutive loss protection
+
+### Emergency Controls
+- Emergency stop functionality
+- Manual override capabilities
+- Risk rule configuration
+
+## 📊 Monitoring & Metrics
+
+### Structured Logging
+- Correlation ID tracking across components
+- Event-based logging with context
+- Configurable log levels and formats
+
+### Performance Metrics
+- Trade execution timing
+- Signal generation performance
+- Risk assessment duration
+- API call latency
+- Success/failure rates
+
+### Health Monitoring
+- System uptime tracking
+- Error rate monitoring
+- Portfolio value tracking
+- Position count monitoring
+
+## 🧪 Testing
+
+### Run Test Suite
+```bash
+# All tests
+pytest binance_trade_agent/tests/
+
+# Specific test categories
+pytest binance_trade_agent/tests/test_agent_flow.py      # Integration tests
+pytest binance_trade_agent/tests/test_binance_client.py  # API tests
+pytest binance_trade_agent/tests/test_mcp_integration.py # MCP tests
+```
+
+### Integration Testing
+The test suite includes comprehensive integration tests that validate:
+- End-to-end trading workflows
+- Live Binance testnet connectivity
+- Risk management validation
+- Portfolio tracking accuracy
+- MCP tool functionality
+
+## 🚀 Deployment
+
+### Docker Deployment
+```bash
+# Build production image
+docker build -t binance-trading-agent .
+
+# Run with environment variables
+docker run -d \
+  -e BINANCE_API_KEY=your_key \
+  -e BINANCE_SECRET_KEY=your_secret \
+  -e BINANCE_TESTNET=true \
+  binance-trading-agent
+```
+
+### Production Considerations
+- Use proper secret management for API keys
+- Configure appropriate risk limits
+- Set up monitoring and alerting
+- Implement backup strategies for portfolio data
+- Consider rate limiting and API quotas
+
+## 📝 Configuration
+
+### Risk Management Config
+```python
+# Default configuration in risk_management_agent.py
+config = {
+    'max_position_per_symbol': 0.05,    # 5% per symbol
+    'max_total_exposure': 0.8,          # 80% total exposure  
+    'max_single_trade_size': 0.02,      # 2% per trade
+    'default_stop_loss_pct': 0.02,      # 2% stop-loss
+    'default_take_profit_pct': 0.06,    # 6% take-profit
+    'max_daily_drawdown': 0.05,         # 5% daily drawdown
+    'max_total_drawdown': 0.15,         # 15% total drawdown
+    'max_trades_per_day': 50,           # Daily trade limit
+    'emergency_stop': False             # Emergency stop state
+}
+```
+
+### Symbol-Specific Rules
+```python
+'symbol_rules': {
+    'BTCUSDT': {
+        'max_position': 0.1,            # 10% max position
+        'volatility_multiplier': 1.0    # Standard volatility handling
+    },
+    'ETHUSDT': {
+        'max_position': 0.08,           # 8% max position
+        'volatility_multiplier': 1.2    # Higher volatility adjustment
+    }
+}
+```
+
+## 🔍 Troubleshooting
+
+### Common Issues
+1. **API Connection Errors**: Check API keys and testnet settings
+2. **Risk Rejections**: Review position sizing and risk limits
+3. **Portfolio Sync Issues**: Update market prices regularly
+4. **Memory Issues**: Monitor log retention and metric storage
+
+### Debug Mode
+```bash
+# Enable debug logging
+export LOG_LEVEL=DEBUG
+python binance_trade_agent/cli.py
+```
+
+### Health Checks
+```python
+# Check system health
+from binance_trade_agent.monitoring import monitoring
+health = monitoring.get_health_status()
+print(health)
+```
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Add comprehensive tests
+4. Update documentation
+5. Submit a pull request
+
+## ⚠️ Disclaimer
+
+This software is for educational and testing purposes only. Use at your own risk. Always test thoroughly on Binance testnet before considering any live trading. The authors are not responsible for any financial losses.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🔗 Resources
+
+- [Binance API Documentation](https://binance-docs.github.io/apidocs/)
+- [Technical Analysis Library](https://technical-analysis-library-in-python.readthedocs.io/)
+- [Model Context Protocol](https://modelcontextprotocol.io/)
+- [Docker Documentation](https://docs.docker.com/)
+
+---
+
+**Happy Trading! 📈**
 
 ## Repository State (as of October 10, 2025)
 

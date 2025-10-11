@@ -29,6 +29,12 @@ class MarketDataAgent:
         """
         return self.client.get_balance(asset)
 
+    def get_latest_price(self, symbol: str) -> float:
+        """
+        Alias for fetch_price to support orchestrator compatibility.
+        """
+        return self.fetch_price(symbol)
+
 # Example usage (for manual/debug test, not run in production agent loop):
 if __name__ == "__main__":
     agent = MarketDataAgent()
