@@ -1,4 +1,5 @@
 import os
+import time
 from binance.client import Client
 from binance.exceptions import BinanceAPIException
 from .config import config
@@ -82,52 +83,44 @@ class BinanceAPIClient:
             print(f"Binance API error: {ex}")
             raise
 
-    def get_klines(self, symbol: str, interval: str = '1h', limit: int = 100):
+    def get_24h_ticker(self, symbol: str):
         """
-        Get historical candlestick (kline) data.
-        Returns list of OHLCV data points.
+        Get 24-hour ticker price change statistics.
+        Returns comprehensive 24h statistics for the symbol.
         """
         if self.config.demo_mode:
-            # Return mock candlestick data
-            import time
+            # Return mock 24h ticker data
             base_price = self.get_latest_price(symbol)
-            current_time = int(time.time() * 1000)
-
-            klines = []
-            for i in range(limit):
-                # Generate somewhat realistic price movement
-                price_variation = (i % 20 - 10) * 0.01  # -10% to +10% variation
-                open_price = base_price * (1 + price_variation)
-                high_price = open_price * 1.005
-                low_price = open_price * 0.995
-                close_price = open_price * (1 + (i % 3 - 1) * 0.002)  # Small random close
-                volume = 100 + i * 10
-
-                timestamp = current_time - (limit - i) * 3600000  # 1 hour intervals
-
-                klines.append([
-                    timestamp,           # Open time
-                    f"{open_price:.2f}", # Open
-                    f"{high_price:.2f}", # High
-                    f"{low_price:.2f}", # Low
-                    f"{close_price:.2f}",# Close
-                    f"{volume:.2f}",     # Volume
-                    timestamp + 3600000, # Close time
-                    "0.0",               # Quote asset volume
-                    100,                 # Number of trades
-                    "0.0",               # Taker buy base asset volume
-                    "0.0",               # Taker buy quote asset volume
-                    "0.0"                # Unused field
-                ])
-            return klines
+            price_change = (base_price * 0.02) * (1 if symbol.startswith('BTC') else -1)  # Mock change
+            price_change_percent = (price_change / (base_price - price_change)) * 100
+            
+            return {
+                'symbol': symbol,
+                'priceChange': f"{price_change:.2f}",
+                'priceChangePercent': f"{price_change_percent:.2f}",
+                'weightedAvgPrice': f"{base_price:.2f}",
+                'prevClosePrice': f"{base_price - price_change:.2f}",
+                'lastPrice': f"{base_price:.2f}",
+                'lastQty': "0.00100000",
+                'bidPrice': f"{base_price - 0.01:.2f}",
+                'bidQty': "10.00000000",
+                'askPrice': f"{base_price + 0.01:.2f}",
+                'askQty': "10.00000000",
+                'openPrice': f"{base_price - price_change:.2f}",
+                'highPrice': f"{base_price + price_change * 0.5:.2f}",
+                'lowPrice': f"{base_price - price_change * 0.5:.2f}",
+                'volume': "1000.00000000",
+                'quoteVolume': f"{base_price * 1000:.2f}",
+                'openTime': str(int(time.time() * 1000) - 86400000),  # 24h ago
+                'closeTime': str(int(time.time() * 1000)),
+                'firstId': 1,
+                'lastId': 1000,
+                'count': 1000
+            }
 
         try:
-            klines = self.client.get_klines(
-                symbol=symbol,
-                interval=interval,
-                limit=limit
-            )
-            return klines
+            ticker = self.client.get_24hr_ticker(symbol=symbol)
+            return ticker
         except Exception as ex:
             print(f"Binance API error: {ex}")
             raise

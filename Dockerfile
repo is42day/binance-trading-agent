@@ -49,9 +49,9 @@ RUN touch /app/supervisord.log && chown trading:trading /app/supervisord.log && 
 # Expose ports
 EXPOSE 8080 9090 8501
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8080/health')" || exit 1
+# Health check removed - MCP server uses stdio, not HTTP
+# HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+#     CMD python -c "import requests; requests.get('http://localhost:8080/health')" || exit 1
 
 # Switch to non-root user
 USER trading

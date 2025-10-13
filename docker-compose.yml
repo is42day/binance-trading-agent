@@ -9,7 +9,7 @@ services:
     container_name: binance-trading-agent
     environment:
       - BINANCE_API_KEY=${BINANCE_API_KEY:-}
-      - BINANCE_SECRET_KEY=${BINANCE_SECRET_KEY:-}
+      - BINANCE_API_SECRET=${BINANCE_API_SECRET:-}
       - BINANCE_API_URL=${BINANCE_API_URL:-https://testnet.binance.vision}
       - MCP_SERVER_PORT=8080
       - LOG_LEVEL=${LOG_LEVEL:-INFO}

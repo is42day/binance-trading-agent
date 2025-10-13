@@ -55,6 +55,12 @@ class MarketDataAgent:
         
         return ohlcv_data
 
+    def fetch_24h_ticker(self, symbol: str):
+        """
+        Fetch 24-hour ticker statistics including price change, volume, etc.
+        """
+        return self.client.get_24h_ticker(symbol)
+
 # Example usage (for manual/debug test, not run in production agent loop):
 if __name__ == "__main__":
     agent = MarketDataAgent()
