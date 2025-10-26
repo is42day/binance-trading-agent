@@ -34,6 +34,7 @@ from binance_trade_agent.signal_agent import SignalAgent
 from binance_trade_agent.risk_management_agent import EnhancedRiskManagementAgent
 from binance_trade_agent.trade_execution_agent import TradeExecutionAgent
 from binance_trade_agent.portfolio_manager import PortfolioManager
+from binance_trade_agent.portfolio_manager import Trade
 from binance_trade_agent.orchestrator import TradingOrchestrator
 from binance_trade_agent.monitoring import monitoring
 from binance_trade_agent.config import config
@@ -128,6 +129,25 @@ st.markdown("""
 
     /* Make plot background transparent so Plotly uses theme */
     .stPlotlyChart > div { background: transparent !important; }
+
+    /* Stat card blocks */
+    .stat-block {
+        background: #292a2d;
+        border-radius: 10px;
+        padding: 0.8rem 1rem;
+        margin-bottom: 0.6rem;
+        display: inline-block;
+        min-width: 140px;
+    }
+    .stat-title { color: #dcdcdc; font-size:0.9rem; opacity:0.9 }
+    .stat-value { color: #ffffff; font-size:1.4rem; font-weight:700; margin-top:0.2rem }
+
+    .muted-note { color: rgba(244,242,238,0.6); font-size:0.9rem }
+
+    /* Slightly larger headline metrics */
+    .headline-metric { font-size:1.6rem; font-weight:800; }
+
+</style>
 
 </style>
 """, unsafe_allow_html=True)
@@ -248,7 +268,6 @@ def execute_trade(symbol: str, side: str, quantity: float):
         portfolio = components['portfolio']
         
         # Create trade object
-        from .portfolio_manager import Trade
         trade = Trade(
             trade_id=f"web_{int(datetime.now().timestamp())}",
             symbol=symbol,
@@ -288,7 +307,7 @@ def get_risk_status():
     """Get comprehensive risk management status"""
     try:
         risk_agent = components['risk_agent']
-        from binance_trade_agent.config import config
+        # use top-level 'config' imported at module level
 
         # Get basic risk status
         status = risk_agent.get_risk_status()
@@ -312,7 +331,7 @@ def get_risk_status():
 def get_system_status():
     """Get comprehensive system health status"""
     try:
-        from binance_trade_agent.config import config
+        # use top-level 'config' imported at module level
         import time
 
         # Get basic health data from monitoring
@@ -414,12 +433,38 @@ def main():
 
     try:
         portfolio = get_portfolio_data()
+        last_refreshed = datetime.now()
         if "error" not in portfolio:
-            st.sidebar.metric("Portfolio Value", f"${portfolio.get('total_value', 0):,.2f}")
-            st.sidebar.metric("Open Positions", portfolio.get('open_positions', 0))
-            st.sidebar.metric("P&L", f"{portfolio.get('total_pnl_percent', 0):+.2f}%")
-    except:
-        st.sidebar.warning("Unable to load portfolio data")
+            pv = portfolio.get('total_value', 0)
+            open_pos = portfolio.get('open_positions', 0)
+            pnl_pct = portfolio.get('total_pnl_percent', 0)
+            pnl_color = "#2ecc71" if pnl_pct >= 0 else "#ff6b6b"
+
+            stats_html = f"""
+            <div style='display:flex;gap:8px;align-items:flex-start'>
+              <div class='stat-block' style='flex:2'>
+                <div class='stat-title'>🪙 Portfolio Value</div>
+                <div class='stat-value headline-metric'>${pv:,.2f}</div>
+              </div>
+              <div class='stat-block' style='flex:1'>
+                <div class='stat-title'>Open Positions</div>
+                <div class='stat-value'>{open_pos}</div>
+              </div>
+              <div class='stat-block' style='flex:1'>
+                <div class='stat-title'>P&L</div>
+                <div class='stat-value' style='color:{pnl_color}'>{pnl_pct:+.2f}%</div>
+              </div>
+            </div>
+            """
+
+            st.sidebar.markdown(stats_html, unsafe_allow_html=True)
+            st.sidebar.caption(f"Last refresh: {last_refreshed.strftime('%Y-%m-%d %H:%M:%S')}")
+            if st.sidebar.button("🔄 Refresh"):
+                st.experimental_rerun()
+        else:
+            st.sidebar.markdown('<div class="muted-note">No portfolio data available.</div>', unsafe_allow_html=True)
+    except Exception:
+        st.sidebar.markdown('<div class="muted-note">Unable to load portfolio data</div>', unsafe_allow_html=True)
 
     # Main content based on selected action
     if action == "View Portfolio":
@@ -778,7 +823,6 @@ def show_health_controls_tab():
     styled_header("🏥 System Health & Real-time Controls")
 
     # System status banner
-    from binance_trade_agent.config import config
     if config.demo_mode:
         st.warning("⚠️ **DEMO MODE ACTIVE** - Using mock data. Set BINANCE_API_KEY and BINANCE_API_SECRET for live trading.")
     else:
@@ -1022,7 +1066,6 @@ def show_health_controls_tab():
 
     with col1:
         # Trading mode status
-        from .config import config
         mode = "🚨 PRODUCTION" if config.is_production_ready() else "🔧 DEMO MODE"
         mode_color = "danger" if config.is_production_ready() else "warning"
         st.metric("Trading Mode", mode)

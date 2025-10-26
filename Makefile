@@ -27,6 +27,14 @@ attach:
 logs:
 	@powershell -NoProfile -Command "$$id = (docker ps -q --filter ancestor=$(IMAGE_NAME) | Select-Object -First 1); if ($$id) { docker logs --tail 200 $$id } else { Write-Host 'No running container for $(IMAGE_NAME)' }"
 
+# Execute package modules inside running container (uses python -m to preserve package context)
+
+exec-cli:
+	@powershell -NoProfile -Command "$$id = (docker ps -q --filter ancestor=$(IMAGE_NAME) | Select-Object -First 1); if ($$id) { docker exec -it $$id /bin/bash -lc 'cd /app/data && /opt/venv/bin/python -m binance_trade_agent.cli' } else { Write-Host 'No running container found for $(IMAGE_NAME)' }"
+
+exec-mcp:
+	@powershell -NoProfile -Command "$$id = (docker ps -q --filter ancestor=$(IMAGE_NAME) | Select-Object -First 1); if ($$id) { docker exec -it $$id /bin/bash -lc '/opt/venv/bin/python -m binance_trade_agent.mcp_server' } else { Write-Host 'No running container found for $(IMAGE_NAME)' }"
+
 else
 
 stop:
@@ -63,6 +71,7 @@ logs:
 
 endif
 
+# rebuild: stop rm build run
 rebuild: stop rm build run
 
 # Usage:

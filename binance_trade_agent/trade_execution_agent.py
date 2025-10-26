@@ -10,7 +10,7 @@ class TradeExecutionAgent:
 
     def place_order(self, symbol, side, order_type, quantity, price=None):
         """
-        Place an order on Binance.
+        Place an order on Binance and persist it to the portfolio DB if successful.
         Args:
             symbol (str): Trading pair symbol (e.g., 'BTCUSDT').
             side (str): 'BUY' or 'SELL'.
@@ -20,8 +20,26 @@ class TradeExecutionAgent:
         Returns:
             dict: Order response or error info.
         """
+        from binance_trade_agent.portfolio_manager import PortfolioManager, Trade
+        from datetime import datetime
         try:
             order = self.client.create_order(symbol, side, order_type, quantity, price)
+            # Only persist if orderId is present (success)
+            if isinstance(order, dict) and order.get('orderId'):
+                # Use web_portfolio.db for all trades (shown in dashboard)
+                pm = PortfolioManager("/app/data/web_portfolio.db")
+                trade_id = str(order.get('orderId'))
+                trade = Trade(
+                    trade_id=trade_id,
+                    symbol=symbol,
+                    side=side,
+                    quantity=float(order.get('executedQty', quantity)),
+                    price=float(order.get('price') or order.get('fills', [{}])[0].get('price', price) or 0),
+                    fee=0.0,  # Fee can be parsed from fills if needed
+                    timestamp=datetime.now(),
+                    order_id=order.get('orderId')
+                )
+                pm.add_trade(trade)
             return order
         except BinanceAPIException as ex:
             return {'error': str(ex)}

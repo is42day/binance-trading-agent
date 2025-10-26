@@ -125,6 +125,55 @@ class BinanceAPIClient:
             print(f"Binance API error: {ex}")
             raise
 
+    def get_klines(self, symbol: str, interval: str = '1h', limit: int = 100):
+        """
+        Wrapper for fetching klines (OHLCV). Returns list of kline arrays as returned
+        by python-binance Client.get_klines. In demo_mode this returns generated
+        mock klines for testing and UI development.
+        """
+        if self.config.demo_mode:
+            # Create simple mock klines: [open_time, open, high, low, close, volume, close_time, ...]
+            import time, random
+            now = int(time.time() * 1000)
+            klines = []
+            # approximate interval ms for common intervals (simple map)
+            interval_ms_map = {
+                '1m': 60_000,
+                '5m': 5 * 60_000,
+                '15m': 15 * 60_000,
+                '1h': 60 * 60_000,
+                '4h': 4 * 60 * 60_000,
+                '1d': 24 * 60 * 60_000
+            }
+            step = interval_ms_map.get(interval, 60 * 60_000)
+            base_price = self.get_latest_price(symbol)
+            for i in range(limit):
+                open_time = now - (limit - i) * step
+                open_p = base_price + random.uniform(-1.0, 1.0)
+                high_p = open_p + random.uniform(0.0, 2.0)
+                low_p = open_p - random.uniform(0.0, 2.0)
+                close_p = open_p + random.uniform(-0.5, 0.5)
+                volume = round(random.uniform(1.0, 100.0), 6)
+                close_time = open_time + step - 1
+                klines.append([
+                    open_time,
+                    f"{open_p:.8f}",
+                    f"{high_p:.8f}",
+                    f"{low_p:.8f}",
+                    f"{close_p:.8f}",
+                    f"{volume:.6f}",
+                    close_time,
+                    '0', '0', '0', '0', '0'
+                ])
+            return klines
+
+        try:
+            klines = self.client.get_klines(symbol=symbol, interval=interval, limit=limit)
+            return klines
+        except Exception as ex:
+            print(f"Binance API error (get_klines): {ex}")
+            raise
+
     def create_order(self, symbol: str, side: str, order_type: str, quantity: float, price=None):
         if self.config.demo_mode:
             # Return mock order data
