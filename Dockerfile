@@ -30,9 +30,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Non-root user
 RUN groupadd -r trading && useradd -r -g trading trading
 
-# Bring in virtualenv
-COPY --from=builder /opt/venv /opt/venv
-RUN chown -R trading:trading /opt/venv
+# Bring in virtualenv with ownership set during copy
+COPY --from=builder --chown=trading:trading /opt/venv /opt/venv
 
 # Supervisord inside the venv
 RUN pip install --no-cache-dir supervisor

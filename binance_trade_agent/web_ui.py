@@ -1,6 +1,6 @@
 """
-Streamlit Web UI for Binance Trading Agent
-Connects directly to trading components (not MCP server)
+Streamlit Web UI for Binance Trading Agent - Enhanced UX
+Connects directly to trading components with improved navigation, feedback, and responsive design
 """
 
 import streamlit as st
@@ -11,6 +11,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 import json
+import time
+from streamlit_option_menu import option_menu
+from streamlit_extras.metric_cards import style_metric_cards
+from streamlit_extras.stylable_container import stylable_container
 
 # Configure Streamlit to run on all interfaces (needed for Docker)
 os.environ['STREAMLIT_SERVER_HEADLESS'] = 'true'
@@ -28,13 +32,23 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Initialize session state for theme and auto-refresh
+if 'theme' not in st.session_state:
+    st.session_state.theme = 'dark'
+if 'auto_refresh' not in st.session_state:
+    st.session_state.auto_refresh = False
+if 'auto_refresh_interval' not in st.session_state:
+    st.session_state.auto_refresh_interval = 30
+if 'last_refresh' not in st.session_state:
+    st.session_state.last_refresh = datetime.now()
+
 # Import trading components directly
 from binance_trade_agent.market_data_agent import MarketDataAgent
 from binance_trade_agent.signal_agent import SignalAgent
 from binance_trade_agent.risk_management_agent import EnhancedRiskManagementAgent
 from binance_trade_agent.trade_execution_agent import TradeExecutionAgent
 from binance_trade_agent.portfolio_manager import PortfolioManager
-from binance_trade_agent.portfolio_manager import Trade
+from binance_trade_agent.portfolio_manager import TradeORM
 from binance_trade_agent.orchestrator import TradingOrchestrator
 from binance_trade_agent.monitoring import monitoring
 from binance_trade_agent.config import config
@@ -62,115 +76,306 @@ def get_trading_components():
 # Get components
 components = get_trading_components()
 
-# Smart-casual dark theme CSS and minor layout tweaks
-# Note: primary theme colors are defined in .streamlit/config.toml; this CSS complements them.
+# Enhanced styling with theme support, responsive design, and improved UX
 st.markdown("""
 <style>
-    /* Page container spacing */
-    div.block-container{padding-top:2rem; padding-left:1.6rem; padding-right:1.6rem;}
+    /* Page container spacing & responsive */
+    div.block-container{
+        padding-top: 2rem;
+        padding-left: 1.6rem;
+        padding-right: 1.6rem;
+    }
+    
+    @media (max-width: 768px) {
+        div.block-container {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+    }
 
-    /* Hide Streamlit chrome (menu/footer/header) for a cleaner app */
+    /* Hide Streamlit chrome for cleaner app */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
 
-    /* Body and text colors (reinforce theme) */
+    /* Dark theme base */
     .reportview-container, .main, body, .stApp {
         background-color: #23242a !important;
         color: #f4f2ee !important;
     }
 
-    /* Metrics and cards — minimal, flat look */
-    .metric-card {
-        background-color: rgba(255,255,255,0.03);
-        padding: 0.75rem;
-        border-radius: 10px;
-        margin: 0.4rem 0;
-        box-shadow: none;
-        border: 1px solid rgba(255,255,255,0.03);
-    }
-
-    /* Muted orange primary buttons */
+    /* Primary buttons - orange with better visibility */
     .stButton>button {
         background-color: #ff914d !important;
         color: #ffffff !important;
         font-weight: 600;
         border-radius: 8px !important;
         border: none !important;
-        padding: 8px 12px !important;
-        transition: background-color 0.15s ease-in-out;
+        padding: 10px 16px !important;
+        transition: all 0.2s ease;
+        width: 100% !important;
     }
     .stButton>button:hover {
         background-color: #ffb974 !important;
         color: #23242a !important;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(255, 145, 77, 0.3);
     }
 
-    /* Secondary small buttons (outline) */
-    .stButton>button.secondary {
-        background-color: transparent !important;
-        border: 1px solid rgba(255,255,255,0.06) !important;
+    /* Danger buttons */
+    .stButton>button.danger, button[data-testid="baseButton-secondary"]:contains("EMERGENCY") {
+        background-color: #e74c3c !important;
+    }
+    .stButton>button.danger:hover {
+        background-color: #c0392b !important;
+    }
+
+    /* Headings - improved hierarchy */
+    h1 {
         color: #f4f2ee !important;
+        font-weight: 700 !important;
+        font-size: 2.2rem !important;
+        letter-spacing: 0.5px !important;
+        margin-bottom: 1rem !important;
     }
-
-    /* Headings - left aligned, understated */
-    h1, h2, h3 {
+    
+    h2 {
         color: #f4f2ee !important;
-        font-weight: 600;
-        letter-spacing: 0.2px;
+        font-weight: 650 !important;
+        font-size: 1.6rem !important;
+        margin-top: 1.5rem !important;
+        margin-bottom: 0.8rem !important;
+        border-bottom: 2px solid rgba(255, 145, 77, 0.3) !important;
+        padding-bottom: 0.5rem !important;
+    }
+    
+    h3 {
+        color: #e8e6e1 !important;
+        font-weight: 600 !important;
+        font-size: 1.2rem !important;
     }
 
-    /* Reduce padding around Streamlit components for a tighter layout */
-    .stMarkdown, .stText, .stMetric {
-        color: #f4f2ee !important;
-    }
-
-    /* Tables: give a subtle muted accent on hover rows */
-    .stDataFrame div[data-testid='stTable'] tr:hover td { background: rgba(255,145,77,0.03); }
-
-    /* Make plot background transparent so Plotly uses theme */
-    .stPlotlyChart > div { background: transparent !important; }
-
-    /* Stat card blocks */
+    /* Stat card blocks - better styling */
     .stat-block {
-        background: #292a2d;
-        border-radius: 10px;
-        padding: 0.8rem 1rem;
-        margin-bottom: 0.6rem;
+        background: linear-gradient(135deg, #2f3035 0%, #292a2d 100%);
+        border-radius: 12px;
+        padding: 1rem;
+        margin: 0.5rem;
         display: inline-block;
-        min-width: 140px;
+        min-width: 150px;
+        border: 1px solid rgba(255, 145, 77, 0.2);
+        transition: all 0.3s ease;
     }
-    .stat-title { color: #dcdcdc; font-size:0.9rem; opacity:0.9 }
-    .stat-value { color: #ffffff; font-size:1.4rem; font-weight:700; margin-top:0.2rem }
+    .stat-block:hover {
+        border-color: rgba(255, 145, 77, 0.5);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(255, 145, 77, 0.15);
+    }
+    
+    .stat-title {
+        color: #b8b8b8;
+        font-size: 0.85rem;
+        opacity: 0.85;
+        font-weight: 500;
+    }
+    
+    .stat-value {
+        color: #ffffff;
+        font-size: 1.5rem;
+        font-weight: 800;
+        margin-top: 0.3rem;
+    }
 
-    .muted-note { color: rgba(244,242,238,0.6); font-size:0.9rem }
+    /* Card containers */
+    .card {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 145, 77, 0.2);
+        border-radius: 12px;
+        padding: 1.2rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+    }
+    .card:hover {
+        border-color: rgba(255, 145, 77, 0.4);
+        background: rgba(255, 145, 77, 0.05);
+    }
 
-    /* Slightly larger headline metrics */
-    .headline-metric { font-size:1.6rem; font-weight:800; }
+    /* Data tables */
+    .stDataFrame {
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .stDataFrame div[data-testid='stTable'] {
+        border-radius: 8px;
+    }
+    .stDataFrame div[data-testid='stTable'] tr:hover td {
+        background: rgba(255, 145, 77, 0.1) !important;
+    }
 
-</style>
+    /* Plots */
+    .stPlotlyChart > div {
+        background: transparent !important;
+        border-radius: 8px;
+    }
+
+    /* Status indicators */
+    .status-healthy { color: #2ecc71; }
+    .status-warning { color: #f39c12; }
+    .status-critical { color: #e74c3c; }
+
+    /* Tooltips */
+    .tooltip {
+        position: relative;
+        display: inline-block;
+        border-bottom: 1px dotted rgba(255, 145, 77, 0.5);
+        cursor: help;
+    }
+    .tooltip .tooltiptext {
+        visibility: hidden;
+        background-color: #1a1b1f;
+        color: #f4f2ee;
+        text-align: center;
+        border-radius: 6px;
+        padding: 8px;
+        position: absolute;
+        z-index: 1;
+        bottom: 125%;
+        left: 50%;
+        margin-left: -50px;
+        opacity: 0;
+        transition: opacity 0.3s;
+        border: 1px solid rgba(255, 145, 77, 0.3);
+        font-size: 0.85rem;
+    }
+    .tooltip:hover .tooltiptext {
+        visibility: visible;
+        opacity: 1;
+    }
+
+    /* Notifications/Toast styling */
+    .toast-success {
+        background-color: rgba(46, 204, 113, 0.2);
+        border-left: 4px solid #2ecc71;
+        padding: 1rem;
+        border-radius: 6px;
+        margin-bottom: 1rem;
+    }
+    .toast-error {
+        background-color: rgba(231, 76, 60, 0.2);
+        border-left: 4px solid #e74c3c;
+        padding: 1rem;
+        border-radius: 6px;
+        margin-bottom: 1rem;
+    }
+    .toast-info {
+        background-color: rgba(52, 152, 219, 0.2);
+        border-left: 4px solid #3498db;
+        padding: 1rem;
+        border-radius: 6px;
+        margin-bottom: 1rem;
+    }
+
+    /* Mobile responsive */
+    @media (max-width: 480px) {
+        h1 { font-size: 1.8rem !important; }
+        h2 { font-size: 1.2rem !important; }
+        .stat-block { min-width: 120px; }
+    }
+
+    /* Muted note */
+    .muted-note {
+        color: rgba(244, 242, 238, 0.6);
+        font-size: 0.9rem;
+    }
+
+    /* Refresh timestamp */
+    .refresh-timestamp {
+        color: rgba(255, 145, 77, 0.7);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+    }
 
 </style>
 """, unsafe_allow_html=True)
 
-# Small helper for using the muted orange as inline marker
-def muted_orange_tag(text: str) -> str:
-        return f"<span style=\"color:#ff914d;font-weight:600\">{text}</span>"
+# ============================================================================
+# Helper Functions for Enhanced UX
+# ============================================================================
 
-# Small helpers for consistent header styling across tabs
-def styled_header(text: str):
-    """Left-aligned, understated header with a small divider."""
-    # Use markdown headers to keep typography consistent with theme
-    st.markdown(f"## {text}", unsafe_allow_html=True)
+def muted_orange_tag(text: str) -> str:
+    """Create styled orange tag for highlighting"""
+    return f"<span style=\"color:#ff914d;font-weight:600\">{text}</span>"
+
+def tooltip(text: str, tooltip_text: str) -> str:
+    """Create interactive tooltip"""
+    return f"""<span class="tooltip">{text}
+        <span class="tooltiptext">{tooltip_text}</span>
+    </span>"""
+
+def show_toast(message: str, toast_type: str = "info"):
+    """Show toast notification (success, error, info)"""
+    toast_class = f"toast-{toast_type}"
+    icon_map = {"success": "✅", "error": "❌", "info": "ℹ️"}
+    icon = icon_map.get(toast_type, "•")
+    
+    st.markdown(f"""
+    <div class="{toast_class}">
+        <strong>{icon} {toast_type.upper()}</strong><br>
+        {message}
+    </div>
+    """, unsafe_allow_html=True)
+
+def styled_header(text: str, subtitle: str = ""):
+    """Enhanced header with better visual hierarchy"""
+    st.markdown(f"## {text}")
+    if subtitle:
+        st.markdown(f"<p style='color: #b8b8b8; font-size: 0.95rem; margin-top: -0.8rem'>{subtitle}</p>", 
+                   unsafe_allow_html=True)
     try:
         st.divider()
     except Exception:
-        # Older Streamlit versions may not have st.divider
         st.markdown("---")
 
+def styled_subheader(text: str, icon: str = ""):
+    """Styled subheader with optional icon"""
+    prefix = f"{icon} " if icon else ""
+    st.markdown(f"### {prefix}{text}")
 
-def styled_subheader(text: str):
-    """Subtle subheader for sections."""
-    st.markdown(f"### {text}", unsafe_allow_html=True)
+def metric_card(label: str, value: str, delta: str = "", icon: str = "", help_text: str = ""):
+    """Create enhanced metric card"""
+    icon_html = f"<span style='font-size: 1.8rem; margin-right: 0.5rem'>{icon}</span>" if icon else ""
+    help_html = f"<span class='tooltip'><span style='cursor: help; opacity: 0.7'>❓</span><span class='tooltiptext'>{help_text}</span></span>" if help_text else ""
+    delta_html = f"<span style='color: #ff914d; font-size: 0.9rem; margin-left: 0.5rem'>{delta}</span>" if delta else ""
+    
+    st.markdown(f"""
+    <div class="stat-block">
+        <div class="stat-title">{icon_html}{label} {help_html}</div>
+        <div class="stat-value">{value}</div>
+        {delta_html}
+    </div>
+    """, unsafe_allow_html=True)
+
+def show_refresh_info():
+    """Display last refresh timestamp"""
+    st.markdown(f"""
+    <div class="refresh-timestamp">
+        🔄 Last refresh: {st.session_state.last_refresh.strftime('%H:%M:%S')}
+    </div>
+    """, unsafe_allow_html=True)
+
+def show_confirmation_dialog(title: str, message: str, action_name: str) -> bool:
+    """Show confirmation modal for high-stakes actions"""
+    st.warning(f"⚠️ {title}")
+    st.markdown(f"**{message}**")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button(f"✅ Confirm {action_name}", type="primary"):
+            return True
+    with col2:
+        if st.button("❌ Cancel"):
+            return False
+    return None
 
 def call_mcp_tool(tool_name: str, arguments: dict = None) -> dict:
     """Call MCP tool via HTTP request"""
@@ -267,24 +472,26 @@ def execute_trade(symbol: str, side: str, quantity: float):
         execution_agent = components['execution_agent']
         portfolio = components['portfolio']
         
-        # Create trade object
-        trade = Trade(
-            trade_id=f"web_{int(datetime.now().timestamp())}",
+        # Get current price
+        price = components['market_agent'].get_latest_price(symbol)
+        
+        # Add trade to portfolio (portfolio manager handles creation)
+        trade_id = f"web_{int(datetime.now().timestamp())}"
+        order_id = f"order_{int(datetime.now().timestamp())}"
+        
+        portfolio.add_trade(
+            trade_id=trade_id,
             symbol=symbol,
             side=side,
             quantity=quantity,
-            price=components['market_agent'].get_latest_price(symbol),
+            price=price,
             fee=0.001,
-            timestamp=datetime.now(),
-            order_id=f"order_{int(datetime.now().timestamp())}",
+            order_id=order_id,
             correlation_id="web_ui"
         )
         
-        # Add to portfolio
-        portfolio.add_trade(trade)
-        
         return {
-            "order_id": trade.order_id,
+            "order_id": order_id,
             "status": "FILLED",
             "symbol": symbol,
             "side": side,
@@ -402,143 +609,290 @@ def set_emergency_stop():
 def main():
     st.title("📈 Binance Trading Agent Dashboard")
 
-    # Sidebar
+    # ========== SIDEBAR: Enhanced Settings ==========
     st.sidebar.title("🎛️ Trading Controls")
-
-    # Symbol selection
+    
+    # Symbol and quantity selection
+    st.sidebar.markdown("### ⚙️ Settings")
+    
     symbol = st.sidebar.selectbox(
         "Trading Symbol",
         ["BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT", "SOLUSDT"],
         index=0
     )
 
-    # Action selection
-    action = st.sidebar.radio(
-        "Action",
-        ["View Portfolio", "Market Data", "Signals & Risk", "Execute Trade", "Health & Controls", "Logs & Monitoring", "Advanced Controls"]
-    )
-
-    # Quantity input for trades
     quantity = st.sidebar.number_input(
-        "Quantity",
+        "Order Quantity",
         min_value=0.0001,
         value=0.001,
         step=0.0001,
-        format="%.4f"
+        format="%.4f",
+        help="Amount of the asset to trade"
     )
 
-    # Quick stats in sidebar
+    # Auto-refresh toggle
     st.sidebar.markdown("---")
-    st.sidebar.subheader("📊 Quick Stats")
+    st.sidebar.markdown("### 🔄 Auto-Refresh")
+    
+    col_refresh1, col_refresh2 = st.sidebar.columns([1, 1])
+    with col_refresh1:
+        st.session_state.auto_refresh = st.checkbox("Enable", value=st.session_state.auto_refresh)
+    with col_refresh2:
+        if st.session_state.auto_refresh:
+            st.session_state.auto_refresh_interval = st.number_input(
+                "Interval (s)", 
+                value=30, 
+                min_value=10, 
+                max_value=300,
+                step=10,
+                label_visibility="collapsed"
+            )
+
+    # Theme toggle
+    st.sidebar.markdown("### 🎨 Appearance")
+    theme_choice = st.sidebar.radio("Theme", ["🌙 Dark", "☀️ Light"], horizontal=True)
+    st.session_state.theme = "dark" if "Dark" in theme_choice else "light"
+
+    # Quick stats in sidebar with better layout
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 📊 Quick Stats")
 
     try:
-        portfolio = get_portfolio_data()
-        last_refreshed = datetime.now()
-        if "error" not in portfolio:
-            pv = portfolio.get('total_value', 0)
-            open_pos = portfolio.get('open_positions', 0)
-            pnl_pct = portfolio.get('total_pnl_percent', 0)
-            pnl_color = "#2ecc71" if pnl_pct >= 0 else "#ff6b6b"
-
+        portfolio_data = get_portfolio_data()
+        st.session_state.last_refresh = datetime.now()
+        
+        if "error" not in portfolio_data:
+            pv = portfolio_data.get('total_value', 0)
+            pnl_pct = portfolio_data.get('total_pnl_percent', 0)
+            open_pos = portfolio_data.get('open_positions', 0)
+            total_trades = portfolio_data.get('total_trades', 0)
+            
+            pnl_color = "#2ecc71" if pnl_pct >= 0 else "#e74c3c"
+            
+            # Stats display with cards
             stats_html = f"""
-            <div style='display:flex;gap:8px;align-items:flex-start'>
-              <div class='stat-block' style='flex:2'>
+            <div style='display: grid; gap: 8px;'>
+              <div class='stat-block' style='width: 100%'>
                 <div class='stat-title'>🪙 Portfolio Value</div>
-                <div class='stat-value headline-metric'>${pv:,.2f}</div>
+                <div class='stat-value' style='font-size: 1.3rem'>${pv:,.2f}</div>
               </div>
-              <div class='stat-block' style='flex:1'>
-                <div class='stat-title'>Open Positions</div>
-                <div class='stat-value'>{open_pos}</div>
+              <div style='display: grid; grid-template-columns: 1fr 1fr; gap: 8px;'>
+                <div class='stat-block'>
+                  <div class='stat-title'>Position</div>
+                  <div class='stat-value'>{open_pos}</div>
+                </div>
+                <div class='stat-block'>
+                  <div class='stat-title'>P&L</div>
+                  <div class='stat-value' style='color: {pnl_color}; font-size: 1.2rem'>{pnl_pct:+.1f}%</div>
+                </div>
               </div>
-              <div class='stat-block' style='flex:1'>
-                <div class='stat-title'>P&L</div>
-                <div class='stat-value' style='color:{pnl_color}'>{pnl_pct:+.2f}%</div>
+              <div class='stat-block'>
+                <div class='stat-title'>Trades</div>
+                <div class='stat-value'>{total_trades}</div>
               </div>
             </div>
             """
-
             st.sidebar.markdown(stats_html, unsafe_allow_html=True)
-            st.sidebar.caption(f"Last refresh: {last_refreshed.strftime('%Y-%m-%d %H:%M:%S')}")
-            if st.sidebar.button("🔄 Refresh"):
-                st.experimental_rerun()
+            show_refresh_info()
+            
+            # Refresh button
+            if st.sidebar.button("🔄 Refresh", use_container_width=True):
+                st.rerun()
         else:
-            st.sidebar.markdown('<div class="muted-note">No portfolio data available.</div>', unsafe_allow_html=True)
-    except Exception:
-        st.sidebar.markdown('<div class="muted-note">Unable to load portfolio data</div>', unsafe_allow_html=True)
+            st.sidebar.error("Unable to load portfolio data")
+    except Exception as e:
+        st.sidebar.warning(f"Portfolio data unavailable: {str(e)[:30]}")
 
-    # Main content based on selected action
-    if action == "View Portfolio":
+    # ========== MAIN CONTENT: Horizontal Option Menu Navigation ==========
+    selected = option_menu(
+        menu_title=None,
+        options=["Portfolio", "Market Data", "Signals & Risk", "Execute Trade", "System Health", "Logs", "Advanced"],
+        icons=["📊", "💰", "🎯", "💼", "🏥", "📋", "⚙️"],
+        menu_icon="🎛️",
+        default_index=0,
+        orientation="horizontal",
+        styles={
+            "container": {"padding": "0!important", "background-color": "#23242a"},
+            "icon": {"color": "#ff914d", "font-size": "20px"},
+            "nav-link": {"font-size": "16px", "text-align": "center", "margin": "0px", "--hover-color": "rgba(255, 145, 77, 0.2)"},
+            "nav-link-selected": {"background-color": "rgba(255, 145, 77, 0.3)", "color": "#ff914d", "font-weight": "bold"},
+        }
+    )
+
+    # ========== MAIN CONTENT: Route to Selected Tab ==========
+    if selected == "Portfolio":
         show_portfolio_tab()
-    elif action == "Market Data":
+    elif selected == "Market Data":
         show_market_data_tab(symbol)
-    elif action == "Signals & Risk":
+    elif selected == "Signals & Risk":
         show_signals_risk_tab()
-    elif action == "Health & Controls":
-        show_health_controls_tab()
-    elif action == "Execute Trade":
+    elif selected == "Execute Trade":
         show_trade_execution_tab(symbol, quantity)
-    elif action == "Health & Controls":
+    elif selected == "System Health":
         show_health_controls_tab()
-    elif action == "Logs & Monitoring":
+    elif selected == "Logs":
         show_logs_monitoring_tab()
-    elif action == "Advanced Controls":
+    elif selected == "Advanced":
         show_advanced_controls_tab()
+    else:
+        show_portfolio_tab()
 
 
 
 def show_portfolio_tab():
-    styled_header("📊 Portfolio Overview")
+    styled_header("📊 Portfolio Overview", "Real-time position tracking and P&L analysis")
 
     with st.spinner("Loading portfolio data..."):
         portfolio_data = get_portfolio_data()
 
     if "error" in portfolio_data:
-        st.error("Failed to load portfolio data")
+        st.error("❌ Failed to load portfolio data. Check database connection.")
         return
 
-    # Portfolio metrics
+    # ===== GROUPED STATS CARDS (Enhanced with Styling) =====
+    st.markdown("### 💰 Portfolio Summary")
+    
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        st.metric("Total Value", f"${portfolio_data.get('total_value', 0):,.2f}")
+        total_val = portfolio_data.get('total_value', 0)
+        st.metric(
+            "Total Value",
+            f"${total_val:,.2f}",
+            help="Current market value of all positions"
+        )
 
     with col2:
-        pnl = portfolio_data.get('total_pnl', 0)
-        pnl_percent = portfolio_data.get('total_pnl_percent', 0)
-        st.metric("Total P&L", f"${pnl:,.2f} ({pnl_percent:+.2f}%)",
-                 delta=f"{pnl_percent:+.2f}%" if pnl_percent != 0 else None)
+        total_pnl = portfolio_data.get('total_pnl', 0)
+        pnl_pct = portfolio_data.get('total_pnl_percent', 0)
+        pnl_color = "🟢" if total_pnl >= 0 else "🔴"
+        st.metric(
+            "Total P&L",
+            f"{pnl_color} ${total_pnl:,.2f}",
+            delta=f"{pnl_pct:+.2f}%",
+            help="Realized + Unrealized profit/loss"
+        )
 
     with col3:
-        st.metric("Open Positions", portfolio_data.get('open_positions', 0))
+        open_pos = portfolio_data.get('open_positions', 0)
+        st.metric(
+            "Open Positions",
+            f"📍 {open_pos}",
+            help="Number of active trading positions"
+        )
 
     with col4:
-        st.metric("Total Trades", portfolio_data.get('total_trades', 0))
+        total_trades = portfolio_data.get('total_trades', 0)
+        st.metric(
+            "Total Trades",
+            f"📈 {total_trades}",
+            help="Cumulative number of executed trades"
+        )
+    
+    # Apply streamlit-extras styling to metrics
+    style_metric_cards(
+        background_color="#2f3035",
+        border_left_color="#ff914d",
+        border_size_px=3
+    )
 
-    # Positions table
-    st.subheader("📋 Current Positions")
+    # ===== PORTFOLIO ALLOCATION CHART =====
+    st.markdown("---")
+    st.markdown("### 🥧 Portfolio Allocation")
+    
     positions = portfolio_data.get('positions', [])
-
+    
     if positions:
         df_positions = pd.DataFrame(positions)
-        st.dataframe(df_positions, use_container_width=True)
+        
+        # Create visual pie chart
+        fig = px.pie(
+            df_positions,
+            values='current_value',
+            names='symbol',
+            title="Asset Distribution by Market Value",
+            hole=0.3,  # Donut chart for better look
+            color_discrete_sequence=["#ff914d", "#ffb974", "#ffd9a8", "#4a90e2", "#50c878"]
+        )
+        fig.update_layout(
+            font=dict(color='#f4f2ee'),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            height=400
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Horizontal bar chart for detailed view
+        fig_bar = px.bar(
+            df_positions.sort_values('current_value', ascending=True),
+            x='current_value',
+            y='symbol',
+            orientation='h',
+            title="Position Sizes (Market Value)",
+            labels={'current_value': 'Value (USDT)', 'symbol': 'Asset'}
+        )
+        fig_bar.update_layout(
+            font=dict(color='#f4f2ee'),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            height=300
+        )
+        st.plotly_chart(fig_bar, use_container_width=True)
 
-        # Portfolio allocation chart
-        if 'symbol' in df_positions.columns and 'current_value' in df_positions.columns:
-            fig = px.pie(df_positions, values='current_value', names='symbol',
-                        title="Portfolio Allocation")
-            st.plotly_chart(fig, use_container_width=True)
+    # ===== POSITIONS TABLE =====
+    st.markdown("---")
+    styled_subheader("📋 Current Positions", "💾")
+    
+    if positions:
+        df_positions = pd.DataFrame(positions)
+        
+        # Color-code the PnL column
+        def pnl_color(val):
+            color = "#2ecc71" if val >= 0 else "#e74c3c"
+            return f"color: {color}"
+        
+        styled_df = df_positions.style.applymap(
+            pnl_color,
+            subset=['unrealized_pnl']
+        ).format({
+            'quantity': '{:.4f}',
+            'average_price': '${:,.2f}',
+            'current_value': '${:,.2f}',
+            'unrealized_pnl': '${:,.2f}'
+        })
+        
+        st.dataframe(styled_df, use_container_width=True)
     else:
-        st.info("No open positions")
+        st.info("📭 No open positions")
 
-    # Recent trades
-    st.subheader("📈 Recent Trades")
+    # ===== RECENT TRADES =====
+    st.markdown("---")
+    styled_subheader("📈 Recent Trades", "📊")
+    
     trades = portfolio_data.get('recent_trades', [])
 
     if trades:
         df_trades = pd.DataFrame(trades)
-        st.dataframe(df_trades, use_container_width=True)
+        
+        # Format trades table with colors
+        def trade_side_color(val):
+            color = "#2ecc71" if val == "BUY" else "#e74c3c"
+            return f"background-color: rgba({color}, 0.1); color: {color}"
+        
+        styled_trades = df_trades.style.applymap(
+            trade_side_color,
+            subset=['side']
+        ).format({
+            'quantity': '{:.4f}',
+            'price': '${:,.2f}',
+            'pnl': '${:,.2f}'
+        })
+        
+        st.dataframe(styled_trades, use_container_width=True, height=300)
     else:
-        st.info("No recent trades")
+        st.info("📭 No recent trades")
+
+    show_refresh_info()
 
 def show_market_data_tab(symbol: str):
     styled_header(f"📊 Market Data - {symbol}")
@@ -774,38 +1128,90 @@ def show_signals_risk_tab():
             st.error("Failed to fetch risk status")
 
 def show_trade_execution_tab(symbol: str, quantity: float):
-    styled_header("💼 Trade Execution")
+    styled_header("💼 Trade Execution", "Execute trades with confirmation & real-time feedback")
 
     col1, col2 = st.columns([1, 2])
 
     with col1:
-        st.subheader("Trade Form")
+        st.markdown("### 📝 Trade Form")
 
-        with st.form("trade_form"):
-            trade_symbol = st.selectbox("Symbol", [symbol], index=0)
-            side = st.selectbox("Side", ["BUY", "SELL"])
+        with st.form("trade_form", clear_on_submit=True):
+            trade_symbol = st.selectbox(
+                "Symbol",
+                ["BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT", "SOLUSDT"],
+                index=["BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT", "SOLUSDT"].index(symbol),
+                help="Select the trading pair"
+            )
+            
+            side = st.selectbox(
+                "Side",
+                ["BUY", "SELL"],
+                help="Buy or Sell the asset"
+            )
+            
             trade_quantity = st.number_input(
                 "Quantity",
                 min_value=0.0001,
                 value=quantity,
                 step=0.0001,
-                format="%.4f"
+                format="%.4f",
+                help="Amount of asset to trade"
             )
+            
+            # Get current price for reference
+            try:
+                current_price = components['market_agent'].get_latest_price(trade_symbol)
+                total_value = trade_quantity * current_price
+                st.caption(f"Current Price: ${current_price:,.2f} | Total: ${total_value:,.2f}")
+            except:
+                pass
 
-            submitted = st.form_submit_button("Execute Trade")
+            # Better button styling with color differentiation
+            col_btn1, col_btn2 = st.columns(2)
+            
+            with col_btn1:
+                submitted = st.form_submit_button(
+                    "✅ Execute Trade",
+                    type="primary",
+                    use_container_width=True,
+                    help="Click to execute the trade (requires confirmation)"
+                )
+            
+            with col_btn2:
+                st.form_submit_button(
+                    "❌ Cancel",
+                    use_container_width=True,
+                    help="Clear the form"
+                )
 
             if submitted:
-                with st.spinner("Executing trade..."):
-                    result = execute_trade(trade_symbol, side, trade_quantity)
+                # Show confirmation dialog
+                st.markdown("---")
+                confirm = show_confirmation_dialog(
+                    "Confirm Trade Execution",
+                    f"Execute {side} {trade_quantity} {trade_symbol} at current market price?",
+                    f"{side} Trade"
+                )
+                
+                if confirm:
+                    with st.spinner(f"⏳ Executing {side} order..."):
+                        result = execute_trade(trade_symbol, side, trade_quantity)
 
-                if "error" not in result:
-                    st.success(f"✅ Trade executed successfully!")
-                    st.json(result)
-                else:
-                    st.error(f"❌ Trade failed: {result['error']}")
+                    if "error" not in result:
+                        show_toast(
+                            f"Trade {result.get('status', 'FILLED')} - Order ID: {result.get('order_id')}",
+                            "success"
+                        )
+                        st.success(f"✅ {side} order executed successfully!")
+                        st.json(result)
+                        time.sleep(2)
+                        st.rerun()
+                    else:
+                        show_toast(f"Trade failed: {result['error']}", "error")
+                        st.error(f"❌ {result['error']}")
 
     with col2:
-        st.subheader("Recent Trade History")
+        st.markdown("### 📊 Recent Trade History")
         with st.spinner("Loading trade history..."):
             trade_history = get_trade_history()
 
@@ -813,155 +1219,18 @@ def show_trade_execution_tab(symbol: str, quantity: float):
             trades = trade_history.get('trades', [])
             if trades:
                 df_trades = pd.DataFrame(trades)
-                st.dataframe(df_trades, use_container_width=True)
+                
+                # Format for better visualization
+                df_trades['timestamp'] = pd.to_datetime(df_trades['timestamp']).dt.strftime('%H:%M:%S')
+                df_trades_display = df_trades[['symbol', 'side', 'quantity', 'price', 'timestamp']]
+                
+                st.dataframe(df_trades_display, use_container_width=True, height=400)
             else:
-                st.info("No trade history available")
+                st.info("📭 No trade history available")
         else:
             st.error("Failed to load trade history")
-
-def show_health_controls_tab():
-    styled_header("🏥 System Health & Real-time Controls")
-
-    # System status banner
-    if config.demo_mode:
-        st.warning("⚠️ **DEMO MODE ACTIVE** - Using mock data. Set BINANCE_API_KEY and BINANCE_API_SECRET for live trading.")
-    else:
-        st.success("🚀 **LIVE MODE ACTIVE** - Connected to Binance API")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.subheader("🏥 System Health Status")
-
-        # Get comprehensive health data
-        with st.spinner("Checking system health..."):
-            try:
-                # Get portfolio health
-                portfolio_data = get_portfolio_data()
-                portfolio_healthy = "error" not in portfolio_data
-
-                # Get risk status
-                risk_data = get_risk_status()
-                risk_healthy = "error" not in risk_data
-
-                # Get system status
-                system_status = get_system_status()
-                system_healthy = "error" not in system_status
-
-                # Overall health
-                overall_healthy = portfolio_healthy and risk_healthy and system_healthy
-
-                if overall_healthy:
-                    st.success("✅ **System Status: HEALTHY**")
-                else:
-                    st.error("❌ **System Status: ISSUES DETECTED**")
-
-                # Detailed metrics
-                st.markdown("### 📊 Health Metrics")
-
-                health_col1, health_col2 = st.columns(2)
-
-                with health_col1:
-                    if portfolio_healthy:
-                        st.metric("Portfolio", "Healthy", "✅")
-                    else:
-                        st.metric("Portfolio", "Error", "❌")
-
-                    if system_healthy:
-                        uptime = system_status.get('uptime_seconds', 0)
-                        st.metric("Uptime", f"{uptime:.0f}s", "✅")
-                    else:
-                        st.metric("Uptime", "Unknown", "❌")
-
-                with health_col2:
-                    if risk_healthy:
-                        emergency_stop = risk_data.get('emergency_stop', False)
-                        st.metric("Risk Engine", "Active" if not emergency_stop else "EMERGENCY", "⚠️" if emergency_stop else "✅")
-                    else:
-                        st.metric("Risk Engine", "Error", "❌")
-
-                    if system_healthy:
-                        api_error_rate = system_status.get('api_error_rate', 0)
-                        st.metric("API Errors", f"{api_error_rate:.1f}%", "✅" if api_error_rate < 5 else "⚠️")
-                    else:
-                        st.metric("API Errors", "Unknown", "❌")
-
-            except Exception as e:
-                st.error(f"Failed to load health data: {str(e)}")
-
-    with col2:
-        st.subheader("🎛️ Real-time Controls")
-
-        # Emergency Stop Toggle
-        st.markdown("### 🚨 Emergency Controls")
-
-        try:
-            risk_data = get_risk_status()
-            if "error" not in risk_data:
-                emergency_active = risk_data.get('emergency_stop', False)
-
-                if emergency_active:
-                    st.error("🚨 **EMERGENCY STOP IS ACTIVE** - All trading halted")
-                else:
-                    st.success("✅ **Trading Active** - Risk controls enabled")
-
-                # Toggle button
-                button_text = "🔴 Deactivate Emergency Stop" if emergency_active else "🟡 Activate Emergency Stop"
-                button_help = "Immediately halt all trading activity" if not emergency_active else "Resume normal trading operations"
-
-                if st.button(button_text, help=button_help):
-                    with st.spinner("Updating emergency stop..."):
-                        result = set_emergency_stop()
-
-                    if "error" not in result:
-                        st.success("✅ Emergency stop status updated")
-                        st.rerun()  # Refresh the page
-                    else:
-                        st.error(f"❌ Failed to update emergency stop: {result['error']}")
-            else:
-                st.error("Unable to fetch risk status for emergency controls")
-
-        except Exception as e:
-            st.error(f"Error loading emergency controls: {str(e)}")
-
-        st.markdown("---")
-
-        # Trading Mode Toggle
-        st.markdown("### 🔄 Trading Mode")
-
-        current_demo = config.demo_mode
-        target_mode = "Live Trading" if current_demo else "Demo Mode"
-        target_desc = "Connect to real Binance API" if current_demo else "Switch to mock data mode"
-
-        st.info(f"**Current Mode:** {'Demo Mode (Mock Data)' if current_demo else 'Live Mode (Real API)'}")
-
-        if st.button(f"🔄 Switch to {target_mode}", help=target_desc):
-            st.warning("⚠️ **Mode switching requires environment variable changes and container restart.**")
-            st.markdown(f"""
-            **To switch to {target_mode}:**
-            1. Set environment variables:
-               - `DEMO_MODE={'false' if current_demo else 'true'}`
-               {'- `BINANCE_API_KEY=your_key`' if current_demo else ''}
-               {'- `BINANCE_API_SECRET=your_secret`' if current_demo else ''}
-            2. Restart the container: `make build && make run`
-            """)
-
-        # Risk Level Indicator
-        st.markdown("---")
-        st.markdown("### 📊 Risk Configuration")
-
-        try:
-            risk_config = config.get_risk_config()
-            st.metric("Max Position/Symbol", f"{risk_config['max_position_per_symbol']:.1%}")
-            st.metric("Max Total Exposure", f"{risk_config['max_total_exposure']:.1%}")
-            st.metric("Stop Loss Default", f"{risk_config['default_stop_loss_pct']:.1%}")
-            st.metric("Take Profit Default", f"{risk_config['default_take_profit_pct']:.1%}")
-
-            if st.button("🔧 Edit Risk Settings", help="Modify risk parameters (requires config change)"):
-                st.info("Risk settings are configured via environment variables. Edit your .env file and restart the container.")
-
-        except Exception as e:
-            st.error(f"Error loading risk configuration: {str(e)}")
+    
+    show_refresh_info()
 
 def show_logs_monitoring_tab():
     styled_header("📋 Logs & System Monitoring")
@@ -1059,7 +1328,7 @@ Timestamp: {datetime.now().isoformat()}
 
 def show_health_controls_tab():
     """Show system health and real-time controls"""
-    styled_header("🏥 System Health & Controls")
+    styled_header("🏥 System Health & Controls", "Monitor health, manage emergency controls, configure trading mode")
 
     # System status overview
     col1, col2, col3 = st.columns(3)
@@ -1067,7 +1336,6 @@ def show_health_controls_tab():
     with col1:
         # Trading mode status
         mode = "🚨 PRODUCTION" if config.is_production_ready() else "🔧 DEMO MODE"
-        mode_color = "danger" if config.is_production_ready() else "warning"
         st.metric("Trading Mode", mode)
 
     with col2:
@@ -1081,6 +1349,13 @@ def show_health_controls_tab():
     with col3:
         # System uptime (simplified)
         st.metric("System Status", "🟢 Healthy")
+
+    # Apply metric styling
+    style_metric_cards(
+        background_color="#2f3035",
+        border_left_color="#ff914d",
+        border_size_px=3
+    )
 
     st.markdown("---")
 
@@ -1128,114 +1403,114 @@ def show_health_controls_tab():
         except:
             st.metric("Active Positions", "🔴 Error")
 
+    # Apply metric styling
+    style_metric_cards(
+        background_color="#2f3035",
+        border_left_color="#2ecc71",
+        border_size_px=2
+    )
+
     st.markdown("---")
 
-    # Real-time Controls Section
+    # Real-time Controls Section with better grouping
     st.subheader("🎛️ Real-Time Controls")
 
-    control_col1, control_col2 = st.columns(2)
+    # Emergency Controls Group
+    st.markdown("### 🚨 Emergency Controls")
+    
+    with stylable_container(
+        key="emergency_container",
+        css_styles="""
+        {
+            background-color: rgba(231, 76, 60, 0.1);
+            border: 2px solid #e74c3c;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        """
+    ):
+        try:
+            risk_data = get_risk_status()
+            if "error" not in risk_data:
+                emergency_active = risk_data.get('emergency_stop', False)
 
-    with control_col1:
-        st.write("**Emergency Controls**")
+                if emergency_active:
+                    st.error("🚨 **EMERGENCY STOP IS ACTIVE** - All trading halted")
+                else:
+                    st.success("✅ **Trading Active** - Risk controls enabled")
 
-        # Emergency stop toggle
-        emergency_stop = st.checkbox("🚨 Emergency Stop All Trading",
-                                   help="Immediately stop all automated trading")
+                # Toggle button
+                em_col1, em_col2 = st.columns(2)
+                
+                with em_col1:
+                    if st.button(
+                        "🔴 Activate Emergency Stop" if not emergency_active else "🟢 Deactivate Emergency Stop",
+                        key="emergency_toggle",
+                        use_container_width=True
+                    ):
+                        with st.spinner("Updating emergency stop..."):
+                            result = set_emergency_stop()
 
-        if emergency_stop:
-            if st.button("CONFIRM EMERGENCY STOP", type="primary"):
-                try:
-                    result = set_emergency_stop()
-                    if "error" not in result:
-                        st.success("🚨 Emergency stop activated!")
+                        if "error" not in result:
+                            st.success("✅ Emergency stop status updated")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ Failed to update emergency stop: {result['error']}")
+                
+                with em_col2:
+                    if st.button("🔄 Check Status", use_container_width=True, key="check_status"):
                         st.rerun()
-                    else:
-                        st.error(f"Failed to activate emergency stop: {result['error']}")
-                except Exception as e:
-                    st.error(f"Error: {str(e)}")
+            else:
+                st.error("Unable to fetch risk status for emergency controls")
 
-        # Reset emergency stop
-        if st.button("🔄 Reset Emergency Stop"):
-            try:
-                # This would need a reset function in the risk agent
-                st.info("Emergency stop reset functionality needs to be implemented")
-            except Exception as e:
-                st.error(f"Error: {str(e)}")
+        except Exception as e:
+            st.error(f"Error loading emergency controls: {str(e)}")
 
-    with control_col2:
-        st.write("**Trading Mode Controls**")
+    st.markdown("")
 
-        # Demo mode toggle
+    # Trading Mode Group
+    st.markdown("### 🔄 Trading Mode & Configuration")
+    
+    with stylable_container(
+        key="config_container",
+        css_styles="""
+        {
+            background-color: rgba(52, 152, 219, 0.1);
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        """
+    ):
         current_demo = config.demo_mode
-        demo_mode = st.checkbox("🔧 Enable Demo Mode",
-                              value=current_demo,
-                              help="Use mock data instead of live trading")
+        target_mode = "Live Trading" if current_demo else "Demo Mode"
+        
+        st.info(f"**Current Mode:** {'Demo Mode (Mock Data)' if current_demo else 'Live Mode (Real API)'}")
 
-        if demo_mode != current_demo:
-            st.warning("⚠️ Mode change requires application restart")
-            if st.button("🔄 Restart Application"):
-                st.info("Application restart functionality needs to be implemented")
-
-        # Risk level selector
-        risk_level = st.selectbox("Risk Level",
-                                ["Conservative", "Moderate", "Aggressive"],
-                                index=1,
-                                help="Adjust risk parameters")
-
-        if risk_level != "Moderate":
-            st.info(f"⚠️ {risk_level} risk settings need to be implemented")
-
-    st.markdown("---")
-
-    # System Configuration Display
-    st.subheader("⚙️ Current Configuration")
-
-    config_col1, config_col2 = st.columns(2)
-
-    with config_col1:
-        st.write("**Risk Parameters**")
-        st.code(f"""
-Max Position/Symbol: {config.risk_max_position_per_symbol * 100:.0f}%
-Max Total Exposure: {config.risk_max_total_exposure * 100:.0f}%
-Stop Loss: {config.risk_default_stop_loss_pct * 100:.1f}%
-Take Profit: {config.risk_default_take_profit_pct * 100:.1f}%
-        """)
-
-    with config_col2:
-        st.write("**Signal Parameters**")
-        st.code(f"""
-RSI Overbought: {config.signal_rsi_overbought}
-RSI Oversold: {config.signal_rsi_oversold}
-MACD Window: {config.signal_macd_signal_window}
-        """)
-
-    # Quick Actions
-    st.markdown("---")
-    st.subheader("⚡ Quick Actions")
-
-    action_col1, action_col2, action_col3 = st.columns(3)
-
-    with action_col1:
-        if st.button("🔄 Refresh All Data"):
-            st.rerun()
-
-    with action_col2:
-        if st.button("📊 Generate New Signals"):
-            with st.spinner("Generating signals..."):
-                signal = get_signals()
-            if "error" not in signal:
-                st.success(f"New signal: {signal.get('signal', 'UNKNOWN')} ({signal.get('confidence', 0):.1%})")
-            else:
-                st.error("Failed to generate signals")
-
-    with action_col3:
-        if st.button("📈 Update Portfolio"):
-            with st.spinner("Updating portfolio..."):
-                portfolio = get_portfolio_data()
-            if "error" not in portfolio:
-                st.success(f"Portfolio updated: ${portfolio.get('total_value', 0):,.2f}")
-            else:
-                st.error("Failed to update portfolio")
+        config_col1, config_col2 = st.columns(2)
+        
+        with config_col1:
+            if st.button(f"🔄 Switch to {target_mode}", use_container_width=True):
+                st.warning(f"⚠️ **To switch to {target_mode}:**")
+                st.markdown(f"""
+                1. Set environment variables in `.env`
+                2. Restart container: `docker-compose build && docker-compose up -d`
+                3. Current mode requires restart to change
+                """)
+        
+        with config_col2:
+            if st.button("📊 View Risk Configuration", use_container_width=True):
+                st.markdown("### Risk Parameters")
+                try:
+                    risk_config = config.get_risk_config()
+                    st.info(f"""
+                    - Max Position/Symbol: {risk_config['max_position_per_symbol']:.1%}
+                    - Max Total Exposure: {risk_config['max_total_exposure']:.1%}
+                    - Stop Loss: {risk_config['default_stop_loss_pct']:.1%}
+                    - Take Profit: {risk_config['default_take_profit_pct']:.1%}
+                    """)
+                except Exception as e:
+                    st.error(f"Error loading risk config: {str(e)}")
 
 if __name__ == "__main__":
     main()

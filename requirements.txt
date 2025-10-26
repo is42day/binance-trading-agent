@@ -21,6 +21,8 @@ toml==0.10.2
 # Web UI dependencies
 streamlit==1.35.0
 plotly==5.20.0
+streamlit-option-menu==0.3.12
+streamlit-extras==0.4.2
 
 # Optional: For enhanced monitoring (uncomment if needed)
 # prometheus-client==0.20.0
