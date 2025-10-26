@@ -407,12 +407,12 @@ def get_portfolio_data():
             "total_trades": stats.get('number_of_trades', 0),
             "positions": [
                 {
-                    "symbol": pos.symbol,
-                    "quantity": pos.quantity,
-                    "average_price": pos.average_price,
-                    "current_value": pos.market_value,
-                    "unrealized_pnl": pos.unrealized_pnl
-                } for pos in positions.values()
+                    "symbol": pos['symbol'],
+                    "quantity": pos['quantity'],
+                    "average_price": pos['average_price'],
+                    "current_value": pos['market_value'],
+                    "unrealized_pnl": pos['unrealized_pnl']
+                } for pos in positions
             ],
             "recent_trades": [
                 {
