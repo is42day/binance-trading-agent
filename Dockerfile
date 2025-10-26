@@ -48,6 +48,10 @@ COPY --chown=trading:trading . .
 # Make the package importable for runtime/tests
 RUN pip install --no-cache-dir -e .
 
+# Clean stale caches (as root, before switching to trading user)
+RUN rm -rf /root/.cache/streamlit /root/.streamlit && \
+    find /app -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+
 # Expose ports
 EXPOSE 8080 9090 8501
 

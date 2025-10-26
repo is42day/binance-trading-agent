@@ -607,62 +607,75 @@ def set_emergency_stop():
         return {"error": str(e)}
 
 def main():
-    st.title("📈 Binance Trading Agent Dashboard")
+    try:
+        st.title("📈 Binance Trading Agent Dashboard")
+        st.write("### Testing New Design")
 
-    # ========== SIDEBAR: Enhanced Settings ==========
-    st.sidebar.title("🎛️ Trading Controls")
-    
-    # Symbol and quantity selection
-    st.sidebar.markdown("### ⚙️ Settings")
-    
-    symbol = st.sidebar.selectbox(
-        "Trading Symbol",
-        ["BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT", "SOLUSDT"],
-        index=0
-    )
+        # ========== SIDEBAR: Enhanced Settings ==========
+        st.sidebar.title("🎛️ Trading Controls")
+        
+        # Symbol and quantity selection
+        st.sidebar.markdown("### ⚙️ Settings")
+        
+        symbol = st.sidebar.selectbox(
+            "Trading Symbol",
+            ["BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT", "SOLUSDT"],
+            index=0
+        )
 
-    quantity = st.sidebar.number_input(
-        "Order Quantity",
-        min_value=0.0001,
-        value=0.001,
-        step=0.0001,
-        format="%.4f",
-        help="Amount of the asset to trade"
-    )
+        quantity = st.sidebar.number_input(
+            "Order Quantity",
+            min_value=0.0001,
+            value=0.001,
+            step=0.0001,
+            format="%.4f",
+            help="Amount of the asset to trade"
+        )
 
-    # ========== MAIN CONTENT: Horizontal Option Menu Navigation ==========
-    selected = option_menu(
-        menu_title=None,
-        options=["Portfolio", "Market Data", "Signals & Risk", "Execute Trade", "System Health", "Logs", "Advanced"],
-        icons=["📊", "💰", "🎯", "💼", "🏥", "📋", "⚙️"],
-        menu_icon="🎛️",
-        default_index=0,
-        orientation="horizontal",
-        styles={
-            "container": {"padding": "0!important", "background-color": "#23242a"},
-            "icon": {"color": "#ff914d", "font-size": "20px"},
-            "nav-link": {"font-size": "16px", "text-align": "center", "margin": "0px", "--hover-color": "rgba(255, 145, 77, 0.2)"},
-            "nav-link-selected": {"background-color": "rgba(255, 145, 77, 0.3)", "color": "#ff914d", "font-weight": "bold"},
-        }
-    )
+        st.write("✓ Sidebar loaded")
 
-    # ========== MAIN CONTENT: Route to Selected Tab ==========
-    if selected == "Portfolio":
-        show_portfolio_tab()
-    elif selected == "Market Data":
-        show_market_data_tab(symbol)
-    elif selected == "Signals & Risk":
-        show_signals_risk_tab()
-    elif selected == "Execute Trade":
-        show_trade_execution_tab(symbol, quantity)
-    elif selected == "System Health":
-        show_health_controls_tab()
-    elif selected == "Logs":
-        show_logs_monitoring_tab()
-    elif selected == "Advanced":
-        show_advanced_controls_tab()
-    else:
-        show_portfolio_tab()
+        # ========== MAIN CONTENT: Horizontal Option Menu Navigation ==========
+        try:
+            selected = option_menu(
+                menu_title=None,
+                options=["Portfolio", "Market Data", "Signals & Risk", "Execute Trade", "System Health", "Logs", "Advanced"],
+                icons=["📊", "💰", "🎯", "💼", "🏥", "📋", "⚙️"],
+                menu_icon="🎛️",
+                default_index=0,
+                orientation="horizontal",
+                styles={
+                    "container": {"padding": "0!important", "background-color": "#23242a"},
+                    "icon": {"color": "#ff914d", "font-size": "20px"},
+                    "nav-link": {"font-size": "16px", "text-align": "center", "margin": "0px", "--hover-color": "rgba(255, 145, 77, 0.2)"},
+                    "nav-link-selected": {"background-color": "rgba(255, 145, 77, 0.3)", "color": "#ff914d", "font-weight": "bold"},
+                }
+            )
+            st.write(f"✓ Menu loaded: {selected}")
+        except Exception as e:
+            st.error(f"Menu error: {e}")
+            return
+
+        # ========== MAIN CONTENT: Route to Selected Tab ==========
+        if selected == "Portfolio":
+            show_portfolio_tab()
+        elif selected == "Market Data":
+            show_market_data_tab(symbol)
+        elif selected == "Signals & Risk":
+            show_signals_risk_tab()
+        elif selected == "Execute Trade":
+            show_trade_execution_tab(symbol, quantity)
+        elif selected == "System Health":
+            show_health_controls_tab()
+        elif selected == "Logs":
+            show_logs_monitoring_tab()
+        elif selected == "Advanced":
+            show_advanced_controls_tab()
+        else:
+            show_portfolio_tab()
+    except Exception as e:
+        st.error(f"FATAL ERROR: {str(e)}")
+        import traceback
+        st.write(traceback.format_exc())
 
 
 
