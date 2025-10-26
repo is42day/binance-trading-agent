@@ -1,6 +1,10 @@
 # binance_trade_agent/market_data_agent.py
 
+
 from binance_trade_agent.binance_client import BinanceAPIClient
+from binance_trade_agent.redis_cache import RedisCache
+from binance_trade_agent.config import Config
+import asyncio
 
 class MarketDataAgent:
     """
@@ -8,20 +12,59 @@ class MarketDataAgent:
     prompt-driven or scheduled data pulls in an AI pipeline.
     """
 
-    def __init__(self, binance_client=None):
+    def __init__(self, binance_client=None, redis_cache=None, config=None):
         self.client = binance_client or BinanceAPIClient()
+        self.config = config or Config()
+        self.cache = redis_cache or RedisCache(
+            host=self.config.redis_host,
+            port=self.config.redis_port,
+            db=self.config.redis_db,
+            ttl=self.config.redis_ttl_prices
+        )
 
     def fetch_price(self, symbol: str) -> float:
         """
-        Get latest price for a symbol.
+        Get latest price for a symbol, with Redis cache fallback.
         """
-        return self.client.get_latest_price(symbol)
+        key = f"price:{symbol}"
+        loop = asyncio.get_event_loop()
+        cached = loop.run_until_complete(self.cache.get(key))
+        if cached is not None:
+            return cached
+        price = self.client.get_latest_price(symbol)
+        loop.run_until_complete(self.cache.set(key, price, ttl=self.config.redis_ttl_prices))
+        return price
+
+    async def fetch_price_async(self, symbol: str) -> float:
+        key = f"price:{symbol}"
+        cached = await self.cache.get(key)
+        if cached is not None:
+            return cached
+        price = self.client.get_latest_price(symbol)
+        await self.cache.set(key, price, ttl=self.config.redis_ttl_prices)
+        return price
 
     def fetch_order_book(self, symbol: str, limit=10):
         """
-        Get order book for a symbol.
+        Get order book for a symbol, with Redis cache fallback.
         """
-        return self.client.get_order_book(symbol, limit=limit)
+        key = f"orderbook:{symbol}:{limit}"
+        loop = asyncio.get_event_loop()
+        cached = loop.run_until_complete(self.cache.get(key))
+        if cached is not None:
+            return cached
+        ob = self.client.get_order_book(symbol, limit=limit)
+        loop.run_until_complete(self.cache.set(key, ob, ttl=self.config.redis_ttl_orderbook))
+        return ob
+
+    async def fetch_order_book_async(self, symbol: str, limit=10):
+        key = f"orderbook:{symbol}:{limit}"
+        cached = await self.cache.get(key)
+        if cached is not None:
+            return cached
+        ob = self.client.get_order_book(symbol, limit=limit)
+        await self.cache.set(key, ob, ttl=self.config.redis_ttl_orderbook)
+        return ob
 
     def fetch_balance(self, asset: str) -> float:
         """
@@ -37,11 +80,14 @@ class MarketDataAgent:
 
     def fetch_ohlcv(self, symbol: str, interval: str = '1h', limit: int = 100):
         """
-        Fetch OHLCV (candlestick) data for technical analysis.
-        Returns list of dictionaries with 'open', 'high', 'low', 'close', 'volume' keys.
+        Fetch OHLCV (candlestick) data for technical analysis, with Redis cache fallback.
         """
+        key = f"ohlcv:{symbol}:{interval}:{limit}"
+        loop = asyncio.get_event_loop()
+        cached = loop.run_until_complete(self.cache.get(key))
+        if cached is not None:
+            return cached
         klines = self.client.get_klines(symbol, interval, limit)
-        
         ohlcv_data = []
         for kline in klines:
             ohlcv_data.append({
@@ -52,7 +98,26 @@ class MarketDataAgent:
                 'close': float(kline[4]),
                 'volume': float(kline[5])
             })
-        
+        loop.run_until_complete(self.cache.set(key, ohlcv_data, ttl=self.config.redis_ttl_ohlcv))
+        return ohlcv_data
+
+    async def fetch_ohlcv_async(self, symbol: str, interval: str = '1h', limit: int = 100):
+        key = f"ohlcv:{symbol}:{interval}:{limit}"
+        cached = await self.cache.get(key)
+        if cached is not None:
+            return cached
+        klines = self.client.get_klines(symbol, interval, limit)
+        ohlcv_data = []
+        for kline in klines:
+            ohlcv_data.append({
+                'timestamp': int(kline[0]),
+                'open': float(kline[1]),
+                'high': float(kline[2]),
+                'low': float(kline[3]),
+                'close': float(kline[4]),
+                'volume': float(kline[5])
+            })
+        await self.cache.set(key, ohlcv_data, ttl=self.config.redis_ttl_ohlcv)
         return ohlcv_data
 
     def fetch_24h_ticker(self, symbol: str):

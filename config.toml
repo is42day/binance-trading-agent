@@ -1,3 +1,12 @@
+# Redis Cache Configuration
+[redis]
+host = "localhost"
+port = 6379
+db = 0
+# TTLs in seconds
+ttl_prices = 2
+ttl_orderbook = 2
+ttl_ohlcv = 5
 [mcpServers.trading-agent]
 command = "python"
 args = ["/app/binance_trade_agent/mcp_server.py"]

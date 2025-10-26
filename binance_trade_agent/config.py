@@ -39,6 +39,13 @@ class Config:
         if not self.binance_api_key or not self.binance_api_secret:
             self.demo_mode = True  # Force demo mode if no API keys
 
+        # Redis Cache Configuration
+        self.redis_host = os.getenv('REDIS_HOST', 'redis')
+        self.redis_port = int(os.getenv('REDIS_PORT', '6379'))
+        self.redis_db = int(os.getenv('REDIS_DB', '0'))
+        self.redis_ttl_prices = int(os.getenv('REDIS_TTL_PRICES', '2'))  # seconds
+        self.redis_ttl_orderbook = int(os.getenv('REDIS_TTL_ORDERBOOK', '2'))
+        self.redis_ttl_ohlcv = int(os.getenv('REDIS_TTL_OHLCV', '5'))
         # Risk Management Configuration
         self.risk_max_position_per_symbol = float(os.getenv('RISK_MAX_POSITION_PER_SYMBOL', '0.05'))
         self.risk_max_total_exposure = float(os.getenv('RISK_MAX_TOTAL_EXPOSURE', '0.8'))

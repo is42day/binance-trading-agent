@@ -18,19 +18,23 @@ class CombinedStrategy(BaseStrategy):
     """
     
     def __init__(self, parameters: Dict[str, Any] = None):
-        super().__init__(parameters)
+        # Initialize sub-strategies BEFORE calling super().__init__()
+        # because get_parameters() (called by parent) needs these to exist
         try:
-            param_dict = self.parameters if hasattr(self, 'parameters') and self.parameters else {}
-            rsi_params = {k.replace('rsi_', ''): v for k, v in param_dict.items() if k.startswith('rsi_')}
-            macd_params = {k.replace('macd_', ''): v for k, v in param_dict.items() if k.startswith('macd_')}
-            self.rsi_strategy = RSIStrategy(rsi_params)
-            self.macd_strategy = MACDStrategy(macd_params)
-        except Exception:
+            param_dict = parameters or {}
+            rsi_params = {k.replace('rsi_', '', 1): v for k, v in param_dict.items() if k.startswith('rsi_')}
+            macd_params = {k.replace('macd_', '', 1): v for k, v in param_dict.items() if k.startswith('macd_')}
+            
+            # Initialize sub-strategies with extracted parameters
+            self.rsi_strategy = RSIStrategy(rsi_params if rsi_params else None)
+            self.macd_strategy = MACDStrategy(macd_params if macd_params else None)
+        except Exception as e:
             # Fallback: always set both sub-strategies to default
-            from .rsi_strategy import RSIStrategy
-            from .macd_strategy import MACDStrategy
             self.rsi_strategy = RSIStrategy()
             self.macd_strategy = MACDStrategy()
+        
+        # Now call parent init, which will call get_parameters() and _validate_parameters()
+        super().__init__(parameters)
     
     def get_name(self) -> str:
         return "combined"
