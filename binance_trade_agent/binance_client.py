@@ -119,7 +119,8 @@ class BinanceAPIClient:
             }
 
         try:
-            ticker = self.client.get_24hr_ticker(symbol=symbol)
+            # Use get_ticker(symbol=symbol) for 24h stats (python-binance >=1.0.17)
+            ticker = self.client.get_ticker(symbol=symbol)
             return ticker
         except Exception as ex:
             print(f"Binance API error: {ex}")

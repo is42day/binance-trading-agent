@@ -8,6 +8,19 @@ from pathlib import Path
 
 
 class Config:
+    def validate(self):
+        """
+        Validate configuration for required API keys and testnet settings.
+        Raises SystemExit with error if invalid.
+        """
+        if self.binance_testnet:
+            if not self.binance_api_key or not self.binance_api_secret:
+                print("[ERROR] Testnet mode requires BINANCE_API_KEY and BINANCE_API_SECRET to be set in the environment.")
+                print("Set these variables and restart the agent.")
+                raise SystemExit(1)
+        if not self.demo_mode and (not self.binance_api_key or not self.binance_api_secret):
+            print("[ERROR] Live trading mode requires BINANCE_API_KEY and BINANCE_API_SECRET.")
+            raise SystemExit(1)
     """Centralized configuration management"""
 
     def __init__(self):

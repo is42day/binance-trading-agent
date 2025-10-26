@@ -54,6 +54,9 @@ class Trade:
 
 
 class PortfolioManager:
+    def get_recent_trades(self, limit: int = 20) -> list:
+        """Alias for get_trade_history(limit=...) for dashboard compatibility."""
+        return self.get_trade_history(limit=limit)
     """Manages trading portfolio with persistence"""
     
     def __init__(self, db_path: str = "portfolio.db"):

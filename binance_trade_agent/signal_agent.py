@@ -7,7 +7,7 @@ import math
 from .config import config
 
 class SignalAgent:
-    def __init__(self, market_data_agent=None, rsi_overbought=None, rsi_oversold=None, macd_signal_window=None):
+    def __init__(self, market_data_agent=None, rsi_overbought=None, rsi_oversold=None, macd_signal_window=None, test_mode=False):
         """
         Initialize SignalAgent with indicator thresholds.
         Args:
@@ -16,16 +16,24 @@ class SignalAgent:
             rsi_oversold (float): RSI value below which market is considered oversold.
             macd_signal_window (int): Window for MACD signal line.
         """
-        self.market_agent = market_data_agent
-        # Use config values if not explicitly provided
-        self.rsi_overbought = rsi_overbought or config.signal_rsi_overbought
-        self.rsi_oversold = rsi_oversold or config.signal_rsi_oversold
-        self.macd_signal_window = macd_signal_window or config.signal_macd_signal_window
+    self.market_agent = market_data_agent
+    # Use config values if not explicitly provided
+    self.rsi_overbought = rsi_overbought or config.signal_rsi_overbought
+    self.rsi_oversold = rsi_oversold or config.signal_rsi_oversold
+    self.macd_signal_window = macd_signal_window or config.signal_macd_signal_window
+    # Test mode: always generate a trade signal for integration testing
+    import os
+    self.test_mode = test_mode or bool(os.environ.get("SIGNAL_AGENT_TEST_MODE", "").lower() in ("1", "true", "yes"))
 
     def generate_signal(self, symbol: str) -> dict:
         """
         Generate a trading signal for the given symbol using technical indicators.
         """
+        if self.test_mode:
+            # Always generate a trade signal for integration testing
+            import random
+            forced_signal = random.choice(["buy", "sell"])
+            return {"signal": forced_signal, "confidence": 0.9, "test_mode": True}
         if not self.market_agent:
             # Fallback to demo mode if no market data agent provided
             return {"signal": "buy", "confidence": 0.8}
