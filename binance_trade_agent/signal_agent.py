@@ -7,7 +7,8 @@ import os
 import logging
 from typing import Dict, Any, Optional, List
 from .config import config
-from .strategies import StrategyManager, BaseStrategy, StrategyResult, SignalType
+from .strategies import StrategyManager, BaseStrategy, StrategyResult
+from .strategies.base_strategy import SignalType
 
 
 class SignalAgent:

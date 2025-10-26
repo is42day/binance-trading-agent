@@ -12,13 +12,13 @@ from mcp.server import Server
 from mcp.types import Tool, TextContent
 
 # Import all trading components
-from .market_data_agent import MarketDataAgent
-from .signal_agent import SignalAgent
-from .risk_management_agent import EnhancedRiskManagementAgent
-from .trade_execution_agent import TradeExecutionAgent
-from .orchestrator import TradingOrchestrator
-from .portfolio_manager import PortfolioManager
-from .monitoring import monitoring, correlation_context
+from binance_trade_agent.market_data_agent import MarketDataAgent
+from binance_trade_agent.signal_agent import SignalAgent
+from binance_trade_agent.risk_management_agent import EnhancedRiskManagementAgent
+from binance_trade_agent.trade_execution_agent import TradeExecutionAgent
+from binance_trade_agent.orchestrator import TradingOrchestrator
+from binance_trade_agent.portfolio_manager import PortfolioManager
+from binance_trade_agent.monitoring import monitoring, correlation_context
 
 
 class EnhancedTradingMCPServer:
@@ -540,23 +540,22 @@ class EnhancedTradingMCPServer:
         }
 
 
+# Module-level server instance for imports
+server = EnhancedTradingMCPServer()
+
+
 async def main():
     """Main function to run the MCP server"""
-    server_instance = EnhancedTradingMCPServer()
-    
     # Run the server
     from mcp.server.stdio import stdio_server
     
     async with stdio_server() as (read_stream, write_stream):
-        await server_instance.server.run(
+        await server.server.run(
             read_stream,
             write_stream,
-            server_instance.server.create_initialization_options()
+            server.server.create_initialization_options()
         )
 
-
-if __name__ == "__main__":
-    asyncio.run(main())
 
 if __name__ == "__main__":
     asyncio.run(main())

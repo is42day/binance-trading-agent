@@ -1,4 +1,7 @@
 """
+IMPORTANT: Always import SignalType directly from this file, not from the strategies package.
+"""
+"""
 Base Strategy Interface
 
 Defines the contract that all trading strategies must implement

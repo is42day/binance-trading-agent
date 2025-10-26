@@ -5,7 +5,7 @@ This module provides a modular approach to trading strategies, making them
 easily testable and swappable.
 """
 
-from .base_strategy import BaseStrategy, StrategyResult
+from .base_strategy import BaseStrategy, StrategyResult, SignalType
 from .rsi_strategy import RSIStrategy
 from .macd_strategy import MACDStrategy
 from .combined_strategy import CombinedStrategy
@@ -13,7 +13,8 @@ from .strategy_manager import StrategyManager
 
 __all__ = [
     'BaseStrategy',
-    'StrategyResult', 
+    'StrategyResult',
+    'SignalType',
     'RSIStrategy',
     'MACDStrategy',
     'CombinedStrategy',

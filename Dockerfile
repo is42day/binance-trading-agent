@@ -1,66 +1,69 @@
+# ---------- Build stage ----------
 FROM python:3.10-slim AS builder
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y \
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# System deps for building wheels / optional git pulls
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     git \
-    && rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/*
 
-# Create virtual environment
+# Isolated virtualenv
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy and install Python dependencies
+# Python deps (cached layer)
 COPY requirements.txt .
-RUN pip install --upgrade pip && \
-    pip install -r requirements.txt
+RUN python -m pip install --upgrade pip setuptools wheel --no-cache-dir && \
+    pip install --no-cache-dir -r requirements.txt
 
+# ---------- Production stage ----------
 FROM python:3.10-slim AS production
 
-# Create non-root user for security
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+# Non-root user
 RUN groupadd -r trading && useradd -r -g trading trading
 
-# Copy virtual environment from builder
+# Bring in virtualenv
 COPY --from=builder /opt/venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+RUN chown -R trading:trading /opt/venv
 
-# Install supervisor for process management
-RUN pip install supervisor
+# Supervisord inside the venv
+RUN pip install --no-cache-dir supervisor
 
-# Set working directory
+# Workdir
 WORKDIR /app
 
-# Create data directory for SQLite databases
-RUN mkdir -p /app/data && chown trading:trading /app/data
+# Data dir for SQLite (owned by 'trading')
+RUN mkdir -p /app/data /app/logs && chown -R trading:trading /app
 
-# Copy application code
+# Copy application code (already owned by 'trading')
 COPY --chown=trading:trading . .
 
-# Copy configuration files
-COPY --chown=trading:trading supervisord.conf /app/supervisord.conf
-
-# Create logs directory
-RUN mkdir -p /app/logs && chown trading:trading /app/logs
-
-# Pre-create supervisord log file and set permissions
-RUN touch /app/supervisord.log && chown trading:trading /app/supervisord.log && chmod 666 /app/supervisord.log
+# Make the package importable for runtime/tests
+RUN pip install --no-cache-dir -e .
 
 # Expose ports
 EXPOSE 8080 9090 8501
 
-# Health check removed - MCP server uses stdio, not HTTP
-# HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-#     CMD python -c "import requests; requests.get('http://localhost:8080/health')" || exit 1
+# Runtime env
+ENV PYTHONPATH=/app \
+    BINANCE_API_URL=https://testnet.binance.vision \
+    MCP_SERVER_PORT=8080 \
+    LOG_LEVEL=INFO
 
-# Switch to non-root user
+# Optional healthcheck (Streamlit UI). Comment out if not desired.
+# HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+#   CMD python -c "import socket; s=socket.socket(); s.settimeout(3); s.connect(('127.0.0.1', 8501)); s.close()" || exit 1
+
+# Drop privileges
 USER trading
 
-# Set environment variables
-ENV PYTHONPATH=/app
-ENV BINANCE_API_URL=https://testnet.binance.vision
-ENV MCP_SERVER_PORT=8080
-ENV LOG_LEVEL=INFO
-
-# Default command
+# Entrypoint
 CMD ["supervisord", "-c", "/app/supervisord.conf"]

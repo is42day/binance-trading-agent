@@ -1,13 +1,6 @@
 import pytest
 import asyncio
-import sys
-import os
-
-# Add the current directory to Python path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, '/app')
-
-from mcp_client import TradingMCPClient
+from binance_trade_agent.mcp_client import TradingMCPClient
 
 @pytest.mark.asyncio
 async def test_mcp_client_initialization():

@@ -3,16 +3,11 @@
 MCP Client for Binance Trading Agent
 Interactive client to test trading agent functionality
 """
+
 import asyncio
 import json
-import sys
-import os
+from binance_trade_agent.mcp_server import server
 
-# Add the current directory to Python path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, '/app')
-
-from mcp_server import server
 
 class TradingMCPClient:
     def __init__(self):
