@@ -3,3 +3,4 @@
 2025-10-26 07:36:12,960 INFO spawned: 'streamlit_ui' with pid 8
 2025-10-26 07:36:14,002 INFO success: binance_agent entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
 2025-10-26 07:36:14,003 INFO success: streamlit_ui entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+2025-10-26 08:26:14,258 INFO reaped unknown pid 434 (terminated by SIGHUP)
