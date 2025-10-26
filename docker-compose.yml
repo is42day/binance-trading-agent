@@ -16,7 +16,7 @@ services:
     ports:
       - "8081:8080"  # MCP Server (changed to avoid port conflict)
       - "9091:9090"  # Monitoring/Metrics (changed to avoid prometheus conflict)
-      - "8502:8501"  # Streamlit Web UI (changed to avoid port conflict)
+      - "8501:8501"  # Streamlit Web UI
     volumes:
       - ./data:/app/data  # Persist SQLite databases
       - ./logs:/app/logs  # Persist logs
