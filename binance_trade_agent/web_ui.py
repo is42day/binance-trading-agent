@@ -606,6 +606,70 @@ def set_emergency_stop():
     except Exception as e:
         return {"error": str(e)}
 
+def resume_trading():
+    """Resume trading after emergency stop"""
+    try:
+        risk_agent = components['risk_agent']
+        risk_agent.set_emergency_stop(False, "Trading resumed from Web UI")
+        return {"success": True}
+    except Exception as e:
+        return {"error": str(e)}
+
+def export_portfolio_data():
+    """Export portfolio data to JSON/CSV"""
+    try:
+        portfolio = components['portfolio']
+        
+        # Get all data
+        stats = portfolio.get_portfolio_stats()
+        positions = portfolio.get_all_positions()
+        trades = portfolio.get_trade_history(limit=100)
+        
+        # Create export data structure
+        export_data = {
+            "timestamp": datetime.now().isoformat(),
+            "stats": stats,
+            "positions": positions,
+            "trades": trades
+        }
+        
+        return {"success": True, "data": export_data}
+    except Exception as e:
+        return {"error": str(e)}
+
+def restart_orchestrator():
+    """Restart/reinitialize trading orchestrator"""
+    try:
+        # Clear the Streamlit cache to force component reinitialization
+        st.cache_resource.clear()
+        return {"success": True, "message": "Orchestrator will reinitialize on next action"}
+    except Exception as e:
+        return {"error": str(e)}
+
+def refresh_strategy():
+    """Refresh and re-analyze strategy for current market conditions"""
+    try:
+        signal_agent = components['signal_agent']
+        market_agent = components['market_agent']
+        
+        # Get current active symbol from session state or use default
+        symbol = st.session_state.get('symbol', 'BTCUSDT')
+        
+        # Fetch latest market data
+        ohlcv_data = market_agent.fetch_ohlcv(symbol, '1h', 100)
+        
+        # Re-run strategy analysis
+        signal_result = signal_agent.analyze_signal(symbol, ohlcv_data)
+        
+        return {
+            "success": True, 
+            "signal": signal_result.get('signal'),
+            "confidence": signal_result.get('confidence'),
+            "strategy": signal_agent.active_strategy
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
 def main():
     try:
         st.title("📈 Binance Trading Agent Dashboard")
@@ -1239,23 +1303,48 @@ def show_advanced_controls_tab():
                 st.error("Failed to activate emergency stop")
 
         if st.button("▶️ Resume Trading"):
-            # This would need a corresponding MCP tool
-            st.info("Resume trading functionality not yet implemented")
+            with st.spinner("Resuming trading..."):
+                result = resume_trading()
+            if "error" not in result:
+                st.success("✅ Trading resumed - system is active again")
+            else:
+                st.error(f"Failed to resume trading: {result['error']}")
 
     with col2:
         st.subheader("🔧 System Operations")
 
         if st.button("📤 Export Portfolio Data"):
-            # This would call an export MCP tool
-            st.info("Export functionality not yet implemented")
+            with st.spinner("Exporting portfolio data..."):
+                result = export_portfolio_data()
+            if "error" not in result:
+                # Convert to JSON for download
+                import json
+                json_str = json.dumps(result['data'], indent=2)
+                st.download_button(
+                    label="⬇️ Download Portfolio Data (JSON)",
+                    data=json_str,
+                    file_name=f"portfolio_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    mime="application/json"
+                )
+                st.success("✅ Portfolio data ready for download")
 
         if st.button("🔄 Restart Orchestrator"):
-            # This would call a restart MCP tool
-            st.info("Restart functionality not yet implemented")
+            with st.spinner("Restarting orchestrator..."):
+                result = restart_orchestrator()
+            if "error" not in result:
+                st.success("✅ Orchestrator restarted - components reinitialized")
+                st.info(result.get('message', 'System refreshed'))
+            else:
+                st.error(f"Failed to restart orchestrator: {result['error']}")
 
         if st.button("📊 Refresh Strategy"):
-            # This would re-run strategy analysis
-            st.info("Strategy refresh not yet implemented")
+            with st.spinner("Refreshing strategy analysis..."):
+                result = refresh_strategy()
+            if "error" not in result:
+                st.success("✅ Strategy refreshed with latest market data")
+                st.info(f"**Signal:** {result.get('signal')} | **Confidence:** {result.get('confidence', 0):.2%} | **Strategy:** {result.get('strategy')}")
+            else:
+                st.error(f"Failed to refresh strategy: {result['error']}")
 
     st.markdown("---")
     st.subheader("📋 System Information")
