@@ -24,29 +24,11 @@ class MarketDataAgent:
 
     def fetch_price(self, symbol: str) -> float:
         """
-        Get latest price for a symbol, with Redis cache fallback.
+        Get latest price for a symbol - cache temporarily disabled for stability.
         """
-        key = f"price:{symbol}"
-        
-        # Check if we're in an async context
-        try:
-            loop = asyncio.get_running_loop()
-            # We're in an async context but this is a sync function - not ideal
-            # Fall through to create new loop
-            raise RuntimeError("Need new loop for sync call")
-        except RuntimeError:
-            # No event loop or need new one - create and use it
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                cached = loop.run_until_complete(self.cache.get(key))
-                if cached is not None:
-                    return cached
-                price = self.client.get_latest_price(symbol)
-                loop.run_until_complete(self.cache.set(key, price, ttl=self.config.redis_ttl_prices))
-                return price
-            finally:
-                loop.close()
+        # Directly fetch without cache to avoid event loop issues
+        price = self.client.get_latest_price(symbol)
+        return price
 
     async def fetch_price_async(self, symbol: str) -> float:
         key = f"price:{symbol}"
@@ -59,22 +41,11 @@ class MarketDataAgent:
 
     def fetch_order_book(self, symbol: str, limit=10):
         """
-        Get order book for a symbol, with Redis cache fallback.
+        Get order book for a symbol - cache temporarily disabled for stability.
         """
-        key = f"orderbook:{symbol}:{limit}"
-        
-        # Create new event loop for sync context
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            cached = loop.run_until_complete(self.cache.get(key))
-            if cached is not None:
-                return cached
-            ob = self.client.get_order_book(symbol, limit=limit)
-            loop.run_until_complete(self.cache.set(key, ob, ttl=self.config.redis_ttl_orderbook))
-            return ob
-        finally:
-            loop.close()
+        # Directly fetch without cache
+        ob = self.client.get_order_book(symbol, limit=limit)
+        return ob
 
     async def fetch_order_book_async(self, symbol: str, limit=10):
         key = f"orderbook:{symbol}:{limit}"
@@ -99,32 +70,21 @@ class MarketDataAgent:
 
     def fetch_ohlcv(self, symbol: str, interval: str = '1h', limit: int = 100):
         """
-        Fetch OHLCV (candlestick) data for technical analysis, with Redis cache fallback.
+        Fetch OHLCV (candlestick) data for technical analysis - cache temporarily disabled for stability.
         """
-        key = f"ohlcv:{symbol}:{interval}:{limit}"
-        
-        # Create new event loop for sync context
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            cached = loop.run_until_complete(self.cache.get(key))
-            if cached is not None:
-                return cached
-            klines = self.client.get_klines(symbol, interval, limit)
-            ohlcv_data = []
-            for kline in klines:
-                ohlcv_data.append({
-                    'timestamp': int(kline[0]),
-                    'open': float(kline[1]),
-                    'high': float(kline[2]),
-                    'low': float(kline[3]),
-                    'close': float(kline[4]),
-                    'volume': float(kline[5])
-                })
-            loop.run_until_complete(self.cache.set(key, ohlcv_data, ttl=self.config.redis_ttl_ohlcv))
-            return ohlcv_data
-        finally:
-            loop.close()
+        # Directly fetch without cache
+        klines = self.client.get_klines(symbol, interval, limit)
+        ohlcv_data = []
+        for kline in klines:
+            ohlcv_data.append({
+                'timestamp': int(kline[0]),
+                'open': float(kline[1]),
+                'high': float(kline[2]),
+                'low': float(kline[3]),
+                'close': float(kline[4]),
+                'volume': float(kline[5])
+            })
+        return ohlcv_data
 
     async def fetch_ohlcv_async(self, symbol: str, interval: str = '1h', limit: int = 100):
         key = f"ohlcv:{symbol}:{interval}:{limit}"
