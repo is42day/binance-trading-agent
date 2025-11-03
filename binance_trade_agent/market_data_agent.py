@@ -27,19 +27,26 @@ class MarketDataAgent:
         Get latest price for a symbol, with Redis cache fallback.
         """
         key = f"price:{symbol}"
+        
+        # Check if we're in an async context
         try:
             loop = asyncio.get_running_loop()
+            # We're in an async context but this is a sync function - not ideal
+            # Fall through to create new loop
+            raise RuntimeError("Need new loop for sync call")
         except RuntimeError:
-            # No event loop in current thread (e.g., Streamlit), create one
+            # No event loop or need new one - create and use it
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-        
-        cached = loop.run_until_complete(self.cache.get(key))
-        if cached is not None:
-            return cached
-        price = self.client.get_latest_price(symbol)
-        loop.run_until_complete(self.cache.set(key, price, ttl=self.config.redis_ttl_prices))
-        return price
+            try:
+                cached = loop.run_until_complete(self.cache.get(key))
+                if cached is not None:
+                    return cached
+                price = self.client.get_latest_price(symbol)
+                loop.run_until_complete(self.cache.set(key, price, ttl=self.config.redis_ttl_prices))
+                return price
+            finally:
+                loop.close()
 
     async def fetch_price_async(self, symbol: str) -> float:
         key = f"price:{symbol}"
@@ -55,19 +62,19 @@ class MarketDataAgent:
         Get order book for a symbol, with Redis cache fallback.
         """
         key = f"orderbook:{symbol}:{limit}"
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            # No event loop in current thread (e.g., Streamlit), create one
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
         
-        cached = loop.run_until_complete(self.cache.get(key))
-        if cached is not None:
-            return cached
-        ob = self.client.get_order_book(symbol, limit=limit)
-        loop.run_until_complete(self.cache.set(key, ob, ttl=self.config.redis_ttl_orderbook))
-        return ob
+        # Create new event loop for sync context
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            cached = loop.run_until_complete(self.cache.get(key))
+            if cached is not None:
+                return cached
+            ob = self.client.get_order_book(symbol, limit=limit)
+            loop.run_until_complete(self.cache.set(key, ob, ttl=self.config.redis_ttl_orderbook))
+            return ob
+        finally:
+            loop.close()
 
     async def fetch_order_book_async(self, symbol: str, limit=10):
         key = f"orderbook:{symbol}:{limit}"
@@ -95,29 +102,29 @@ class MarketDataAgent:
         Fetch OHLCV (candlestick) data for technical analysis, with Redis cache fallback.
         """
         key = f"ohlcv:{symbol}:{interval}:{limit}"
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            # No event loop in current thread (e.g., Streamlit), create one
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
         
-        cached = loop.run_until_complete(self.cache.get(key))
-        if cached is not None:
-            return cached
-        klines = self.client.get_klines(symbol, interval, limit)
-        ohlcv_data = []
-        for kline in klines:
-            ohlcv_data.append({
-                'timestamp': int(kline[0]),
-                'open': float(kline[1]),
-                'high': float(kline[2]),
-                'low': float(kline[3]),
-                'close': float(kline[4]),
-                'volume': float(kline[5])
-            })
-        loop.run_until_complete(self.cache.set(key, ohlcv_data, ttl=self.config.redis_ttl_ohlcv))
-        return ohlcv_data
+        # Create new event loop for sync context
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            cached = loop.run_until_complete(self.cache.get(key))
+            if cached is not None:
+                return cached
+            klines = self.client.get_klines(symbol, interval, limit)
+            ohlcv_data = []
+            for kline in klines:
+                ohlcv_data.append({
+                    'timestamp': int(kline[0]),
+                    'open': float(kline[1]),
+                    'high': float(kline[2]),
+                    'low': float(kline[3]),
+                    'close': float(kline[4]),
+                    'volume': float(kline[5])
+                })
+            loop.run_until_complete(self.cache.set(key, ohlcv_data, ttl=self.config.redis_ttl_ohlcv))
+            return ohlcv_data
+        finally:
+            loop.close()
 
     async def fetch_ohlcv_async(self, symbol: str, interval: str = '1h', limit: int = 100):
         key = f"ohlcv:{symbol}:{interval}:{limit}"
