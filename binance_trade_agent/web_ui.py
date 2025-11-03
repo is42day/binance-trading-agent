@@ -570,17 +570,9 @@ def get_trade_history():
     """Get trade history"""
     try:
         portfolio = components['portfolio']
-        trades = portfolio.get_recent_trades(limit=20)
+        trades = portfolio.get_trade_history(limit=20)
         return {
-            "trades": [
-                {
-                    "symbol": trade.symbol,
-                    "side": trade.side,
-                    "quantity": trade.quantity,
-                    "price": trade.price,
-                    "timestamp": trade.timestamp.isoformat()
-                } for trade in trades
-            ]
+            "trades": trades  # Already returns list of dicts
         }
     except Exception as e:
         return {"error": str(e)}
