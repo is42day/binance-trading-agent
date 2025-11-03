@@ -426,6 +426,9 @@ def get_portfolio_data():
             ]
         }
     except Exception as e:
+        print(f"ERROR in get_portfolio_data: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return {"error": str(e)}
 
 def get_market_data(symbol: str):
@@ -571,10 +574,14 @@ def get_trade_history():
     try:
         portfolio = components['portfolio']
         trades = portfolio.get_trade_history(limit=20)
+        print(f"DEBUG: Successfully fetched {len(trades)} trades")  # Debug log
         return {
             "trades": trades  # Already returns list of dicts
         }
     except Exception as e:
+        print(f"ERROR in get_trade_history: {str(e)}")  # Debug log
+        import traceback
+        traceback.print_exc()
         return {"error": str(e)}
 
 def get_performance_metrics():
