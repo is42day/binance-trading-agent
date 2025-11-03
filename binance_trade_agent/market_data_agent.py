@@ -27,7 +27,13 @@ class MarketDataAgent:
         Get latest price for a symbol, with Redis cache fallback.
         """
         key = f"price:{symbol}"
-        loop = asyncio.get_event_loop()
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No event loop in current thread (e.g., Streamlit), create one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
         cached = loop.run_until_complete(self.cache.get(key))
         if cached is not None:
             return cached
@@ -49,7 +55,13 @@ class MarketDataAgent:
         Get order book for a symbol, with Redis cache fallback.
         """
         key = f"orderbook:{symbol}:{limit}"
-        loop = asyncio.get_event_loop()
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No event loop in current thread (e.g., Streamlit), create one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
         cached = loop.run_until_complete(self.cache.get(key))
         if cached is not None:
             return cached
@@ -83,7 +95,13 @@ class MarketDataAgent:
         Fetch OHLCV (candlestick) data for technical analysis, with Redis cache fallback.
         """
         key = f"ohlcv:{symbol}:{interval}:{limit}"
-        loop = asyncio.get_event_loop()
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No event loop in current thread (e.g., Streamlit), create one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
         cached = loop.run_until_complete(self.cache.get(key))
         if cached is not None:
             return cached
