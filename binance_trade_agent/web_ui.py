@@ -1187,32 +1187,55 @@ def show_trade_execution_tab(symbol: str, quantity: float):
                     use_container_width=True,
                     help="Clear the form"
                 )
-
-            if submitted:
-                # Show confirmation dialog
-                st.markdown("---")
-                confirm = show_confirmation_dialog(
-                    "Confirm Trade Execution",
-                    f"Execute {side} {trade_quantity} {trade_symbol} at current market price?",
-                    f"{side} Trade"
-                )
+        
+        # Handle trade submission outside form context
+        if submitted:
+            # Store submission in session state to trigger confirmation
+            if 'pending_trade' not in st.session_state:
+                st.session_state.pending_trade = {
+                    'symbol': trade_symbol,
+                    'side': side,
+                    'quantity': trade_quantity
+                }
+        
+        # Show confirmation dialog outside form (if trade is pending)
+        if 'pending_trade' in st.session_state:
+            st.markdown("---")
+            confirm = show_confirmation_dialog(
+                "Confirm Trade Execution",
+                f"Execute {st.session_state.pending_trade['side']} {st.session_state.pending_trade['quantity']} {st.session_state.pending_trade['symbol']} at current market price?",
+                f"{st.session_state.pending_trade['side']} Trade"
+            )
+            
+            if confirm is True:
+                with st.spinner(f"⏳ Executing {st.session_state.pending_trade['side']} order..."):
+                    result = execute_trade(
+                        st.session_state.pending_trade['symbol'], 
+                        st.session_state.pending_trade['side'], 
+                        st.session_state.pending_trade['quantity']
+                    )
                 
-                if confirm:
-                    with st.spinner(f"⏳ Executing {side} order..."):
-                        result = execute_trade(trade_symbol, side, trade_quantity)
+                # Clear pending trade
+                del st.session_state.pending_trade
 
-                    if "error" not in result:
-                        show_toast(
-                            f"Trade {result.get('status', 'FILLED')} - Order ID: {result.get('order_id')}",
-                            "success"
-                        )
-                        st.success(f"✅ {side} order executed successfully!")
-                        st.json(result)
-                        time.sleep(2)
-                        st.rerun()
-                    else:
-                        show_toast(f"Trade failed: {result['error']}", "error")
-                        st.error(f"❌ {result['error']}")
+                if "error" not in result:
+                    show_toast(
+                        f"Trade {result.get('status', 'FILLED')} - Order ID: {result.get('order_id')}",
+                        "success"
+                    )
+                    st.success(f"✅ {result['side']} order executed successfully!")
+                    st.json(result)
+                    time.sleep(2)
+                    st.rerun()
+                else:
+                    show_toast(f"Trade failed: {result['error']}", "error")
+                    st.error(f"❌ {result['error']}")
+            
+            elif confirm is False:
+                # User cancelled
+                del st.session_state.pending_trade
+                st.info("Trade cancelled")
+                st.rerun()
 
     with col2:
         st.markdown("### 📊 Recent Trade History")
