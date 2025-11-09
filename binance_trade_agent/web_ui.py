@@ -76,6 +76,16 @@ def get_trading_components():
 # Get components
 components = get_trading_components()
 
+# Load unified design system CSS
+try:
+    css_path = os.path.join(os.path.dirname(__file__), 'ui_styles.css')
+    if os.path.exists(css_path):
+        with open(css_path, 'r') as f:
+            css_content = f.read()
+            st.markdown(f"<style>{css_content}</style>", unsafe_allow_html=True)
+except Exception as e:
+    st.warning(f"⚠️ Could not load unified CSS system: {e}")
+
 # Enhanced styling with theme support, responsive design, and improved UX
 st.markdown("""
 <style>
@@ -200,6 +210,73 @@ st.markdown("""
         background: rgba(255, 145, 77, 0.05);
     }
 
+    /* ===== UNIFIED METRIC CARD STYLING ===== */
+    /* Force all metric cards to 120px height for perfect alignment */
+    [data-testid="metric-container"] {
+        background-color: #2f3035 !important;
+        border-radius: 8px !important;
+        border: 1px solid rgba(255, 145, 77, 0.2) !important;
+        padding: 16px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        min-height: 120px !important;
+        height: 120px !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    [data-testid="metric-container"]:hover {
+        border-color: rgba(255, 145, 77, 0.5) !important;
+        background-color: #353a3f !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(255, 145, 77, 0.2) !important;
+    }
+    
+    /* Metric card label - uppercase, smaller */
+    [data-testid="metric-container"] label {
+        font-size: 12px !important;
+        color: #b8b8b8 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+        margin-bottom: 8px !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Metric card value - large, bold */
+    [data-testid="metric-container"] > div > div:nth-child(2) {
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        flex-grow: 1 !important;
+    }
+    
+    /* Metric value text - 32px, bold, white */
+    [data-testid="metric-container"] span[data-testid="stMetricValue"] {
+        font-size: 32px !important;
+        font-weight: 700 !important;
+        color: #ffffff !important;
+        line-height: 1.2 !important;
+    }
+    
+    /* Metric delta text - smaller, colored */
+    [data-testid="metric-container"] span[data-testid="stMetricDelta"] {
+        font-size: 14px !important;
+        margin-top: 4px !important;
+        font-weight: 500 !important;
+    }
+
+    /* ===== UNIFIED COLUMN STYLING ===== */
+    /* Ensure uniform gap and padding between columns */
+    .stColumn {
+        gap: 16px !important;
+    }
+    
+    /* Container div for columns - ensure proper spacing */
+    [data-testid="column"] {
+        padding: 0 !important;
+    }
+
+    /* ===== UNIFIED TABLE STYLING ===== */
     /* Data tables */
     .stDataFrame {
         border-radius: 8px;
@@ -218,7 +295,41 @@ st.markdown("""
         border-radius: 8px;
     }
 
-    /* Status indicators */
+    /* ===== FORM STYLING ===== */
+    /* Input fields - consistent sizing */
+    .stTextInput input,
+    .stNumberInput input,
+    .stSelectbox select {
+        height: 44px !important;
+        padding: 10px 16px !important;
+        font-size: 14px !important;
+        border-radius: 8px !important;
+        border: 1px solid rgba(255, 145, 77, 0.2) !important;
+        background-color: #2f3035 !important;
+        color: #ffffff !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    .stTextInput input:focus,
+    .stNumberInput input:focus,
+    .stSelectbox select:focus {
+        border-color: rgba(255, 145, 77, 0.6) !important;
+        box-shadow: 0 0 0 3px rgba(255, 145, 77, 0.1) !important;
+        outline: none !important;
+    }
+
+    /* Selectbox styling */
+    [data-testid="stSelectbox"] > div:first-child {
+        border-radius: 8px !important;
+    }
+
+    /* ===== CONTAINER STYLING ===== */
+    /* stylable_container styling */
+    [data-testid="stHorizontalBlock"] > div {
+        gap: 16px !important;
+    }
+
+    /* ===== STATUS INDICATORS ===== */
     .status-healthy { color: #2ecc71; }
     .status-warning { color: #f39c12; }
     .status-critical { color: #e74c3c; }
@@ -275,11 +386,67 @@ st.markdown("""
         margin-bottom: 1rem;
     }
 
-    /* Mobile responsive */
-    @media (max-width: 480px) {
+    /* ===== RESPONSIVE DESIGN ===== */
+    /* Desktop - 1920px and above */
+    @media (min-width: 1920px) {
+        /* 4 columns on large screens */
+        [data-testid="stHorizontalBlock"] > div {
+            grid-template-columns: repeat(4, 1fr) !important;
+        }
+    }
+
+    /* Laptop - 1440px to 1919px */
+    @media (min-width: 1440px) and (max-width: 1919px) {
+        /* 3 columns on medium screens */
+        [data-testid="stHorizontalBlock"] > div {
+            grid-template-columns: repeat(3, 1fr) !important;
+        }
+    }
+
+    /* Tablet landscape - 1024px to 1439px */
+    @media (min-width: 1024px) and (max-width: 1439px) {
+        /* 2 columns on tablet landscape */
+        [data-testid="stHorizontalBlock"] > div {
+            grid-template-columns: repeat(2, 1fr) !important;
+        }
+        div.block-container {
+            padding-left: 1.2rem !important;
+            padding-right: 1.2rem !important;
+        }
+    }
+
+    /* Tablet portrait - 768px to 1023px */
+    @media (min-width: 768px) and (max-width: 1023px) {
+        /* 1-2 columns on tablet portrait */
+        [data-testid="stHorizontalBlock"] > div {
+            grid-template-columns: repeat(1, 1fr) !important;
+        }
+        div.block-container {
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+        }
         h1 { font-size: 1.8rem !important; }
         h2 { font-size: 1.2rem !important; }
-        .stat-block { min-width: 120px; }
+    }
+
+    /* Mobile - 375px to 767px */
+    @media (max-width: 767px) {
+        /* Single column on mobile */
+        [data-testid="stHorizontalBlock"] > div {
+            grid-template-columns: repeat(1, 1fr) !important;
+        }
+        div.block-container {
+            padding-left: 0.8rem !important;
+            padding-right: 0.8rem !important;
+            padding-top: 1rem !important;
+        }
+        h1 { font-size: 1.6rem !important; }
+        h2 { font-size: 1.1rem !important; }
+        .stat-block { min-width: 100%; }
+        [data-testid="metric-container"] {
+            min-height: 100px !important;
+            height: 100px !important;
+        }
     }
 
     /* Muted note */
