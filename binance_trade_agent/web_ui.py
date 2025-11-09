@@ -203,34 +203,40 @@ st.markdown("""
 
     /* ===== UNIFIED METRIC CARD STYLING (CRITICAL FIX) ===== */
     /* Force all metric cards to 120px height for perfect alignment */
-    [data-testid="metric-container"] {
+    /* Multiple selectors to catch all Streamlit metric card variations */
+    
+    [data-testid="metric-container"],
+    div[data-testid="metric-container"],
+    .css-1oaqf2d,  /* Common Streamlit metric container class */
+    .css-ocqkz7 {  /* Alternative Streamlit metric class */
         background-color: #2f3035 !important;
-        border-radius: 8px !important;
         border: 1px solid rgba(255, 145, 77, 0.2) !important;
+        border-radius: 8px !important;
         padding: 16px !important;
         min-height: 120px !important;
         height: 120px !important;
+        max-height: 120px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        box-sizing: border-box !important;
         transition: all 0.2s ease !important;
         overflow: hidden !important;
     }
     
-    [data-testid="metric-container"]:hover {
+    [data-testid="metric-container"]:hover,
+    div[data-testid="metric-container"]:hover,
+    .css-1oaqf2d:hover,
+    .css-ocqkz7:hover {
         border-color: rgba(255, 145, 77, 0.5) !important;
         background-color: #353a3f !important;
         transform: translateY(-2px) !important;
         box-shadow: 0 4px 12px rgba(255, 145, 77, 0.2) !important;
     }
     
-    /* ALL metric-related containers - ensure fixed sizing */
-    div[data-testid="metric-container"] {
-        min-height: 120px !important;
-    }
-    
-    .metric {
-        background: #2f3035 !important;
-        min-height: 120px !important;
-        height: 120px !important;
-        padding: 16px !important;
+    /* Ensure child elements don't override */
+    [data-testid="metric-container"] * {
+        box-sizing: border-box !important;
     }
 
     /* ===== UNIFIED COLUMN STYLING ===== */
