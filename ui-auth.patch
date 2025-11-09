@@ -1,0 +1,63 @@
+diff --git a/binance_trade_agent/security/auth.py b/binance_trade_agent/security/auth.py
+new file mode 100644
+index 0000000..b9fac41
+--- /dev/null
++++ b/binance_trade_agent/security/auth.py
+@@ -0,0 +1,83 @@
++import os
++import streamlit as st
++
++SESSION_KEY = "ui_auth_ok"
++ROLE_KEY = "ui_role"
++
++def _check_password() -> bool:
++    password = os.getenv("UI_PASSWORD", "")
++    if not password:
++        # No password configured -> allow (dev-friendly). In prod, set UI_PASSWORD.
++        return True
++    if st.session_state.get(SESSION_KEY):
++        return True
++    with st.sidebar:
++        st.markdown("### 🔐 Login")
++        pw = st.text_input("Password", type="password", placeholder="••••••••")
++        submit = st.button("Sign in")
++    if submit and pw == password:
++        st.session_state[SESSION_KEY] = True
++        return True
++    if submit and pw != password:
++        st.error("Incorrect password.")
++    st.stop()
++
++def _set_role():
++    # Seed role for future RBAC. Default viewer.
++    role = os.getenv("UI_ROLE", "viewer").strip().lower()
++    st.session_state.setdefault(ROLE_KEY, role)
++
++def require_auth():
++    """Gate UI behind a password. Call once near top of web_ui.py."""
++    ok = _check_password()
++    if ok:
++        _set_role()
++
++def current_role() -> str:
++    return st.session_state.get(ROLE_KEY, "viewer")
+diff --git a/binance_trade_agent/web_ui.py b/binance_trade_agent/web_ui.py
+index 1111111..2222222 100644
+--- a/binance_trade_agent/web_ui.py
++++ b/binance_trade_agent/web_ui.py
+@@ -1,5 +1,15 @@
++# --- UI auth guard (inserted near the top) ---
++try:
++    from binance_trade_agent.security.auth import require_auth, current_role
++except Exception:
++    # Soft-fail in CLI contexts that import this module.
++    def require_auth(): 
++        return
++    def current_role():
++        return "viewer"
++
++require_auth()
+ 
+ # existing imports below
+ # import streamlit as st
+ # from ... (rest of your original imports)
