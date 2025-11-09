@@ -483,16 +483,38 @@ def styled_subheader(text: str, icon: str = ""):
     st.markdown(f"### {prefix}{text}")
 
 def metric_card(label: str, value: str, delta: str = "", icon: str = "", help_text: str = ""):
-    """Create enhanced metric card"""
+    """Create enhanced metric card with FIXED 120px height and proper styling"""
     icon_html = f"<span style='font-size: 1.8rem; margin-right: 0.5rem'>{icon}</span>" if icon else ""
     help_html = f"<span class='tooltip'><span style='cursor: help; opacity: 0.7'>❓</span><span class='tooltiptext'>{help_text}</span></span>" if help_text else ""
-    delta_html = f"<span style='color: #ff914d; font-size: 0.9rem; margin-left: 0.5rem'>{delta}</span>" if delta else ""
+    delta_html = f"<span style='color: #ff914d; font-size: 0.9rem; margin-left: 0.5rem; margin-top: auto'>{delta}</span>" if delta else ""
     
+    # Use inline styles to FORCE 120px height - bypass Streamlit's metric rendering
     st.markdown(f"""
-    <div class="stat-block">
-        <div class="stat-title">{icon_html}{label} {help_html}</div>
-        <div class="stat-value">{value}</div>
-        {delta_html}
+    <div style="
+        background-color: #2f3035;
+        border: 1px solid rgba(255, 145, 77, 0.2);
+        border-radius: 8px;
+        padding: 16px;
+        height: 120px;
+        min-height: 120px;
+        max-height: 120px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        box-sizing: border-box;
+        transition: all 0.2s ease;
+    " 
+    onmouseover="this.style.borderColor='rgba(255, 145, 77, 0.5)'; this.style.backgroundColor='#353a3f'; this.style.boxShadow='0 4px 12px rgba(255, 145, 77, 0.2)';"
+    onmouseout="this.style.borderColor='rgba(255, 145, 77, 0.2)'; this.style.backgroundColor='#2f3035'; this.style.boxShadow='none';">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                {icon_html}<strong style="color: #b8b8b8; font-size: 0.95rem">{label}</strong> {help_html}
+            </div>
+        </div>
+        <div style="flex-grow: 1; display: flex; align-items: flex-end; gap: 8px;">
+            <div style="color: #ffffff; font-size: 1.4rem; font-weight: 600">{value}</div>
+            {delta_html}
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -1550,26 +1572,19 @@ def show_health_controls_tab():
     with col1:
         # Trading mode status
         mode = "🚨 PRODUCTION" if config.is_production_ready() else "🔧 DEMO MODE"
-        st.metric("Trading Mode", mode)
+        metric_card("Trading Mode", mode, icon="⚙️")
 
     with col2:
         # API connectivity
         try:
             test_price = components['market_agent'].get_latest_price('BTCUSDT')
-            st.metric("API Status", "🟢 Connected", delta="OK")
+            metric_card("API Status", "🟢 Connected", delta="OK", icon="🔌")
         except:
-            st.metric("API Status", "🔴 Disconnected", delta="ERROR")
+            metric_card("API Status", "🔴 Disconnected", delta="ERROR", icon="🔌")
 
     with col3:
         # System uptime (simplified)
-        st.metric("System Status", "🟢 Healthy")
-
-    # Apply metric styling
-    style_metric_cards(
-        background_color="#2f3035",
-        border_left_color="#ff914d",
-        border_size_px=3
-    )
+        metric_card("System Status", "🟢 Healthy", icon="✅")
 
     st.markdown("---")
 
@@ -1583,46 +1598,39 @@ def show_health_controls_tab():
         try:
             portfolio = get_portfolio_data()
             pnl_pct = portfolio.get('total_pnl_percent', 0)
-            st.metric("Portfolio Health",
-                     "🟢 Good" if pnl_pct >= -5 else "🟡 Warning" if pnl_pct >= -15 else "🔴 Critical",
-                     delta=f"{pnl_pct:+.1f}%")
+            health_status = "🟢 Good" if pnl_pct >= -5 else "🟡 Warning" if pnl_pct >= -15 else "🔴 Critical"
+            metric_card("Portfolio Health", health_status, delta=f"{pnl_pct:+.1f}%", icon="💼")
         except:
-            st.metric("Portfolio Health", "🔴 Error")
+            metric_card("Portfolio Health", "🔴 Error", icon="💼")
 
     with health_col2:
         # Risk status
         try:
             risk_data = get_risk_status()
             emergency = risk_data.get('emergency_stop', False)
-            st.metric("Risk Status", "🚨 EMERGENCY STOP" if emergency else "🟢 Normal")
+            risk_status = "🚨 EMERGENCY STOP" if emergency else "🟢 Normal"
+            metric_card("Risk Status", risk_status, icon="⚠️")
         except:
-            st.metric("Risk Status", "🔴 Unknown")
+            metric_card("Risk Status", "🔴 Unknown", icon="⚠️")
 
     with health_col3:
         # Signal generation
         try:
             signal = get_signals()
             confidence = signal.get('confidence', 0)
-            st.metric("Signal Confidence", f"{confidence:.1%}",
-                     delta="High" if confidence > 0.7 else "Medium" if confidence > 0.5 else "Low")
+            confidence_label = "High" if confidence > 0.7 else "Medium" if confidence > 0.5 else "Low"
+            metric_card("Signal Confidence", f"{confidence:.1%}", delta=confidence_label, icon="📊")
         except:
-            st.metric("Signal Confidence", "🔴 Error")
+            metric_card("Signal Confidence", "🔴 Error", icon="📊")
 
     with health_col4:
         # Active positions
         try:
             portfolio = get_portfolio_data()
             positions = portfolio.get('open_positions', 0)
-            st.metric("Active Positions", positions)
+            metric_card("Active Positions", str(positions), icon="📈")
         except:
-            st.metric("Active Positions", "🔴 Error")
-
-    # Apply metric styling
-    style_metric_cards(
-        background_color="#2f3035",
-        border_left_color="#2ecc71",
-        border_size_px=2
-    )
+            metric_card("Active Positions", "🔴 Error", icon="📈")
 
     st.markdown("---")
 
