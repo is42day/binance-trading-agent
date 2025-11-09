@@ -489,34 +489,8 @@ def metric_card(label: str, value: str, delta: str = "", icon: str = "", help_te
     delta_html = f"<span style='color: #ff914d; font-size: 0.9rem; margin-left: 0.5rem; margin-top: auto'>{delta}</span>" if delta else ""
     
     # Use inline styles to FORCE 120px height - bypass Streamlit's metric rendering
-    st.markdown(f"""
-    <div style="
-        background-color: #2f3035;
-        border: 1px solid rgba(255, 145, 77, 0.2);
-        border-radius: 8px;
-        padding: 16px;
-        height: 120px;
-        min-height: 120px;
-        max-height: 120px;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        box-sizing: border-box;
-        transition: all 0.2s ease;
-    " 
-    onmouseover="this.style.borderColor='rgba(255, 145, 77, 0.5)'; this.style.backgroundColor='#353a3f'; this.style.boxShadow='0 4px 12px rgba(255, 145, 77, 0.2)';"
-    onmouseout="this.style.borderColor='rgba(255, 145, 77, 0.2)'; this.style.backgroundColor='#2f3035'; this.style.boxShadow='none';">
-        <div style="display: flex; align-items: center; justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                {icon_html}<strong style="color: #b8b8b8; font-size: 0.95rem">{label}</strong> {help_html}
-            </div>
-        </div>
-        <div style="flex-grow: 1; display: flex; align-items: flex-end; gap: 8px;">
-            <div style="color: #ffffff; font-size: 1.4rem; font-weight: 600">{value}</div>
-            {delta_html}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    html_content = f"""<div style="background-color: #2f3035; border: 1px solid rgba(255, 145, 77, 0.2); border-radius: 8px; padding: 16px; height: 120px; min-height: 120px; max-height: 120px; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; transition: all 0.2s ease;" onmouseover="this.style.borderColor='rgba(255, 145, 77, 0.5)'; this.style.backgroundColor='#353a3f'; this.style.boxShadow='0 4px 12px rgba(255, 145, 77, 0.2)';" onmouseout="this.style.borderColor='rgba(255, 145, 77, 0.2)'; this.style.backgroundColor='#2f3035'; this.style.boxShadow='none';"><div style="display: flex; align-items: center; justify-content: space-between;"><div style="display: flex; align-items: center; gap: 8px;">{icon_html}<strong style="color: #b8b8b8; font-size: 0.95rem">{label}</strong> {help_html}</div></div><div style="flex-grow: 1; display: flex; align-items: flex-end; gap: 8px;"><div style="color: #ffffff; font-size: 1.4rem; font-weight: 600">{value}</div>{delta_html}</div></div>"""
+    st.markdown(html_content, unsafe_allow_html=True)
 
 def show_refresh_info():
     """Display last refresh timestamp"""
