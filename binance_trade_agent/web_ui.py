@@ -357,11 +357,18 @@ def metric_card(label: str, value: str, delta: str = "", icon: str = "", help_te
 
 def show_refresh_info():
     """Display last refresh timestamp"""
-    st.markdown(f"""
-    <div class="refresh-timestamp">
-        🔄 Last refresh: {st.session_state.last_refresh.strftime('%H:%M:%S')}
-    </div>
-    """, unsafe_allow_html=True)
+    try:
+        if 'last_refresh' not in st.session_state:
+            st.session_state.last_refresh = datetime.now()
+        
+        refresh_time = st.session_state.last_refresh.strftime('%H:%M:%S')
+        st.markdown(f"""
+        <div class="refresh-timestamp">
+            🔄 Last refresh: {refresh_time}
+        </div>
+        """, unsafe_allow_html=True)
+    except Exception as e:
+        print(f"Error in show_refresh_info: {str(e)}")
 
 def show_confirmation_dialog(title: str, message: str, action_name: str) -> bool:
     """Show confirmation modal for high-stakes actions"""
@@ -394,12 +401,24 @@ def call_mcp_tool(tool_name: str, arguments: dict = None) -> dict:
 def get_portfolio_data():
     """Get portfolio summary"""
     try:
+        print("DEBUG: Fetching portfolio component...")
         portfolio = components['portfolio']
-        stats = portfolio.get_portfolio_stats()
-        positions = portfolio.get_all_positions()
-        recent_trades = portfolio.get_trade_history(limit=10)
+        print("DEBUG: Portfolio component retrieved")
         
-        return {
+        print("DEBUG: Getting portfolio stats...")
+        stats = portfolio.get_portfolio_stats()
+        print(f"DEBUG: Stats retrieved: {stats}")
+        
+        print("DEBUG: Getting all positions...")
+        positions = portfolio.get_all_positions()
+        print(f"DEBUG: Positions retrieved: {len(positions)} items")
+        
+        print("DEBUG: Getting trade history...")
+        recent_trades = portfolio.get_trade_history(limit=10)
+        print(f"DEBUG: Trade history retrieved: {len(recent_trades)} items")
+        
+        print("DEBUG: Building return dictionary...")
+        result = {
             "total_value": stats.get('total_value', 0),
             "total_pnl": stats.get('total_pnl', 0),
             "total_pnl_percent": (stats.get('total_pnl', 0) / max(stats.get('total_value', 0) - stats.get('total_pnl', 0), 1)) * 100,
@@ -416,15 +435,17 @@ def get_portfolio_data():
             ],
             "recent_trades": [
                 {
-                    "symbol": trade.symbol,
-                    "side": trade.side,
-                    "quantity": trade.quantity,
-                    "price": trade.price,
-                    "timestamp": trade.timestamp.isoformat(),
-                    "pnl": trade.pnl or 0
+                    "symbol": trade['symbol'],  # ✅ Access as dictionary
+                    "side": trade['side'],
+                    "quantity": trade['quantity'],
+                    "price": trade['price'],
+                    "timestamp": trade['timestamp'],  # ✅ Already ISO string
+                    "pnl": trade.get('pnl') or 0
                 } for trade in recent_trades
             ]
         }
+        print("DEBUG: Return dictionary built successfully")
+        return result
     except Exception as e:
         print(f"ERROR in get_portfolio_data: {str(e)}")
         import traceback
@@ -749,7 +770,8 @@ def show_portfolio_tab():
         portfolio_data = get_portfolio_data()
 
     if "error" in portfolio_data:
-        st.error("❌ Failed to load portfolio data. Check database connection.")
+        st.error(f"❌ Failed to load portfolio data: {portfolio_data.get('error', 'Unknown error')}")
+        st.info("Check the console logs above for detailed error information")
         return
 
     # ===== GROUPED STATS CARDS (Enhanced with Styling) =====

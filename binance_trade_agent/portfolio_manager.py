@@ -120,7 +120,7 @@ class PortfolioManager:
             session.commit()
             self.logger.info(f"Added trade: {side} {quantity} {symbol} @ ${price:.2f}")
             
-            # Update position based on trade
+            # Update position based on trade (pass the TradeORM object, not dict)
             self._update_position_from_trade(session, trade)
             
             return trade
@@ -131,81 +131,102 @@ class PortfolioManager:
         finally:
             session.close()
     
-    def _update_position_from_trade(self, session: SQLAlchemySession, trade: TradeORM):
+    def _update_position_from_trade(self, session: SQLAlchemySession, trade):
         """Update position based on new trade"""
         try:
-            position = session.query(PositionORM).filter_by(symbol=trade.symbol).first()
+            # Handle both TradeORM objects and dictionaries
+            if isinstance(trade, dict):
+                symbol = trade.get('symbol')
+                side = trade.get('side')
+                quantity = trade.get('quantity')
+                price = trade.get('price')
+                fee = trade.get('fee', 0.001)  # Default fee
+            else:
+                # Assume it's a TradeORM object
+                symbol = trade.symbol
+                side = trade.side
+                quantity = trade.quantity
+                price = trade.price
+                fee = getattr(trade, 'fee', 0.001)  # Default fee
+            
+            # Validate required fields
+            if not symbol or not side or quantity is None or price is None:
+                error_msg = f"Invalid trade data: symbol={symbol}, side={side}, quantity={quantity}, price={price}"
+                self.logger.error(error_msg)
+                raise ValueError(error_msg)
+            
+            position = session.query(PositionORM).filter_by(symbol=symbol).first()
             
             if position is None:
                 # Create new position
-                side = 'LONG' if trade.side == 'BUY' else 'SHORT'
-                quantity = trade.quantity if trade.side == 'BUY' else -trade.quantity
+                side_str = 'LONG' if side == 'BUY' else 'SHORT'
+                quantity_val = quantity if side == 'BUY' else -quantity
                 
                 position = PositionORM(
-                    symbol=trade.symbol,
-                    side=side,
-                    quantity=quantity,
-                    average_price=trade.price,
-                    current_price=trade.price,
+                    symbol=symbol,
+                    side=side_str,
+                    quantity=quantity_val,
+                    average_price=price,
+                    current_price=price,
                     unrealized_pnl=0.0,
-                    realized_pnl=-trade.fee,
+                    realized_pnl=-fee,
                     timestamp=datetime.now()
                 )
                 session.add(position)
             else:
                 # Update existing position
-                if trade.side == 'BUY':
+                if side == 'BUY':
                     if position.quantity >= 0:
                         # Adding to long position
-                        total_value = (position.quantity * position.average_price) + (trade.quantity * trade.price)
-                        total_quantity = position.quantity + trade.quantity
+                        total_value = (position.quantity * position.average_price) + (quantity * price)
+                        total_quantity = position.quantity + quantity
                         position.average_price = total_value / total_quantity if total_quantity > 0 else 0
                         position.quantity = total_quantity
                     else:
                         # Reducing short position or going long
-                        if abs(position.quantity) >= trade.quantity:
-                            pnl = (position.average_price - trade.price) * trade.quantity
-                            position.realized_pnl += pnl - trade.fee
-                            position.quantity += trade.quantity
+                        if abs(position.quantity) >= quantity:
+                            pnl = (position.average_price - price) * quantity
+                            position.realized_pnl += pnl - fee
+                            position.quantity += quantity
                         else:
                             cover_quantity = abs(position.quantity)
-                            cover_pnl = (position.average_price - trade.price) * cover_quantity
+                            cover_pnl = (position.average_price - price) * cover_quantity
                             position.realized_pnl += cover_pnl
                             
-                            remaining_quantity = trade.quantity - cover_quantity
+                            remaining_quantity = quantity - cover_quantity
                             position.quantity = remaining_quantity
-                            position.average_price = trade.price
+                            position.average_price = price
                             position.side = 'LONG'
-                            position.realized_pnl -= trade.fee
+                            position.realized_pnl -= fee
                 
                 else:  # SELL
                     if position.quantity > 0:
                         # Reducing long position
-                        if position.quantity >= trade.quantity:
-                            pnl = (trade.price - position.average_price) * trade.quantity
-                            position.realized_pnl += pnl - trade.fee
-                            position.quantity -= trade.quantity
+                        if position.quantity >= quantity:
+                            pnl = (price - position.average_price) * quantity
+                            position.realized_pnl += pnl - fee
+                            position.quantity -= quantity
                         else:
                             close_quantity = position.quantity
-                            close_pnl = (trade.price - position.average_price) * close_quantity
+                            close_pnl = (price - position.average_price) * close_quantity
                             position.realized_pnl += close_pnl
                             
-                            remaining_quantity = trade.quantity - close_quantity
+                            remaining_quantity = quantity - close_quantity
                             position.quantity = -remaining_quantity
-                            position.average_price = trade.price
+                            position.average_price = price
                             position.side = 'SHORT'
-                            position.realized_pnl -= trade.fee
+                            position.realized_pnl -= fee
                     else:
                         # Adding to short position
-                        total_value = (abs(position.quantity) * position.average_price) + (trade.quantity * trade.price)
-                        total_quantity = abs(position.quantity) + trade.quantity
+                        total_value = (abs(position.quantity) * position.average_price) + (quantity * price)
+                        total_quantity = abs(position.quantity) + quantity
                         position.average_price = total_value / total_quantity
                         position.quantity = -total_quantity
                 
                 position.timestamp = datetime.now()
             
             session.commit()
-            self.logger.info(f"Position updated for {trade.symbol}")
+            self.logger.info(f"Position updated for {symbol}")
         except Exception as e:
             session.rollback()
             self.logger.error(f"Error updating position: {str(e)}")
