@@ -205,49 +205,75 @@ st.markdown("""
     /* Force all metric cards to 120px height for perfect alignment */
     /* Multiple selectors to catch all Streamlit metric card variations */
     
+    /* Target metric container - ALL possible selectors */
     [data-testid="metric-container"],
+    .metric-container,
     div[data-testid="metric-container"],
-    .css-1oaqf2d,  /* Common Streamlit metric container class */
-    .css-ocqkz7 {  /* Alternative Streamlit metric class */
+    .css-1oaqf2d,
+    .css-ocqkz7,
+    [class*="metric"],
+    .stMetric {
         background-color: #2f3035 !important;
-        border: 1px solid rgba(255, 145, 77, 0.2) !important;
-        border-radius: 8px !important;
+        border: 2px solid #ff914d !important;
+        border-radius: 12px !important;
         padding: 16px !important;
-        min-height: 120px !important;
         height: 120px !important;
+        min-height: 120px !important;
         max-height: 120px !important;
         display: flex !important;
         flex-direction: column !important;
         justify-content: space-between !important;
+        align-items: flex-start !important;
         box-sizing: border-box !important;
-        transition: all 0.2s ease !important;
-        overflow: hidden !important;
+        overflow: visible !important;
     }
     
+    /* Metric value text */
+    [data-testid="metric-container"] > div {
+        height: auto !important;
+    }
+    
+    /* Metric label styling */
+    [data-testid="metric-container"] > div > div:first-child {
+        color: #b8b8b8 !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+    }
+    
+    /* Metric value (big number) */
+    [data-testid="metric-container"] > div > div:nth-child(2) {
+        color: #ffffff !important;
+        font-size: 24px !important;
+        font-weight: 700 !important;
+        margin: 0 !important;
+    }
+    
+    /* Metric delta styling */
+    [data-testid="metric-container"] > div > div:nth-child(3) {
+        color: #ff914d !important;
+        font-size: 12px !important;
+        margin-top: auto !important;
+    }
+    
+    /* Hover effects */
     [data-testid="metric-container"]:hover,
     div[data-testid="metric-container"]:hover,
     .css-1oaqf2d:hover,
     .css-ocqkz7:hover {
-        border-color: rgba(255, 145, 77, 0.5) !important;
+        border-color: #ffb974 !important;
         background-color: #353a3f !important;
-        transform: translateY(-2px) !important;
         box-shadow: 0 4px 12px rgba(255, 145, 77, 0.2) !important;
     }
     
-    /* Ensure child elements don't override */
-    [data-testid="metric-container"] * {
-        box-sizing: border-box !important;
-    }
-
-    /* ===== UNIFIED COLUMN STYLING ===== */
-    /* Ensure uniform gap and padding between columns */
-    .stColumn {
+    /* Column spacing - fix horizontal gaps */
+    [data-testid="stHorizontalBlock"] > [data-testid="column"] {
         gap: 16px !important;
+        padding: 0 !important;
     }
     
-    /* Container div for columns - ensure proper spacing */
-    [data-testid="column"] {
-        padding: 0 !important;
+    /* Remove extra padding from metric containers */
+    [data-testid="metric-container"] * {
+        box-sizing: border-box !important;
     }
 
     /* ===== UNIFIED TABLE STYLING ===== */
@@ -483,44 +509,8 @@ def styled_subheader(text: str, icon: str = ""):
     st.markdown(f"### {prefix}{text}")
 
 def metric_card(label: str, value: str, delta: str = "", icon: str = "", help_text: str = ""):
-    """Create enhanced metric card with FIXED 120px height using containerized approach"""
-    with st.container(border=False):
-        # Create a proper card container with strict inline styles
-        icon_part = f"{icon} " if icon else ""
-        delta_part = f"<br/><span style='font-size: 0.85rem; color: #ff914d'>{delta}</span>" if delta else ""
-        
-        html = f"""
-        <div style="
-            background: linear-gradient(135deg, #2f3035 0%, #282930 100%);
-            border: 2px solid #ff914d;
-            border-radius: 12px;
-            padding: 18px;
-            height: 120px;
-            min-height: 120px;
-            max-height: 120px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            align-items: flex-start;
-            box-sizing: border-box;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-        ">
-            <div style="width: 100%; display: flex; justify-content: space-between; align-items: flex-start;">
-                <div style="color: #b8b8b8; font-size: 13px; font-weight: 500; line-height: 1.4;">
-                    {icon_part}{label}
-                </div>
-            </div>
-            <div style="width: 100%; display: flex; justify-content: space-between; align-items: flex-end;">
-                <div style="color: #ffffff; font-size: 24px; font-weight: 700; line-height: 1;">
-                    {value}
-                </div>
-                <div style="text-align: right; font-size: 12px;">
-                    {delta_part}
-                </div>
-            </div>
-        </div>
-        """
-        st.write(html, unsafe_allow_html=True)
+    """Wrapper around st.metric with CSS styling - simplified approach"""
+    st.metric(label, value, delta=delta if delta else None)
 
 def show_refresh_info():
     """Display last refresh timestamp"""
