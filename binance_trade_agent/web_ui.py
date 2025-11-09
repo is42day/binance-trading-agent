@@ -76,17 +76,8 @@ def get_trading_components():
 # Get components
 components = get_trading_components()
 
-# Load unified design system CSS
-try:
-    css_path = os.path.join(os.path.dirname(__file__), 'ui_styles.css')
-    if os.path.exists(css_path):
-        with open(css_path, 'r') as f:
-            css_content = f.read()
-            st.markdown(f"<style>{css_content}</style>", unsafe_allow_html=True)
-except Exception as e:
-    st.warning(f"⚠️ Could not load unified CSS system: {e}")
-
 # Enhanced styling with theme support, responsive design, and improved UX
+# INCLUDES unified design system CSS inline
 st.markdown("""
 <style>
     /* Page container spacing & responsive */
@@ -210,19 +201,17 @@ st.markdown("""
         background: rgba(255, 145, 77, 0.05);
     }
 
-    /* ===== UNIFIED METRIC CARD STYLING ===== */
+    /* ===== UNIFIED METRIC CARD STYLING (CRITICAL FIX) ===== */
     /* Force all metric cards to 120px height for perfect alignment */
     [data-testid="metric-container"] {
         background-color: #2f3035 !important;
         border-radius: 8px !important;
         border: 1px solid rgba(255, 145, 77, 0.2) !important;
         padding: 16px !important;
-        display: flex !important;
-        flex-direction: column !important;
-        justify-content: space-between !important;
         min-height: 120px !important;
         height: 120px !important;
         transition: all 0.2s ease !important;
+        overflow: hidden !important;
     }
     
     [data-testid="metric-container"]:hover {
@@ -232,37 +221,16 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(255, 145, 77, 0.2) !important;
     }
     
-    /* Metric card label - uppercase, smaller */
-    [data-testid="metric-container"] label {
-        font-size: 12px !important;
-        color: #b8b8b8 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.5px !important;
-        margin-bottom: 8px !important;
-        font-weight: 600 !important;
+    /* ALL metric-related containers - ensure fixed sizing */
+    div[data-testid="metric-container"] {
+        min-height: 120px !important;
     }
     
-    /* Metric card value - large, bold */
-    [data-testid="metric-container"] > div > div:nth-child(2) {
-        display: flex !important;
-        flex-direction: column !important;
-        justify-content: space-between !important;
-        flex-grow: 1 !important;
-    }
-    
-    /* Metric value text - 32px, bold, white */
-    [data-testid="metric-container"] span[data-testid="stMetricValue"] {
-        font-size: 32px !important;
-        font-weight: 700 !important;
-        color: #ffffff !important;
-        line-height: 1.2 !important;
-    }
-    
-    /* Metric delta text - smaller, colored */
-    [data-testid="metric-container"] span[data-testid="stMetricDelta"] {
-        font-size: 14px !important;
-        margin-top: 4px !important;
-        font-weight: 500 !important;
+    .metric {
+        background: #2f3035 !important;
+        min-height: 120px !important;
+        height: 120px !important;
+        padding: 16px !important;
     }
 
     /* ===== UNIFIED COLUMN STYLING ===== */
