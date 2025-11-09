@@ -202,78 +202,17 @@ st.markdown("""
     }
 
     /* ===== UNIFIED METRIC CARD STYLING (CRITICAL FIX) ===== */
-    /* Force all metric cards to 120px height for perfect alignment */
-    /* Multiple selectors to catch all Streamlit metric card variations */
+    /* Professional Streamlit approach - work WITH the framework */
+    /* Use simple border accent and proper spacing */
     
-    /* Target metric container - ALL possible selectors */
-    [data-testid="metric-container"],
-    .metric-container,
-    div[data-testid="metric-container"],
-    .css-1oaqf2d,
-    .css-ocqkz7,
-    [class*="metric"],
-    .stMetric {
-        background-color: #2f3035 !important;
-        border: 2px solid #ff914d !important;
-        border-radius: 12px !important;
-        padding: 16px !important;
-        height: 120px !important;
-        min-height: 120px !important;
-        max-height: 120px !important;
-        display: flex !important;
-        flex-direction: column !important;
-        justify-content: space-between !important;
-        align-items: flex-start !important;
-        box-sizing: border-box !important;
-        overflow: visible !important;
+    [data-testid="metric-container"] {
+        border-left: 4px solid #ff914d !important;
+        border-radius: 8px !important;
     }
     
-    /* Metric value text */
-    [data-testid="metric-container"] > div {
-        height: auto !important;
-    }
-    
-    /* Metric label styling */
-    [data-testid="metric-container"] > div > div:first-child {
-        color: #b8b8b8 !important;
-        font-size: 13px !important;
-        font-weight: 500 !important;
-    }
-    
-    /* Metric value (big number) */
-    [data-testid="metric-container"] > div > div:nth-child(2) {
-        color: #ffffff !important;
-        font-size: 24px !important;
-        font-weight: 700 !important;
-        margin: 0 !important;
-    }
-    
-    /* Metric delta styling */
-    [data-testid="metric-container"] > div > div:nth-child(3) {
-        color: #ff914d !important;
-        font-size: 12px !important;
-        margin-top: auto !important;
-    }
-    
-    /* Hover effects */
-    [data-testid="metric-container"]:hover,
-    div[data-testid="metric-container"]:hover,
-    .css-1oaqf2d:hover,
-    .css-ocqkz7:hover {
-        border-color: #ffb974 !important;
-        background-color: #353a3f !important;
-        box-shadow: 0 4px 12px rgba(255, 145, 77, 0.2) !important;
-    }
-    
-    /* Column spacing - fix horizontal gaps */
-    [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+    /* Column gap spacing */
+    [data-testid="stHorizontalBlock"] {
         gap: 16px !important;
-        padding: 0 !important;
-    }
-    
-    /* Remove extra padding from metric containers */
-    [data-testid="metric-container"] * {
-        box-sizing: border-box !important;
     }
 
     /* ===== UNIFIED TABLE STYLING ===== */
