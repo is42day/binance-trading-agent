@@ -483,14 +483,44 @@ def styled_subheader(text: str, icon: str = ""):
     st.markdown(f"### {prefix}{text}")
 
 def metric_card(label: str, value: str, delta: str = "", icon: str = "", help_text: str = ""):
-    """Create enhanced metric card with FIXED 120px height and proper styling"""
-    icon_html = f"<span style='font-size: 1.8rem; margin-right: 0.5rem'>{icon}</span>" if icon else ""
-    help_html = f"<span class='tooltip'><span style='cursor: help; opacity: 0.7'>❓</span><span class='tooltiptext'>{help_text}</span></span>" if help_text else ""
-    delta_html = f"<span style='color: #ff914d; font-size: 0.9rem; margin-left: 0.5rem; margin-top: auto'>{delta}</span>" if delta else ""
-    
-    # Use inline styles to FORCE 120px height - bypass Streamlit's metric rendering
-    html_content = f"""<div style="background-color: #2f3035; border: 1px solid rgba(255, 145, 77, 0.2); border-radius: 8px; padding: 16px; height: 120px; min-height: 120px; max-height: 120px; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; transition: all 0.2s ease;" onmouseover="this.style.borderColor='rgba(255, 145, 77, 0.5)'; this.style.backgroundColor='#353a3f'; this.style.boxShadow='0 4px 12px rgba(255, 145, 77, 0.2)';" onmouseout="this.style.borderColor='rgba(255, 145, 77, 0.2)'; this.style.backgroundColor='#2f3035'; this.style.boxShadow='none';"><div style="display: flex; align-items: center; justify-content: space-between;"><div style="display: flex; align-items: center; gap: 8px;">{icon_html}<strong style="color: #b8b8b8; font-size: 0.95rem">{label}</strong> {help_html}</div></div><div style="flex-grow: 1; display: flex; align-items: flex-end; gap: 8px;"><div style="color: #ffffff; font-size: 1.4rem; font-weight: 600">{value}</div>{delta_html}</div></div>"""
-    st.markdown(html_content, unsafe_allow_html=True)
+    """Create enhanced metric card with FIXED 120px height using containerized approach"""
+    with st.container(border=False):
+        # Create a proper card container with strict inline styles
+        icon_part = f"{icon} " if icon else ""
+        delta_part = f"<br/><span style='font-size: 0.85rem; color: #ff914d'>{delta}</span>" if delta else ""
+        
+        html = f"""
+        <div style="
+            background: linear-gradient(135deg, #2f3035 0%, #282930 100%);
+            border: 2px solid #ff914d;
+            border-radius: 12px;
+            padding: 18px;
+            height: 120px;
+            min-height: 120px;
+            max-height: 120px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: flex-start;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        ">
+            <div style="width: 100%; display: flex; justify-content: space-between; align-items: flex-start;">
+                <div style="color: #b8b8b8; font-size: 13px; font-weight: 500; line-height: 1.4;">
+                    {icon_part}{label}
+                </div>
+            </div>
+            <div style="width: 100%; display: flex; justify-content: space-between; align-items: flex-end;">
+                <div style="color: #ffffff; font-size: 24px; font-weight: 700; line-height: 1;">
+                    {value}
+                </div>
+                <div style="text-align: right; font-size: 12px;">
+                    {delta_part}
+                </div>
+            </div>
+        </div>
+        """
+        st.write(html, unsafe_allow_html=True)
 
 def show_refresh_info():
     """Display last refresh timestamp"""
