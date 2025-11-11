@@ -18,11 +18,18 @@ tabulate==0.9.0
 pytest-asyncio==0.24.0
 toml==0.10.2
 
-# Web UI dependencies
+# Web UI dependencies - Streamlit (legacy)
 streamlit==1.35.0
-plotly==5.20.0
 streamlit-option-menu==0.3.12
 streamlit-extras==0.4.2
+
+# Plotly and Dash (new dashboard)
+plotly==5.18.0
+dash==2.14.2
+dash-bootstrap-components==1.5.0
+orjson==3.9.14
+flask==2.3.3
+werkzeug==2.3.7
 
 # Optional: For enhanced monitoring (uncomment if needed)
 # prometheus-client==0.20.0

@@ -20,7 +20,7 @@ class TradeExecutionAgent:
         Returns:
             dict: Order response or error info.
         """
-        from binance_trade_agent.portfolio_manager import PortfolioManager, Trade
+        from binance_trade_agent.portfolio_manager import PortfolioManager, TradeORM
         from datetime import datetime
         try:
             order = self.client.create_order(symbol, side, order_type, quantity, price)
@@ -29,7 +29,7 @@ class TradeExecutionAgent:
                 # Use web_portfolio.db for all trades (shown in dashboard)
                 pm = PortfolioManager("/app/data/web_portfolio.db")
                 trade_id = str(order.get('orderId'))
-                trade = Trade(
+                trade = TradeORM(
                     trade_id=trade_id,
                     symbol=symbol,
                     side=side,
@@ -79,6 +79,32 @@ class TradeExecutionAgent:
             return {'error': str(ex)}
         except Exception as ex:
             return {'error': str(ex)}
+
+    def place_buy_order(self, symbol, quantity, order_type='MARKET', price=None):
+        """
+        Place a BUY order.
+        Args:
+            symbol (str): Trading pair symbol (e.g., 'BTCUSDT').
+            quantity (float): Amount to buy.
+            order_type (str): 'MARKET' or 'LIMIT'.
+            price (float, optional): Price for LIMIT orders.
+        Returns:
+            dict: Order response or error info.
+        """
+        return self.place_order(symbol, 'BUY', order_type, quantity, price)
+
+    def place_sell_order(self, symbol, quantity, order_type='MARKET', price=None):
+        """
+        Place a SELL order.
+        Args:
+            symbol (str): Trading pair symbol (e.g., 'BTCUSDT').
+            quantity (float): Amount to sell.
+            order_type (str): 'MARKET' or 'LIMIT'.
+            price (float, optional): Price for LIMIT orders.
+        Returns:
+            dict: Order response or error info.
+        """
+        return self.place_order(symbol, 'SELL', order_type, quantity, price)
 
 if __name__ == "__main__":
     agent = TradeExecutionAgent()
