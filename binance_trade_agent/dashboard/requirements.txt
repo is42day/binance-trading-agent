@@ -1,0 +1,21 @@
+# Plotly Dash Dashboard Dependencies
+# Add to main requirements.txt - these are extras for dashboard
+
+# Dash framework and components
+dash==2.14.0
+dash-bootstrap-components==1.5.0
+plotly==5.18.0
+
+# Data processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Web framework (Dash uses Flask internally)
+Flask>=2.3.0
+Werkzeug>=2.3.0
+
+# HTTP client
+requests>=2.31.0
+
+# JSON handling
+python-json-logger>=2.0.7

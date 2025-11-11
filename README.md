@@ -43,8 +43,12 @@ Click "Portfolio" tab → Should show portfolio stats and positions.
 
 ## 📚 Documentation
 
-- **[COMPREHENSIVE_GUIDE.md](COMPREHENSIVE_GUIDE.md)** - Complete usage guide, architecture, testing, deployment, troubleshooting (START HERE for full docs)
-- **[DEVELOPMENT_REFERENCE.md](DEVELOPMENT_REFERENCE.md)** - API reference, code patterns, optimization, extending system
+See **[docs/](docs/README.md)** for complete documentation index.
+
+Key guides:
+- **[docs/COMPREHENSIVE_GUIDE.md](docs/COMPREHENSIVE_GUIDE.md)** - Complete usage guide, architecture, testing, deployment
+- **[docs/DEVELOPMENT_REFERENCE.md](docs/DEVELOPMENT_REFERENCE.md)** - API reference, code patterns, optimization
+- **[docs/QUICK_START_AUTONOMOUS_TRADING.md](docs/QUICK_START_AUTONOMOUS_TRADING.md)** - 5-minute autonomous trading setup
 - **[binance_trade_agent/README.md](binance_trade_agent/README.md)** - Package-level documentation
 
 ---
@@ -92,7 +96,7 @@ docker-compose up -d --force-recreate
 docker-compose logs -f trading-agent
 ```
 
-**See [COMPREHENSIVE_GUIDE.md](COMPREHENSIVE_GUIDE.md#troubleshooting) for full troubleshooting guide.**
+**See [docs/RUN_AUTONOMOUS_TRADING_NOW.md](docs/RUN_AUTONOMOUS_TRADING_NOW.md#troubleshooting) for full troubleshooting guide.**
 
 ---
 

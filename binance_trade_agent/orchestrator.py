@@ -118,7 +118,7 @@ class TradingOrchestrator:
             )
             
             # Step 4: Execute trade if approved
-            if risk_approved and signal_result['signal'] in ['BUY', 'SELL', 'buy', 'sell']:
+            if risk_approved:
                 self.logger.info("Step 4: Executing trade", extra=extra)
                 execution_result = await self._execute_trade(trade_decision, correlation_id)
                 
@@ -221,12 +221,15 @@ class TradingOrchestrator:
     ) -> Optional[Dict[str, Any]]:
         """Execute the trade"""
         try:
-            if trade_decision.signal_type == 'BUY':
+            # Normalize signal type to uppercase
+            signal_upper = trade_decision.signal_type.upper()
+            
+            if signal_upper == 'BUY':
                 result = self.execution_agent.place_buy_order(
                     symbol=trade_decision.symbol,
                     quantity=trade_decision.quantity
                 )
-            elif trade_decision.signal_type == 'SELL':
+            elif signal_upper == 'SELL':
                 result = self.execution_agent.place_sell_order(
                     symbol=trade_decision.symbol,
                     quantity=trade_decision.quantity

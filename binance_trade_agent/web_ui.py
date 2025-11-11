@@ -76,17 +76,8 @@ def get_trading_components():
 # Get components
 components = get_trading_components()
 
-# Load unified design system CSS
-try:
-    css_path = os.path.join(os.path.dirname(__file__), 'ui_styles.css')
-    if os.path.exists(css_path):
-        with open(css_path, 'r') as f:
-            css_content = f.read()
-            st.markdown(f"<style>{css_content}</style>", unsafe_allow_html=True)
-except Exception as e:
-    st.warning(f"⚠️ Could not load unified CSS system: {e}")
-
 # Enhanced styling with theme support, responsive design, and improved UX
+# INCLUDES unified design system CSS inline
 st.markdown("""
 <style>
     /* Page container spacing & responsive */
@@ -210,70 +201,79 @@ st.markdown("""
         background: rgba(255, 145, 77, 0.05);
     }
 
-    /* ===== UNIFIED METRIC CARD STYLING ===== */
+    /* ===== UNIFIED METRIC CARD STYLING (CRITICAL FIX) ===== */
     /* Force all metric cards to 120px height for perfect alignment */
-    [data-testid="metric-container"] {
+    /* Multiple selectors to catch all Streamlit metric card variations */
+    
+    /* Target metric container - ALL possible selectors */
+    [data-testid="metric-container"],
+    .metric-container,
+    div[data-testid="metric-container"],
+    .css-1oaqf2d,
+    .css-ocqkz7,
+    [class*="metric"],
+    .stMetric {
         background-color: #2f3035 !important;
-        border-radius: 8px !important;
-        border: 1px solid rgba(255, 145, 77, 0.2) !important;
+        border: 2px solid #ff914d !important;
+        border-radius: 12px !important;
         padding: 16px !important;
+        height: 120px !important;
+        min-height: 120px !important;
+        max-height: 120px !important;
         display: flex !important;
         flex-direction: column !important;
         justify-content: space-between !important;
-        min-height: 120px !important;
-        height: 120px !important;
-        transition: all 0.2s ease !important;
+        align-items: flex-start !important;
+        box-sizing: border-box !important;
+        overflow: visible !important;
     }
     
-    [data-testid="metric-container"]:hover {
-        border-color: rgba(255, 145, 77, 0.5) !important;
+    /* Metric value text */
+    [data-testid="metric-container"] > div {
+        height: auto !important;
+    }
+    
+    /* Metric label styling */
+    [data-testid="metric-container"] > div > div:first-child {
+        color: #b8b8b8 !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+    }
+    
+    /* Metric value (big number) */
+    [data-testid="metric-container"] > div > div:nth-child(2) {
+        color: #ffffff !important;
+        font-size: 24px !important;
+        font-weight: 700 !important;
+        margin: 0 !important;
+    }
+    
+    /* Metric delta styling */
+    [data-testid="metric-container"] > div > div:nth-child(3) {
+        color: #ff914d !important;
+        font-size: 12px !important;
+        margin-top: auto !important;
+    }
+    
+    /* Hover effects */
+    [data-testid="metric-container"]:hover,
+    div[data-testid="metric-container"]:hover,
+    .css-1oaqf2d:hover,
+    .css-ocqkz7:hover {
+        border-color: #ffb974 !important;
         background-color: #353a3f !important;
-        transform: translateY(-2px) !important;
         box-shadow: 0 4px 12px rgba(255, 145, 77, 0.2) !important;
     }
     
-    /* Metric card label - uppercase, smaller */
-    [data-testid="metric-container"] label {
-        font-size: 12px !important;
-        color: #b8b8b8 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.5px !important;
-        margin-bottom: 8px !important;
-        font-weight: 600 !important;
-    }
-    
-    /* Metric card value - large, bold */
-    [data-testid="metric-container"] > div > div:nth-child(2) {
-        display: flex !important;
-        flex-direction: column !important;
-        justify-content: space-between !important;
-        flex-grow: 1 !important;
-    }
-    
-    /* Metric value text - 32px, bold, white */
-    [data-testid="metric-container"] span[data-testid="stMetricValue"] {
-        font-size: 32px !important;
-        font-weight: 700 !important;
-        color: #ffffff !important;
-        line-height: 1.2 !important;
-    }
-    
-    /* Metric delta text - smaller, colored */
-    [data-testid="metric-container"] span[data-testid="stMetricDelta"] {
-        font-size: 14px !important;
-        margin-top: 4px !important;
-        font-weight: 500 !important;
-    }
-
-    /* ===== UNIFIED COLUMN STYLING ===== */
-    /* Ensure uniform gap and padding between columns */
-    .stColumn {
+    /* Column spacing - fix horizontal gaps */
+    [data-testid="stHorizontalBlock"] > [data-testid="column"] {
         gap: 16px !important;
+        padding: 0 !important;
     }
     
-    /* Container div for columns - ensure proper spacing */
-    [data-testid="column"] {
-        padding: 0 !important;
+    /* Remove extra padding from metric containers */
+    [data-testid="metric-container"] * {
+        box-sizing: border-box !important;
     }
 
     /* ===== UNIFIED TABLE STYLING ===== */
@@ -509,18 +509,8 @@ def styled_subheader(text: str, icon: str = ""):
     st.markdown(f"### {prefix}{text}")
 
 def metric_card(label: str, value: str, delta: str = "", icon: str = "", help_text: str = ""):
-    """Create enhanced metric card"""
-    icon_html = f"<span style='font-size: 1.8rem; margin-right: 0.5rem'>{icon}</span>" if icon else ""
-    help_html = f"<span class='tooltip'><span style='cursor: help; opacity: 0.7'>❓</span><span class='tooltiptext'>{help_text}</span></span>" if help_text else ""
-    delta_html = f"<span style='color: #ff914d; font-size: 0.9rem; margin-left: 0.5rem'>{delta}</span>" if delta else ""
-    
-    st.markdown(f"""
-    <div class="stat-block">
-        <div class="stat-title">{icon_html}{label} {help_html}</div>
-        <div class="stat-value">{value}</div>
-        {delta_html}
-    </div>
-    """, unsafe_allow_html=True)
+    """Wrapper around st.metric with CSS styling - simplified approach"""
+    st.metric(label, value, delta=delta if delta else None)
 
 def show_refresh_info():
     """Display last refresh timestamp"""
@@ -1576,26 +1566,19 @@ def show_health_controls_tab():
     with col1:
         # Trading mode status
         mode = "🚨 PRODUCTION" if config.is_production_ready() else "🔧 DEMO MODE"
-        st.metric("Trading Mode", mode)
+        metric_card("Trading Mode", mode, icon="⚙️")
 
     with col2:
         # API connectivity
         try:
             test_price = components['market_agent'].get_latest_price('BTCUSDT')
-            st.metric("API Status", "🟢 Connected", delta="OK")
+            metric_card("API Status", "🟢 Connected", delta="OK", icon="🔌")
         except:
-            st.metric("API Status", "🔴 Disconnected", delta="ERROR")
+            metric_card("API Status", "🔴 Disconnected", delta="ERROR", icon="🔌")
 
     with col3:
         # System uptime (simplified)
-        st.metric("System Status", "🟢 Healthy")
-
-    # Apply metric styling
-    style_metric_cards(
-        background_color="#2f3035",
-        border_left_color="#ff914d",
-        border_size_px=3
-    )
+        metric_card("System Status", "🟢 Healthy", icon="✅")
 
     st.markdown("---")
 
@@ -1609,46 +1592,39 @@ def show_health_controls_tab():
         try:
             portfolio = get_portfolio_data()
             pnl_pct = portfolio.get('total_pnl_percent', 0)
-            st.metric("Portfolio Health",
-                     "🟢 Good" if pnl_pct >= -5 else "🟡 Warning" if pnl_pct >= -15 else "🔴 Critical",
-                     delta=f"{pnl_pct:+.1f}%")
+            health_status = "🟢 Good" if pnl_pct >= -5 else "🟡 Warning" if pnl_pct >= -15 else "🔴 Critical"
+            metric_card("Portfolio Health", health_status, delta=f"{pnl_pct:+.1f}%", icon="💼")
         except:
-            st.metric("Portfolio Health", "🔴 Error")
+            metric_card("Portfolio Health", "🔴 Error", icon="💼")
 
     with health_col2:
         # Risk status
         try:
             risk_data = get_risk_status()
             emergency = risk_data.get('emergency_stop', False)
-            st.metric("Risk Status", "🚨 EMERGENCY STOP" if emergency else "🟢 Normal")
+            risk_status = "🚨 EMERGENCY STOP" if emergency else "🟢 Normal"
+            metric_card("Risk Status", risk_status, icon="⚠️")
         except:
-            st.metric("Risk Status", "🔴 Unknown")
+            metric_card("Risk Status", "🔴 Unknown", icon="⚠️")
 
     with health_col3:
         # Signal generation
         try:
             signal = get_signals()
             confidence = signal.get('confidence', 0)
-            st.metric("Signal Confidence", f"{confidence:.1%}",
-                     delta="High" if confidence > 0.7 else "Medium" if confidence > 0.5 else "Low")
+            confidence_label = "High" if confidence > 0.7 else "Medium" if confidence > 0.5 else "Low"
+            metric_card("Signal Confidence", f"{confidence:.1%}", delta=confidence_label, icon="📊")
         except:
-            st.metric("Signal Confidence", "🔴 Error")
+            metric_card("Signal Confidence", "🔴 Error", icon="📊")
 
     with health_col4:
         # Active positions
         try:
             portfolio = get_portfolio_data()
             positions = portfolio.get('open_positions', 0)
-            st.metric("Active Positions", positions)
+            metric_card("Active Positions", str(positions), icon="📈")
         except:
-            st.metric("Active Positions", "🔴 Error")
-
-    # Apply metric styling
-    style_metric_cards(
-        background_color="#2f3035",
-        border_left_color="#2ecc71",
-        border_size_px=2
-    )
+            metric_card("Active Positions", "🔴 Error", icon="📈")
 
     st.markdown("---")
 
