@@ -24,6 +24,9 @@ jobs:
           pip install -r requirements.txt
           pip install ruff black isort pip-audit pytest pytest-asyncio
 
+      - name: Create test database directory
+        run: mkdir -p data && touch data/test_portfolio.db
+
       - name: Lint with ruff
         run: ruff check binance_trade_agent tests/
 
