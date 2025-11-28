@@ -19,6 +19,7 @@ sys.path.insert(
 from binance_trade_agent.dashboard.components import navbar
 from binance_trade_agent.dashboard.pages import (
     advanced,
+    automation,
     execute_trade,
     logs,
     market_data,
@@ -73,6 +74,11 @@ PAGES = {
         "component": signals_risk.layout,
         "name": "Signals & Risk",
         "icon": "🎯",
+    },
+    "/automation": {
+        "component": automation.layout,
+        "name": "Automation",
+        "icon": "🤖",
     },
     "/execute-trade": {
         "component": execute_trade.layout,
