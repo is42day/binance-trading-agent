@@ -275,10 +275,7 @@ class TestEnhancedSignalAgent:
         """Test conversion of StrategyResult to dictionary format"""
         from datetime import datetime
 
-        from binance_trade_agent.strategies.base_strategy import (
-            SignalType,
-            StrategyResult,
-        )
+        from binance_trade_agent.strategies.base_strategy import SignalType, StrategyResult
 
         # Create a test StrategyResult
         result = StrategyResult(

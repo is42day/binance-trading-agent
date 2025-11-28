@@ -646,9 +646,7 @@ def trigger_emergency_stop(n_clicks):
         return html.Div()
 
     try:
-        from binance_trade_agent.dashboard.utils.data_fetch import (
-            get_trading_components,
-        )
+        from binance_trade_agent.dashboard.utils.data_fetch import get_trading_components
 
         components = get_trading_components()
         risk_agent = components["risk_agent"]
