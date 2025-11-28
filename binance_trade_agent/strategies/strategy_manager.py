@@ -46,27 +46,43 @@ class StrategyManager:
         except Exception as e:
             self.logger.error(f"Failed to register macd_default: {str(e)}")
         try:
-            self.register_strategy('combined_default', CombinedStrategy())
+            combined_strategy = CombinedStrategy()
+            self.register_strategy('combined_default', combined_strategy)
+            self.register_strategy('combined', combined_strategy)  # Alias for convenience
         except Exception as e:
-            self.logger.error(f"Failed to register combined_default: {str(e)}")
+            self.logger.error(f"Failed to register combined strategy: {str(e)}")
         try:
-            self.register_strategy('rsi_aggressive', RSIStrategy({
+            rsi_strategy = RSIStrategy({
                 'overbought': 65,
                 'oversold': 35,
                 'extreme_overbought': 75,
                 'extreme_oversold': 25
-            }))
+            })
+            self.register_strategy('rsi_aggressive', rsi_strategy)
         except Exception as e:
             self.logger.error(f"Failed to register rsi_aggressive: {str(e)}")
         try:
-            self.register_strategy('rsi_conservative', RSIStrategy({
+            rsi_conservative = RSIStrategy({
                 'overbought': 75,
                 'oversold': 25,
                 'extreme_overbought': 85,
                 'extreme_oversold': 15
-            }))
+            })
+            self.register_strategy('rsi_conservative', rsi_conservative)
         except Exception as e:
             self.logger.error(f"Failed to register rsi_conservative: {str(e)}")
+        try:
+            rsi_default = RSIStrategy()
+            self.register_strategy('rsi_default', rsi_default)
+            self.register_strategy('rsi', rsi_default)  # Alias
+        except Exception as e:
+            self.logger.error(f"Failed to register rsi: {str(e)}")
+        try:
+            macd_default = MACDStrategy()
+            self.register_strategy('macd_default', macd_default)
+            self.register_strategy('macd', macd_default)  # Alias
+        except Exception as e:
+            self.logger.error(f"Failed to register macd: {str(e)}")
         self.logger.info(f"Initialized {len(self.strategies)} default strategies")
     
     def register_strategy(self, name: str, strategy: BaseStrategy) -> bool:

@@ -77,9 +77,9 @@ class EnhancedRiskManagementAgent:
             'drawdown_pause_hours': 24,       # Pause trading for 24h after max drawdown
 
             # Frequency controls
-            'max_trades_per_hour': 10,
-            'max_trades_per_day': 50,
-            'min_time_between_trades': 60,     # 60 seconds minimum between trades
+            'max_trades_per_hour': 100,
+            'max_trades_per_day': 500,
+            'min_time_between_trades': 5,     # 5 seconds minimum between trades
 
             # Symbol-specific rules
             'symbol_rules': {

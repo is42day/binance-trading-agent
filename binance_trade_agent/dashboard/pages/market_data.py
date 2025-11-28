@@ -285,10 +285,10 @@ def update_order_book(symbol, n_intervals):
         # Add bids and asks
         max_rows = max(len(bids), len(asks))
         for i in range(max_rows):
-            bid_price = f"${bids[i][0]:,.2f}" if i < len(bids) else ""
-            bid_qty = f"{bids[i][1]:.4f}" if i < len(bids) else ""
-            ask_price = f"${asks[i][0]:,.2f}" if i < len(asks) else ""
-            ask_qty = f"{asks[i][1]:.4f}" if i < len(asks) else ""
+            bid_price = f"${float(bids[i][0]):,.2f}" if i < len(bids) else ""
+            bid_qty = f"{float(bids[i][1]):.4f}" if i < len(bids) else ""
+            ask_price = f"${float(asks[i][0]):,.2f}" if i < len(asks) else ""
+            ask_qty = f"{float(asks[i][1]):.4f}" if i < len(asks) else ""
             
             table_rows.append(
                 html.Tr([

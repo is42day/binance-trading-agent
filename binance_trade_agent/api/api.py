@@ -35,8 +35,8 @@ app.add_middleware(
 )
 
 # Initialize components
-# Use a separate DB for the API to avoid SQLite connection issues with the main agent
-portfolio_manager = PortfolioManager(db_path="/app/data/portfolio.db")
+# Use web_portfolio.db which is shared with the dashboard and trading agent
+portfolio_manager = PortfolioManager(db_path="/app/data/web_portfolio.db")
 risk_agent = EnhancedRiskManagementAgent()
 market_agent = MarketDataAgent()
 cache = RedisCache(host="redis") # Use the service name from docker-compose

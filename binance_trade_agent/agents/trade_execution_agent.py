@@ -18,29 +18,69 @@ class TradeExecutionAgent:
             quantity (float): Amount to trade.
             price (float, optional): Price for LIMIT orders.
         Returns:
-            dict: Order response or error info.
+            dict: Structured response with order_id and price.
         """
-        from ..core.portfolio_manager import PortfolioManager, TradeORM
+        from ..core.portfolio_manager import PortfolioManager
         from datetime import datetime
+        import uuid
         try:
             order = self.client.create_order(symbol, side, order_type, quantity, price)
-            # Only persist if orderId is present (success)
-            if isinstance(order, dict) and order.get('orderId'):
+            
+            # Persist trade whether or not orderId is present (for testnet compatibility)
+            if isinstance(order, dict):
                 # Use web_portfolio.db for all trades (shown in dashboard)
                 pm = PortfolioManager("/app/data/web_portfolio.db")
-                trade_id = str(order.get('orderId'))
-                trade = TradeORM(
+                
+                # Generate a trade ID - use orderId if available, otherwise generate UUID
+                trade_id = str(order.get('orderId', str(uuid.uuid4())[:16]))
+                
+                # Get executed quantity - fallback to requested quantity if not available
+                exec_qty = float(order.get('executedQty', quantity))
+                
+                # Get price - try multiple sources
+                order_price = price
+                if 'price' in order and order['price'] and float(order['price']) > 0:
+                    order_price = float(order['price'])
+                elif 'fills' in order and order['fills']:
+                    order_price = float(order['fills'][0].get('price', price or 0))
+                
+                # If price still not found, fetch current market price
+                if not order_price or order_price == 0:
+                    try:
+                        current_price = self.client.get_ticker(symbol).get('lastPrice')
+                        if current_price:
+                            order_price = float(current_price)
+                    except:
+                        pass  # Use 0 as fallback
+                
+                # Call add_trade with individual parameters
+                pm.add_trade(
                     trade_id=trade_id,
                     symbol=symbol,
                     side=side,
-                    quantity=float(order.get('executedQty', quantity)),
-                    price=float(order.get('price') or order.get('fills', [{}])[0].get('price', price) or 0),
+                    quantity=exec_qty,
+                    price=order_price or 0,
                     fee=0.0,  # Fee can be parsed from fills if needed
-                    timestamp=datetime.now(),
-                    order_id=order.get('orderId')
+                    order_id=order.get('orderId', trade_id)
                 )
-                pm.add_trade(trade)
-            return order
+                
+                # Return structured response that includes the extracted price
+                return {
+                    'order_id': order.get('orderId', trade_id),
+                    'price': order_price or 0,
+                    'quantity': exec_qty,
+                    'side': side,
+                    'symbol': symbol,
+                    'status': order.get('status', 'UNKNOWN'),
+                    'original_response': order
+                }
+            
+            # If order is not a dict, still try to extract useful info
+            return {
+                'error': 'Invalid order response',
+                'original_response': order
+            }
+            
         except BinanceAPIException as ex:
             return {'error': str(ex)}
         except Exception as ex:
