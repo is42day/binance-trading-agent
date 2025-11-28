@@ -3,12 +3,13 @@ Async Redis caching service for market data with TTL support.
 Falls back to in-memory cache if Redis is not available.
 """
 
-import aioredis
 import asyncio
 import json
 import logging
-from typing import Any, Optional
 from datetime import datetime, timedelta
+from typing import Any, Optional
+
+import redis.asyncio as aioredis
 
 logger = logging.getLogger(__name__)
 
