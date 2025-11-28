@@ -3,20 +3,20 @@ FastAPI Data Service for Binance Trading Agent
 Exposes portfolio, risk, and market data to the Dash UI
 """
 
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime
 import logging
 import traceback
+from datetime import datetime
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+
+from ..agents.market_data_agent import MarketDataAgent
+from ..agents.risk_management_agent import EnhancedRiskManagementAgent
+from ..clients.redis_cache import RedisCache
+from ..common.config import config
+from ..core.portfolio_manager import PortfolioManager
 
 logger = logging.getLogger(__name__)
-
-# Import core components
-from ..core.portfolio_manager import PortfolioManager
-from ..agents.risk_management_agent import EnhancedRiskManagementAgent
-from ..agents.market_data_agent import MarketDataAgent
-from ..common.config import config
-from ..clients.redis_cache import RedisCache
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -35,13 +35,14 @@ app.add_middleware(
 )
 
 # Initialize components
-# Use a separate DB for the API to avoid SQLite connection issues with the main agent
-portfolio_manager = PortfolioManager(db_path="/app/data/portfolio.db")
+# Use web_portfolio.db which is shared with the dashboard and trading agent
+portfolio_manager = PortfolioManager(db_path="/app/data/web_portfolio.db")
 risk_agent = EnhancedRiskManagementAgent()
 market_agent = MarketDataAgent()
-cache = RedisCache(host="redis") # Use the service name from docker-compose
+cache = RedisCache(host="redis")  # Use the service name from docker-compose
 
 # --- Lifecycle Events ---
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -54,6 +55,7 @@ async def startup_event():
     except Exception as e:
         logger.error(f"❌ Error in startup event: {e}", exc_info=True)
         raise
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -68,20 +70,22 @@ async def shutdown_event():
 
 # --- API Endpoints ---
 
+
 @app.get("/")
 def read_root():
     """Root endpoint for API health check."""
     return {
         "status": "ok",
         "timestamp": datetime.now().isoformat(),
-        "message": "Binance Trading Agent API is running."
+        "message": "Binance Trading Agent API is running.",
     }
+
 
 @app.get("/api/v1/portfolio/summary")
 async def get_portfolio_summary():
     """Get a summary of the portfolio including P&L and value."""
     cache_key = "portfolio:summary"
-    logger.info(f"=== GET /api/v1/portfolio/summary ===")
+    logger.info("=== GET /api/v1/portfolio/summary ===")
     try:
         logger.info(f"Attempting to get cached value for key '{cache_key}'...")
         # 1. Check cache first
@@ -102,7 +106,8 @@ async def get_portfolio_summary():
         return {**stats, "source": "live"}
     except Exception as e:
         logger.error(f"Error in get_portfolio_summary: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
 
 @app.get("/api/v1/portfolio/positions")
 async def get_all_positions():
@@ -111,7 +116,8 @@ async def get_all_positions():
         positions = portfolio_manager.get_all_positions()
         return {"positions": positions}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
 
 @app.get("/api/v1/portfolio/trade-history")
 async def get_trade_history(limit: int = 50):
@@ -120,7 +126,8 @@ async def get_trade_history(limit: int = 50):
         trades = portfolio_manager.get_trade_history(limit=limit)
         return {"trades": trades}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
 
 @app.get("/api/v1/risk/status")
 async def get_risk_status():
@@ -140,7 +147,8 @@ async def get_risk_status():
 
         return {**status, "source": "live"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
 
 @app.get("/api/v1/market/price/{symbol}")
 async def get_market_price(symbol: str):
@@ -164,7 +172,8 @@ async def get_market_price(symbol: str):
 
         return {"symbol": symbol_upper, "price": price, "source": "live"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"API error: {e}")
+        raise HTTPException(status_code=500, detail=f"API error: {e}") from e
+
 
 @app.get("/api/v1/system/config")
 async def get_system_config():
@@ -173,11 +182,13 @@ async def get_system_config():
         return {
             "demo_mode": config.demo_mode,
             "binance_testnet": config.binance_testnet,
-            "risk_config": config.get_risk_config()
+            "risk_config": config.get_risk_config(),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -8,7 +8,7 @@ anyio==4.11.0
 requests==2.31.0
 httpx==0.27.0
 redis==5.0.3
-aioredis==2.0.1
+# aioredis is included in redis>=5.0, no separate package needed
 
 # Additional dependencies for enhanced features
 numpy==1.26.4
@@ -29,6 +29,12 @@ werkzeug==2.3.7
 # API dependencies
 fastapi==0.110.0
 uvicorn==0.22.0
+
+# Development & Linting dependencies
+ruff==0.6.8
+black==24.1.1
+isort==5.13.2
+mypy==1.8.0
 
 # Optional: For enhanced monitoring (uncomment if needed)
 # prometheus-client==0.20.0
