@@ -3,8 +3,8 @@ Test Enhanced Signal Agent with Modular Strategies
 """
 import pytest
 from unittest.mock import Mock, patch
-from binance_trade_agent.signal_agent import SignalAgent
-from binance_trade_agent.strategies.base_strategy import SignalType
+from ..agents.signal_agent import SignalAgent
+from ..strategies.base_strategy import SignalType
 
 
 class TestEnhancedSignalAgent:

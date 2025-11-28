@@ -1,6 +1,6 @@
 import os
 import pytest
-from binance_trade_agent.binance_client import BinanceAPIClient
+from ..clients.binance_client import BinanceAPIClient
 
 def test_binance_connectivity():
     client = BinanceAPIClient()
