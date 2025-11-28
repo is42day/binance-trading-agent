@@ -10,9 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from binance_trade_agent.core.portfolio_manager import (
-    PortfolioManager,
-)
+from binance_trade_agent.core.portfolio_manager import PortfolioManager
 
 # ============================================================================
 # Test Fixtures

@@ -7,10 +7,7 @@ from dash import Input, Output, callback, dcc, html
 
 try:
     from binance_trade_agent.dashboard.components.navbar import create_metric_card
-    from binance_trade_agent.dashboard.utils.data_fetch import (
-        get_risk_status,
-        get_signals,
-    )
+    from binance_trade_agent.dashboard.utils.data_fetch import get_risk_status, get_signals
 except Exception as e:
     print(f"Import error: {e}")
     get_signals = None

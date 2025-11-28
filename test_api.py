@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 """Simple test API to verify FastAPI works."""
-from fastapi import FastAPI
-from datetime import datetime
 import logging
+from datetime import datetime
+
+from fastapi import FastAPI
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
