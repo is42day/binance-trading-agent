@@ -10,14 +10,13 @@ from datetime import datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-logger = logging.getLogger(__name__)
-
-# Import core components
 from ..agents.market_data_agent import MarketDataAgent
 from ..agents.risk_management_agent import EnhancedRiskManagementAgent
 from ..clients.redis_cache import RedisCache
 from ..common.config import config
 from ..core.portfolio_manager import PortfolioManager
+
+logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -107,7 +106,7 @@ async def get_portfolio_summary():
         return {**stats, "source": "live"}
     except Exception as e:
         logger.error(f"Error in get_portfolio_summary: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/api/v1/portfolio/positions")
@@ -117,7 +116,7 @@ async def get_all_positions():
         positions = portfolio_manager.get_all_positions()
         return {"positions": positions}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/api/v1/portfolio/trade-history")
@@ -127,7 +126,7 @@ async def get_trade_history(limit: int = 50):
         trades = portfolio_manager.get_trade_history(limit=limit)
         return {"trades": trades}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/api/v1/risk/status")
@@ -148,7 +147,7 @@ async def get_risk_status():
 
         return {**status, "source": "live"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/api/v1/market/price/{symbol}")
@@ -173,7 +172,7 @@ async def get_market_price(symbol: str):
 
         return {"symbol": symbol_upper, "price": price, "source": "live"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"API error: {e}")
+        raise HTTPException(status_code=500, detail=f"API error: {e}") from e
 
 
 @app.get("/api/v1/system/config")
@@ -186,7 +185,7 @@ async def get_system_config():
             "risk_config": config.get_risk_config(),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 if __name__ == "__main__":

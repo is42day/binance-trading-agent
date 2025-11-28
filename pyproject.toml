@@ -46,6 +46,7 @@ ignore = [
     "E501",  # line too long, handled by black
     "E203",  # whitespace before ':'
     "W505",  # doc line too long (ruff renames W503 to W505)
+    "F841",  # local variable assigned but never used (often intentional in development)
 ]
 
 [tool.mypy]

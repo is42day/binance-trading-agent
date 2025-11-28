@@ -54,7 +54,7 @@ class TradeExecutionAgent:
                         current_price = self.client.get_ticker(symbol).get("lastPrice")
                         if current_price:
                             order_price = float(current_price)
-                    except:
+                    except Exception:  # noqa: E722
                         pass  # Use 0 as fallback
 
                 # Call add_trade with individual parameters

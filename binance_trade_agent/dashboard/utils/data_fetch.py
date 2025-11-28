@@ -273,7 +273,7 @@ def get_system_status():
         # Get basic health data from monitoring
         try:
             health_data = monitoring.get_health_status()
-        except:
+        except Exception:  # noqa: E722
             health_data = {
                 "status": "healthy",
                 "uptime_seconds": 3600,

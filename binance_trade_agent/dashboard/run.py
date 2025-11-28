@@ -92,25 +92,23 @@ def check_component_imports():
 
     try:
         logger.info("  Importing data_fetch...")
-        from binance_trade_agent.dashboard.utils import data_fetch
+        import binance_trade_agent.dashboard.utils.data_fetch  # noqa: F401
 
         logger.info("    ✓ data_fetch")
 
         logger.info("  Importing components.navbar...")
-        from binance_trade_agent.dashboard.components import navbar
+        import binance_trade_agent.dashboard.components.navbar  # noqa: F401
 
         logger.info("    ✓ navbar")
 
         logger.info("  Importing pages...")
-        from binance_trade_agent.dashboard.pages import (
-            advanced,
-            execute_trade,
-            logs,
-            market_data,
-            portfolio,
-            signals_risk,
-            system_health,
-        )
+        import binance_trade_agent.dashboard.pages.advanced  # noqa: F401
+        import binance_trade_agent.dashboard.pages.execute_trade  # noqa: F401
+        import binance_trade_agent.dashboard.pages.logs  # noqa: F401
+        import binance_trade_agent.dashboard.pages.market_data  # noqa: F401
+        import binance_trade_agent.dashboard.pages.portfolio  # noqa: F401
+        import binance_trade_agent.dashboard.pages.signals_risk  # noqa: F401
+        import binance_trade_agent.dashboard.pages.system_health  # noqa: F401
 
         logger.info("    ✓ portfolio, market_data, signals_risk, execute_trade")
         logger.info("    ✓ system_health, logs, advanced")

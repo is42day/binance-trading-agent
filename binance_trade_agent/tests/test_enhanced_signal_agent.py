@@ -267,7 +267,7 @@ class TestEnhancedSignalAgent:
         assert len(strategies) > 0
 
         # Check structure of strategy info
-        for name, info in strategies.items():
+        for _name, info in strategies.items():
             assert "type" in info
             assert "description" in info
             assert "parameters" in info

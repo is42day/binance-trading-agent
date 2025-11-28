@@ -490,7 +490,7 @@ Type 'help <command>' for detailed help on specific commands.
                 best_bid = order_book["bids"][0][0] if order_book["bids"] else 0
                 best_ask = order_book["asks"][0][0] if order_book["asks"] else 0
                 spread = best_ask - best_bid if best_ask and best_bid else 0
-            except:
+            except Exception:  # noqa: E722
                 best_bid = best_ask = spread = 0
 
             print("\n" + "=" * 40)

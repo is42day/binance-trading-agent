@@ -319,6 +319,7 @@ class TestDashboardCacheInvalidation:
         mock_components.return_value = {"portfolio": mock_portfolio}
 
         # Act
+        from binance_trade_agent.api.api import get_portfolio_summary
         result1 = get_portfolio_summary()
         result2 = get_portfolio_summary()
 

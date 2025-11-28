@@ -120,7 +120,7 @@ class TestStrategyManager:
         assert len(results) > 0
 
         # All results should be valid
-        for name, result in results.items():
+        for _name, result in results.items():
             assert isinstance(result, StrategyResult)
             assert result.signal in [SignalType.BUY, SignalType.SELL, SignalType.HOLD]
             assert 0 <= result.confidence <= 1
@@ -178,7 +178,7 @@ class TestStrategyManager:
         assert len(all_performance) > 0
 
         # Each strategy should have performance data
-        for strategy_name, performance in all_performance.items():
+        for _strategy_name, performance in all_performance.items():
             assert "total_signals" in performance
             assert performance["total_signals"] > 0
 
@@ -213,7 +213,7 @@ class TestStrategyManager:
         results = self.manager.analyze_with_all_strategies(insufficient_data)
 
         # Some strategies might still work, others might return HOLD with low confidence
-        for name, result in results.items():
+        for _name, result in results.items():
             assert isinstance(result, StrategyResult)
             # Either valid signal or HOLD due to insufficient data
             assert result.signal in [SignalType.BUY, SignalType.SELL, SignalType.HOLD]
@@ -223,7 +223,7 @@ class TestStrategyManager:
         strategies = self.manager.list_strategies()
 
         # Should contain detailed information
-        for name, info in strategies.items():
+        for _name, info in strategies.items():
             assert "type" in info
             assert "description" in info
             assert "parameters" in info

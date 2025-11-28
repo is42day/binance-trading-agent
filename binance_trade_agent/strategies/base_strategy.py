@@ -7,11 +7,11 @@ Base Strategy Interface
 
 Defines the contract that all trading strategies must implement
 """
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from datetime import datetime
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from abc import ABC, abstractmethod  # noqa: E402
+from dataclasses import dataclass  # noqa: E402
+from datetime import datetime  # noqa: E402
+from enum import Enum  # noqa: E402
+from typing import Any, Dict, List, Optional  # noqa: E402
 
 
 class SignalType(Enum):
@@ -141,10 +141,10 @@ class BaseStrategy(ABC):
         if expected_type and not isinstance(value, expected_type):
             try:
                 value = expected_type(value)
-            except (ValueError, TypeError):
+            except (ValueError, TypeError) as e:
                 raise ValueError(
                     f"Parameter '{name}' must be of type {expected_type.__name__}"
-                )
+                ) from e
 
         # Range validation if specified
         min_val = param_config.get("min")
