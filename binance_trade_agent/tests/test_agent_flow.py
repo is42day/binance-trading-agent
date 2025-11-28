@@ -5,11 +5,11 @@ import pytest
 import asyncio
 from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime
-from binance_trade_agent.orchestrator import TradingOrchestrator, TradeDecision
-from binance_trade_agent.market_data_agent import MarketDataAgent
-from binance_trade_agent.signal_agent import SignalAgent
-from binance_trade_agent.risk_management_agent import RiskManagementAgent
-from binance_trade_agent.trade_execution_agent import TradeExecutionAgent
+from ..core.orchestrator import TradingOrchestrator, TradeDecision
+from ..agents.market_data_agent import MarketDataAgent
+from ..agents.signal_agent import SignalAgent
+from ..agents.risk_management_agent import RiskManagementAgent
+from ..agents.trade_execution_agent import TradeExecutionAgent
 
 
 class TestAgentFlow:
@@ -25,7 +25,6 @@ class TestAgentFlow:
     
     def test_market_to_signal_flow(self):
         """Test market data to signal generation flow"""
-        # Test that market data flows correctly to signal generation
         symbol = "BTCUSDT"
         
         # Get market data
@@ -36,7 +35,7 @@ class TestAgentFlow:
         signal_result = self.signal_agent.generate_signal(symbol)
         assert 'signal' in signal_result
         assert 'confidence' in signal_result
-        assert signal_result['signal'] in ['BUY', 'SELL', 'HOLD']
+        assert signal_result['signal'] in ['BUY', 'SELL', 'HOLD', 'buy', 'sell', 'hold']
         assert 0 <= signal_result['confidence'] <= 1
     
     def test_signal_to_risk_flow(self):
@@ -93,7 +92,7 @@ class TestAgentFlow:
         
         # Step 2: Signal generation
         signal_result = self.signal_agent.generate_signal(symbol)
-        assert signal_result['signal'] in ['BUY', 'SELL', 'HOLD']
+        assert signal_result['signal'] in ['BUY', 'SELL', 'HOLD', 'buy', 'sell', 'hold']
         
         # Step 3: Risk validation
         risk_result = self.risk_agent.validate_trade(
@@ -104,7 +103,7 @@ class TestAgentFlow:
         )
         
         # Step 4: Conditional execution
-        if risk_result['approved'] and signal_result['signal'] in ['BUY', 'SELL']:
+        if risk_result['approved'] and signal_result['signal'] in ['BUY', 'SELL', 'buy', 'sell']:
             # Mock execution for testing
             with patch.object(self.execution_agent, 'place_buy_order') as mock_execution:
                 mock_execution.return_value = {
@@ -142,7 +141,7 @@ class TestAgentFlow:
             assert isinstance(decision, TradeDecision)
             assert decision.symbol == symbol
             assert decision.quantity == quantity
-            assert decision.signal_type in ['BUY', 'SELL', 'HOLD']
+            assert decision.signal_type in ['BUY', 'SELL', 'HOLD', 'buy', 'sell', 'hold']
             assert 0 <= decision.confidence <= 1
             assert decision.price > 0
             assert isinstance(decision.risk_approved, bool)

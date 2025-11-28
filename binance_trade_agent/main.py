@@ -1,5 +1,3 @@
-
-
 import asyncio
 import signal
 import sys
@@ -38,7 +36,7 @@ def main():
         logger.addHandler(ch)
         logger.addHandler(fh)
 
-    from .config import config
+    from .common.config import config
     config.validate()
 
     loop = asyncio.get_event_loop()
@@ -57,7 +55,7 @@ def main():
 
         # Integration test mode: trigger a trade immediately if SIGNAL_AGENT_TEST_MODE is set
         if os.environ.get("SIGNAL_AGENT_TEST_MODE", "").lower() in ("1", "true", "yes"):
-            from .orchestrator import TradingOrchestrator
+            from .core.orchestrator import TradingOrchestrator
             orchestrator = TradingOrchestrator()
             symbol = "BTCUSDT"
             quantity = config.get_default_quantity(symbol)

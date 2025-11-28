@@ -4,7 +4,7 @@ from dash import html, dcc, Input, Output, callback
 import logging
 
 try:
-    from binance_trade_agent.dashboard.utils.data_fetch import get_portfolio_data
+    from binance_trade_agent.dashboard import api_client
     from binance_trade_agent.dashboard.components.navbar import create_metric_card
 except Exception as e:
     print(f"Import error: {e}")
@@ -37,26 +37,24 @@ layout = dbc.Container([
 def update_metrics(n_intervals):
     """Update portfolio metrics display"""
     try:
-        if get_portfolio_data is None or create_metric_card is None:
-            logger.warning("Data fetch functions not available")
-            return dbc.Alert("Data loading unavailable", color="warning")
+        data = api_client.get_portfolio_summary()
         
-        try:
-            data = get_portfolio_data()
-        except Exception as fetch_err:
-            logger.error(f"Failed to fetch portfolio data: {fetch_err}")
-            return dbc.Alert(f"Failed to fetch data: {str(fetch_err)[:100]}", color="danger")
-        
-        if isinstance(data, dict) and "error" in data:
-            logger.error(f"Data error: {data['error']}")
-            return dbc.Alert(f"Error: {data['error']}", color="danger")
-        
+        if "error" in data:
+            logger.error(f"API Error: {data['error']}")
+            return dbc.Alert(f"API Error: {data['error']}", color="danger")
+
+        # Calculate P&L percentage
+        total_value = data.get('total_value', 0)
+        total_pnl = data.get('total_pnl', 0)
+        initial_capital = total_value - total_pnl
+        pnl_percent = (total_pnl / initial_capital) * 100 if initial_capital > 0 else 0
+
         # Build metric cards
         cards = dbc.Row([
             dbc.Col([
                 create_metric_card(
                     label="Total Value",
-                    value=f"${data.get('total_value', 0):,.2f}",
+                    value=f"${total_value:,.2f}",
                     icon="💰",
                     status="primary"
                 )
@@ -65,17 +63,17 @@ def update_metrics(n_intervals):
             dbc.Col([
                 create_metric_card(
                     label="Total P&L",
-                    value=f"${data.get('total_pnl', 0):,.2f}",
-                    delta=f"{data.get('total_pnl_percent', 0):+.2f}%",
+                    value=f"${total_pnl:,.2f}",
+                    delta=f"{pnl_percent:+.2f}%",
                     icon="📊",
-                    status="success" if data.get("total_pnl", 0) >= 0 else "danger"
+                    status="success" if total_pnl >= 0 else "danger"
                 )
             ], lg=3, md=6, xs=12, className="mb-3"),
             
             dbc.Col([
                 create_metric_card(
                     label="Open Positions",
-                    value=str(data.get("open_positions", 0)),
+                    value=str(data.get("positions_count", 0)),
                     icon="📍",
                     status="info"
                 )
@@ -84,7 +82,7 @@ def update_metrics(n_intervals):
             dbc.Col([
                 create_metric_card(
                     label="Total Trades",
-                    value=str(data.get("total_trades", 0)),
+                    value=str(data.get("number_of_trades", 0)),
                     icon="📈",
                     status="warning"
                 )

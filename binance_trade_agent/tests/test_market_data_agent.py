@@ -1,6 +1,6 @@
 # tests/test_market_data_agent.py
 
-from binance_trade_agent.market_data_agent import MarketDataAgent
+from ..agents.market_data_agent import MarketDataAgent
 
 class DummyClient:
     def get_latest_price(self, symbol):

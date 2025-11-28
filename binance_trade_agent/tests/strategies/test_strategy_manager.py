@@ -2,10 +2,10 @@
 Test Strategy Manager Implementation
 """
 import pytest
-from binance_trade_agent.strategies.strategy_manager import StrategyManager
-from binance_trade_agent.strategies.base_strategy import SignalType, StrategyResult
-from binance_trade_agent.strategies.rsi_strategy import RSIStrategy
-from binance_trade_agent.strategies.macd_strategy import MACDStrategy
+from ...strategies.strategy_manager import StrategyManager
+from ...strategies.base_strategy import SignalType, StrategyResult
+from ...strategies.rsi_strategy import RSIStrategy
+from ...strategies.macd_strategy import MACDStrategy
 
 
 class TestStrategyManager:

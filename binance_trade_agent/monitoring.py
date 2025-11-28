@@ -14,7 +14,7 @@ import threading
 from collections import defaultdict, deque
 import statistics
 
-from .config import config
+from .common.config import config
 
 
 @dataclass

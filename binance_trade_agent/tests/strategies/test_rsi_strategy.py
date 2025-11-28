@@ -2,8 +2,8 @@
 Test RSI Strategy Implementation
 """
 import pytest
-from binance_trade_agent.strategies.rsi_strategy import RSIStrategy
-from binance_trade_agent.strategies.base_strategy import SignalType, StrategyResult
+from ...strategies.rsi_strategy import RSIStrategy
+from ...strategies.base_strategy import SignalType, StrategyResult
 
 
 class TestRSIStrategy:
