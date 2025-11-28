@@ -15,6 +15,9 @@ on:
 env:
   BINANCE_API_URL: https://testnet.binance.vision
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Code Quality Checks
