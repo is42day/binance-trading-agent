@@ -101,6 +101,7 @@ def check_component_imports():
 
         logger.info("  Importing pages...")
         import binance_trade_agent.dashboard.pages.advanced  # noqa: F401
+        import binance_trade_agent.dashboard.pages.automation  # noqa: F401
         import binance_trade_agent.dashboard.pages.execute_trade  # noqa: F401
         import binance_trade_agent.dashboard.pages.logs  # noqa: F401
         import binance_trade_agent.dashboard.pages.market_data  # noqa: F401
@@ -108,7 +109,7 @@ def check_component_imports():
         import binance_trade_agent.dashboard.pages.signals_risk  # noqa: F401
         import binance_trade_agent.dashboard.pages.system_health  # noqa: F401
 
-        logger.info("    ✓ portfolio, market_data, signals_risk, execute_trade")
+        logger.info("    ✓ portfolio, market_data, signals_risk, automation, execute_trade")
         logger.info("    ✓ system_health, logs, advanced")
 
         return True
@@ -177,6 +178,7 @@ def main():
     logger.info("   /                  - Portfolio")
     logger.info("   /market-data       - Market Data")
     logger.info("   /signals-risk      - Signals & Risk")
+    logger.info("   /automation        - Automation")
     logger.info("   /execute-trade     - Execute Trade")
     logger.info("   /system-health     - System Health")
     logger.info("   /logs              - Logs")
