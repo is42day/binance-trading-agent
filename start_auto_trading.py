@@ -15,12 +15,11 @@ Examples:
     python start_auto_trading.py --symbols BTCUSDT,ETHUSDT --interval 30
 """
 
+import argparse
 import asyncio
-import signal
-import sys
 import logging
 import os
-import argparse
+import signal
 from datetime import datetime
 from typing import List
 
@@ -40,9 +39,7 @@ logger = logging.getLogger(__name__)
 class AutomatedTradingAgent:
     """Runs automated trading loop with specified strategy"""
 
-    def __init__(
-        self, strategy: str = "combined", symbols: List[str] = None, interval: int = 60
-    ):
+    def __init__(self, strategy: str = "combined", symbols: List[str] = None, interval: int = 60):
         """
         Initialize automated trading agent
 
@@ -51,9 +48,9 @@ class AutomatedTradingAgent:
             symbols: List of symbols to trade (default: ['BTCUSDT'])
             interval: Seconds between trading cycles
         """
+        from binance_trade_agent.common.config import config
         from binance_trade_agent.core.orchestrator import TradingOrchestrator
         from binance_trade_agent.core.portfolio_manager import PortfolioManager
-        from binance_trade_agent.common.config import config
 
         self.strategy = strategy
         self.symbols = symbols or ["BTCUSDT"]
@@ -68,7 +65,7 @@ class AutomatedTradingAgent:
         self.trades_executed = 0
         self.errors = 0
 
-        logger.info(f"Initialized AutomatedTradingAgent")
+        logger.info("Initialized AutomatedTradingAgent")
         logger.info(f"  Strategy: {strategy}")
         logger.info(f"  Symbols: {', '.join(self.symbols)}")
         logger.info(f"  Interval: {interval}s")
@@ -174,9 +171,7 @@ async def main():
     logger.info(f"Logs: {log_file}")
     logger.info("=" * 70)
 
-    agent = AutomatedTradingAgent(
-        strategy=args.strategy, symbols=symbols, interval=args.interval
-    )
+    agent = AutomatedTradingAgent(strategy=args.strategy, symbols=symbols, interval=args.interval)
 
     # Setup signal handlers for graceful shutdown
     def signal_handler(signum, frame):
