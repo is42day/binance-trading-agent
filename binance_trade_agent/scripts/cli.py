@@ -14,9 +14,9 @@ from tabulate import tabulate
 
 # Import trading agent components
 from ..core.orchestrator import TradingOrchestrator
-from ..core.portfolio_manager import PortfolioManager, Trade
+from ..core.portfolio_manager import PortfolioManager
 from ..agents.risk_management_agent import EnhancedRiskManagementAgent
-from ..common.monitoring import monitoring, correlation_context
+from ..monitoring import monitoring, correlation_context
 from ..agents.market_data_agent import MarketDataAgent
 from ..agents.signal_agent import SignalAgent
 from ..agents.trade_execution_agent import TradeExecutionAgent
@@ -134,17 +134,17 @@ Type 'help <command>' for detailed help on specific commands.
                 print(f"   Signal: {decision.signal_type} (confidence: {decision.confidence:.1%})")
                 
                 # Add to portfolio
-                trade = Trade(
+                trade_price = decision.execution_price or decision.price or 0
+                self.portfolio.add_trade(
                     trade_id=decision.order_id or f"cli_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
                     symbol=symbol,
                     side="BUY",
                     quantity=quantity,
-                    price=decision.execution_price or decision.price,
-                    fee=quantity * (decision.execution_price or decision.price) * 0.001,  # Assume 0.1% fee
-                    timestamp=datetime.now(),
+                    price=trade_price,
+                    fee=quantity * trade_price * 0.001,  # Assume 0.1% fee
+                    order_id=decision.order_id,
                     correlation_id=decision.correlation_id
                 )
-                self.portfolio.add_trade(trade)
                 
             else:
                 print(f"❌ Order rejected")
@@ -179,16 +179,15 @@ Type 'help <command>' for detailed help on specific commands.
                 print(f"   Price: ${price:,.2f}")
                 
                 # Add to portfolio
-                trade = Trade(
+                self.portfolio.add_trade(
                     trade_id=result.get('order_id', f"cli_sell_{datetime.now().strftime('%Y%m%d_%H%M%S')}"),
                     symbol=symbol,
                     side="SELL",
                     quantity=quantity,
                     price=price,
                     fee=quantity * price * 0.001,  # Assume 0.1% fee
-                    timestamp=datetime.now()
+                    order_id=result.get('order_id')
                 )
-                self.portfolio.add_trade(trade)
                 
             else:
                 print(f"❌ SELL order rejected")
