@@ -12,11 +12,11 @@ from .combined_strategy import CombinedStrategy
 from .strategy_manager import StrategyManager
 
 __all__ = [
-    'BaseStrategy',
-    'StrategyResult',
-    'SignalType',
-    'RSIStrategy',
-    'MACDStrategy',
-    'CombinedStrategy',
-    'StrategyManager'
+    "BaseStrategy",
+    "StrategyResult",
+    "SignalType",
+    "RSIStrategy",
+    "MACDStrategy",
+    "CombinedStrategy",
+    "StrategyManager",
 ]

@@ -15,6 +15,7 @@ API_HOST = os.getenv("API_HOST", "host.docker.internal")
 API_PORT = os.getenv("API_PORT", "8000")
 API_BASE_URL = f"http://{API_HOST}:{API_PORT}/api/v1"
 
+
 def get_portfolio_summary() -> Dict[str, Any]:
     """Fetch portfolio summary stats."""
     try:
@@ -24,6 +25,7 @@ def get_portfolio_summary() -> Dict[str, Any]:
     except requests.exceptions.RequestException as e:
         print(f"API Error (get_portfolio_summary): {e}")
         return {"error": str(e)}
+
 
 def get_all_positions() -> List[Dict[str, Any]]:
     """Fetch all open positions."""
@@ -35,6 +37,7 @@ def get_all_positions() -> List[Dict[str, Any]]:
         print(f"API Error (get_all_positions): {e}")
         return []
 
+
 def get_trade_history(limit: int = 50) -> List[Dict[str, Any]]:
     """Fetch recent trade history."""
     try:
@@ -44,6 +47,7 @@ def get_trade_history(limit: int = 50) -> List[Dict[str, Any]]:
     except requests.exceptions.RequestException as e:
         print(f"API Error (get_trade_history): {e}")
         return []
+
 
 def get_risk_status() -> Dict[str, Any]:
     """Fetch risk management agent status."""
@@ -55,6 +59,7 @@ def get_risk_status() -> Dict[str, Any]:
         print(f"API Error (get_risk_status): {e}")
         return {"error": str(e)}
 
+
 def get_market_price(symbol: str) -> Dict[str, Any]:
     """Fetch the latest price for a symbol."""
     try:
@@ -64,6 +69,7 @@ def get_market_price(symbol: str) -> Dict[str, Any]:
     except requests.exceptions.RequestException as e:
         print(f"API Error (get_market_price): {e}")
         return {"error": str(e), "price": 0}
+
 
 def get_system_config() -> Dict[str, Any]:
     """Fetch system configuration details."""

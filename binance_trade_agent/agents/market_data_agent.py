@@ -6,6 +6,7 @@ from ..clients.redis_cache import RedisCache
 from ..common.config import Config
 import asyncio
 
+
 class MarketDataAgent:
     """
     Agent for retrieving market data from Binance. Can be extended to implement
@@ -19,7 +20,7 @@ class MarketDataAgent:
             host=self.config.redis_host,
             port=self.config.redis_port,
             db=self.config.redis_db,
-            ttl=self.config.redis_ttl_prices
+            ttl=self.config.redis_ttl_prices,
         )
 
     def fetch_price(self, symbol: str) -> float:
@@ -68,7 +69,7 @@ class MarketDataAgent:
         """
         return self.fetch_price(symbol)
 
-    def fetch_ohlcv(self, symbol: str, interval: str = '1h', limit: int = 100):
+    def fetch_ohlcv(self, symbol: str, interval: str = "1h", limit: int = 100):
         """
         Fetch OHLCV (candlestick) data for technical analysis - cache temporarily disabled for stability.
         """
@@ -76,17 +77,21 @@ class MarketDataAgent:
         klines = self.client.get_klines(symbol, interval, limit)
         ohlcv_data = []
         for kline in klines:
-            ohlcv_data.append({
-                'timestamp': int(kline[0]),
-                'open': float(kline[1]),
-                'high': float(kline[2]),
-                'low': float(kline[3]),
-                'close': float(kline[4]),
-                'volume': float(kline[5])
-            })
+            ohlcv_data.append(
+                {
+                    "timestamp": int(kline[0]),
+                    "open": float(kline[1]),
+                    "high": float(kline[2]),
+                    "low": float(kline[3]),
+                    "close": float(kline[4]),
+                    "volume": float(kline[5]),
+                }
+            )
         return ohlcv_data
 
-    async def fetch_ohlcv_async(self, symbol: str, interval: str = '1h', limit: int = 100):
+    async def fetch_ohlcv_async(
+        self, symbol: str, interval: str = "1h", limit: int = 100
+    ):
         key = f"ohlcv:{symbol}:{interval}:{limit}"
         cached = await self.cache.get(key)
         if cached is not None:
@@ -94,14 +99,16 @@ class MarketDataAgent:
         klines = self.client.get_klines(symbol, interval, limit)
         ohlcv_data = []
         for kline in klines:
-            ohlcv_data.append({
-                'timestamp': int(kline[0]),
-                'open': float(kline[1]),
-                'high': float(kline[2]),
-                'low': float(kline[3]),
-                'close': float(kline[4]),
-                'volume': float(kline[5])
-            })
+            ohlcv_data.append(
+                {
+                    "timestamp": int(kline[0]),
+                    "open": float(kline[1]),
+                    "high": float(kline[2]),
+                    "low": float(kline[3]),
+                    "close": float(kline[4]),
+                    "volume": float(kline[5]),
+                }
+            )
         await self.cache.set(key, ohlcv_data, ttl=self.config.redis_ttl_ohlcv)
         return ohlcv_data
 
@@ -110,6 +117,7 @@ class MarketDataAgent:
         Fetch 24-hour ticker statistics including price change, volume, etc.
         """
         return self.client.get_24h_ticker(symbol)
+
 
 # Example usage (for manual/debug test, not run in production agent loop):
 if __name__ == "__main__":

@@ -2,6 +2,7 @@
 Async Redis caching service for market data with TTL support.
 Falls back to in-memory cache if Redis is not available.
 """
+
 import aioredis
 import asyncio
 import json
@@ -11,19 +12,21 @@ from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
+
 class InMemoryCache:
     """Fallback in-memory cache when Redis is unavailable."""
+
     def __init__(self, ttl: int = 2):
         self.ttl = ttl
         self._cache = {}
         self._expiry = {}
-    
+
     async def connect(self):
         pass
-    
+
     async def close(self):
         pass
-    
+
     async def get(self, key: str) -> Optional[Any]:
         if key in self._cache:
             if key in self._expiry and self._expiry[key] < datetime.now():
@@ -32,21 +35,21 @@ class InMemoryCache:
                 return None
             return self._cache[key]
         return None
-    
+
     async def set(self, key: str, value: Any, ttl: Optional[int] = None):
         ttl = ttl if ttl is not None else self.ttl
         self._cache[key] = value
         self._expiry[key] = datetime.now() + timedelta(seconds=ttl)
-    
+
     async def delete(self, key: str):
         if key in self._cache:
             del self._cache[key]
             del self._expiry[key]
-    
+
     async def clear(self, pattern: str = "*"):
         self._cache.clear()
         self._expiry.clear()
-    
+
     async def exists(self, key: str) -> int:
         """Check if key exists. Returns 1 if exists, 0 otherwise."""
         if key in self._cache:
@@ -57,8 +60,11 @@ class InMemoryCache:
             return 1
         return 0
 
+
 class RedisCache:
-    def __init__(self, host: str = 'localhost', port: int = 6379, db: int = 0, ttl: int = 2):
+    def __init__(
+        self, host: str = "localhost", port: int = 6379, db: int = 0, ttl: int = 2
+    ):
         self.host = host
         self.port = port
         self.db = db
@@ -68,22 +74,26 @@ class RedisCache:
 
     async def connect(self):
         if not self._redis and not self._use_fallback:
-            logger.debug(f"Attempting to connect to Redis at {self.host}:{self.port}/{self.db}")
+            logger.debug(
+                f"Attempting to connect to Redis at {self.host}:{self.port}/{self.db}"
+            )
             try:
                 redis_client = await asyncio.wait_for(
                     aioredis.from_url(
-                        f"redis://{self.host}:{self.port}/{self.db}", 
-                        encoding="utf-8", 
-                        decode_responses=True
+                        f"redis://{self.host}:{self.port}/{self.db}",
+                        encoding="utf-8",
+                        decode_responses=True,
                     ),
-                    timeout=2
+                    timeout=2,
                 )
                 # Test the connection with a ping
                 await asyncio.wait_for(redis_client.ping(), timeout=2)
                 self._redis = redis_client
                 logger.info(f"Connected to Redis at {self.host}:{self.port}")
             except (asyncio.TimeoutError, Exception) as e:
-                logger.warning(f"Failed to connect to Redis ({self.host}:{self.port}): {type(e).__name__}: {e}. Using in-memory cache fallback.")
+                logger.warning(
+                    f"Failed to connect to Redis ({self.host}:{self.port}): {type(e).__name__}: {e}. Using in-memory cache fallback."
+                )
                 self._use_fallback = True
                 self._redis = InMemoryCache(self.ttl)
                 logger.info(f"Fallback initialized. Using in-memory cache.")
@@ -96,7 +106,9 @@ class RedisCache:
 
     async def get(self, key: str) -> Optional[Any]:
         await self.connect()
-        logger.debug(f"Getting key '{key}' from {'in-memory' if self._use_fallback else 'Redis'} cache")
+        logger.debug(
+            f"Getting key '{key}' from {'in-memory' if self._use_fallback else 'Redis'} cache"
+        )
         try:
             value = await self._redis.get(key)
             if value is not None and not self._use_fallback:
@@ -106,7 +118,9 @@ class RedisCache:
                     return value
             return value
         except Exception as e:
-            logger.error(f"Error getting key '{key}' from cache: {type(e).__name__}: {e}")
+            logger.error(
+                f"Error getting key '{key}' from cache: {type(e).__name__}: {e}"
+            )
             raise
 
     async def set(self, key: str, value: Any, ttl: Optional[int] = None):
@@ -129,6 +143,7 @@ class RedisCache:
     async def exists(self, key: str) -> bool:
         await self.connect()
         return await self._redis.exists(key) > 0
+
 
 # Example usage:
 # cache = RedisCache(ttl=2)

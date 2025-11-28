@@ -5,6 +5,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import os
 
+
 async def run_forever(stop_event):
     logger = logging.getLogger("binance_agent")
     try:
@@ -16,6 +17,7 @@ async def run_forever(stop_event):
     except asyncio.CancelledError:
         logger.info("Binance Trade Agent shutting down gracefully...")
 
+
 def main():
 
     # Setup root logger (console + file)
@@ -24,12 +26,12 @@ def main():
     log_file = os.path.join(log_dir, "agent.log")
     logger = logging.getLogger("binance_agent")
     logger.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     # Console handler
     ch = logging.StreamHandler()
     ch.setFormatter(formatter)
     # Rotating file handler
-    fh = RotatingFileHandler(log_file, maxBytes=2*1024*1024, backupCount=3)
+    fh = RotatingFileHandler(log_file, maxBytes=2 * 1024 * 1024, backupCount=3)
     fh.setFormatter(formatter)
     # Avoid duplicate handlers
     if not logger.hasHandlers():
@@ -37,6 +39,7 @@ def main():
         logger.addHandler(fh)
 
     from .common.config import config
+
     config.validate()
 
     loop = asyncio.get_event_loop()
@@ -56,11 +59,16 @@ def main():
         # Integration test mode: trigger a trade immediately if SIGNAL_AGENT_TEST_MODE is set
         if os.environ.get("SIGNAL_AGENT_TEST_MODE", "").lower() in ("1", "true", "yes"):
             from .core.orchestrator import TradingOrchestrator
+
             orchestrator = TradingOrchestrator()
             symbol = "BTCUSDT"
             quantity = config.get_default_quantity(symbol)
-            logger.info(f"[TEST MODE] Triggering single trading workflow for {symbol}...")
-            loop.run_until_complete(orchestrator.execute_trading_workflow(symbol, quantity))
+            logger.info(
+                f"[TEST MODE] Triggering single trading workflow for {symbol}..."
+            )
+            loop.run_until_complete(
+                orchestrator.execute_trading_workflow(symbol, quantity)
+            )
 
         loop.run_until_complete(run_forever(stop_event))
     except KeyboardInterrupt:
@@ -71,6 +79,7 @@ def main():
     finally:
         logger.info("Shutting down...")
         loop.close()
+
 
 if __name__ == "__main__":
     main()
