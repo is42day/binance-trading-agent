@@ -2,7 +2,6 @@
 Pytest configuration and fixtures for tests
 """
 
-import os
 import tempfile
 from pathlib import Path
 
