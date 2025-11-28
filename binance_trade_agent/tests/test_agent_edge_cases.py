@@ -1,11 +1,8 @@
-import os
 import pytest
-from datetime import datetime
 
 from ..agents.market_data_agent import MarketDataAgent
 from ..agents.trade_execution_agent import TradeExecutionAgent
-from ..core.portfolio_manager import PortfolioManager, Trade
-from ..common import config as cfg
+from ..core.portfolio_manager import PortfolioManager
 
 
 @pytest.fixture(autouse=True)

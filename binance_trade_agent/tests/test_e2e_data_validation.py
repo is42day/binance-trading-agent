@@ -3,22 +3,16 @@ End-to-End Data Validation Tests
 Tests complete data flows: portfolio calculations, trade reconciliation, API consistency
 """
 
-import pytest
 import asyncio
-from datetime import datetime, timedelta
-from decimal import Decimal
-from pathlib import Path
-import tempfile
 import json
+import tempfile
+from pathlib import Path
+
+import pytest
 
 from binance_trade_agent.core.portfolio_manager import (
     PortfolioManager,
-    Trade,
-    TradeORM,
-    PositionORM,
 )
-from binance_trade_agent.clients.redis_cache import RedisCache, InMemoryCache
-
 
 # ============================================================================
 # Test Fixtures

@@ -6,6 +6,7 @@ Interactive client to test trading agent functionality
 
 import asyncio
 import json
+
 from binance_trade_agent.api.mcp_server import server
 
 
@@ -29,7 +30,7 @@ class TradingMCPClient:
 
     async def test_risk_validation(self):
         """Test risk management validation"""
-        print(f"\n⚖️ Testing risk validation...")
+        print("\n⚖️ Testing risk validation...")
 
         # Sample data for validation
         signal = {
@@ -110,15 +111,15 @@ class TradingMCPClient:
                 {**signal, "symbol": symbol, "quantity": 0.001}, portfolio, market_data
             )
 
-            print(f"\n⚖️ Trade validation result:")
+            print("\n⚖️ Trade validation result:")
             print(json.dumps(validation, indent=2))
 
             # 5. Place order (dry run)
             if validation.get("valid", False):
-                print(f"\n✅ Trade validated - proceeding with dry run order")
+                print("\n✅ Trade validated - proceeding with dry run order")
                 await self.test_order_placement(symbol, dry_run=True)
             else:
-                print(f"\n❌ Trade validation failed - no order placed")
+                print("\n❌ Trade validation failed - no order placed")
 
             print("\n🎉 Workflow completed successfully!")
 
@@ -134,7 +135,7 @@ async def main():
     print("=" * 50)
 
     while True:
-        print(f"\nAvailable commands:")
+        print("\nAvailable commands:")
         print("1. Test market data")
         print("2. Test trading signal")
         print("3. Test risk validation")
@@ -144,7 +145,7 @@ async def main():
         print("0. Exit")
 
         try:
-            choice = input(f"\nEnter your choice (0-6): ").strip()
+            choice = input("\nEnter your choice (0-6): ").strip()
 
             if choice == "0":
                 print("👋 Goodbye!")
@@ -173,7 +174,7 @@ async def main():
                 print("❌ Invalid choice, please try again")
 
         except KeyboardInterrupt:
-            print(f"\n👋 Goodbye!")
+            print("\n👋 Goodbye!")
             break
         except Exception as e:
             print(f"❌ Error: {str(e)}")

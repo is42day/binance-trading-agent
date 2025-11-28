@@ -2,10 +2,10 @@
 Logs Page - System logs and monitoring with filtering and search
 """
 
-import dash_bootstrap_components as dbc
-from dash import html, dcc, callback, Input, Output, State, ctx
 from datetime import datetime, timedelta
-import json
+
+import dash_bootstrap_components as dbc
+from dash import Input, Output, State, callback, ctx, dcc, html
 
 # Log levels
 LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR"]

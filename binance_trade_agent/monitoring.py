@@ -3,17 +3,16 @@ Structured Logging and Monitoring System for Trading Agent
 """
 
 import logging
-import json
+import statistics
+import threading
 import time
 import uuid
-from datetime import datetime
-from typing import Dict, Any, Optional, List, Callable
-from dataclasses import dataclass, asdict
-from functools import wraps
-from contextlib import contextmanager
-import threading
 from collections import defaultdict, deque
-import statistics
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass
+from datetime import datetime
+from functools import wraps
+from typing import Any, Callable, Dict, List, Optional
 
 from .common.config import config
 
@@ -272,7 +271,7 @@ class StructuredLogger:
 
         # Record metrics
         self.metrics.record_counter(
-            f"log_events_total", labels={"level": level, "module": self.name}
+            "log_events_total", labels={"level": level, "module": self.name}
         )
 
     def info(self, message: str, context: Optional[Dict[str, Any]] = None, **kwargs):

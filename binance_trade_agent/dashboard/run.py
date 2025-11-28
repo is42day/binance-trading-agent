@@ -4,9 +4,8 @@ Dash Dashboard Startup Script
 Initializes and runs the Binance Trading Agent Dash application
 """
 
-import sys
-import os
 import logging
+import sys
 from pathlib import Path
 
 # Add project root to path
@@ -104,13 +103,13 @@ def check_component_imports():
 
         logger.info("  Importing pages...")
         from binance_trade_agent.dashboard.pages import (
-            portfolio,
-            market_data,
-            signals_risk,
-            execute_trade,
-            system_health,
-            logs,
             advanced,
+            execute_trade,
+            logs,
+            market_data,
+            portfolio,
+            signals_risk,
+            system_health,
         )
 
         logger.info("    ✓ portfolio, market_data, signals_risk, execute_trade")
@@ -130,15 +129,13 @@ def initialize_app():
     logger.info("Initializing Dash app...")
 
     try:
-        import dash
-        import dash_bootstrap_components as dbc
 
         # Import main app
         from binance_trade_agent.dashboard.app import app
 
         logger.info("  ✓ App initialized")
         logger.info(f"  ✓ Server: {app.server}")
-        logger.info(f"  ✓ Layout ready")
+        logger.info("  ✓ Layout ready")
 
         return app
     except Exception as e:

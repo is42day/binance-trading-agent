@@ -1,15 +1,16 @@
 """Signals & Risk Page - Trading signals, risk metrics, emergency controls"""
 
-import dash_bootstrap_components as dbc
-from dash import html, dcc, Input, Output, callback
 import logging
 
+import dash_bootstrap_components as dbc
+from dash import Input, Output, callback, dcc, html
+
 try:
-    from binance_trade_agent.dashboard.utils.data_fetch import (
-        get_signals,
-        get_risk_status,
-    )
     from binance_trade_agent.dashboard.components.navbar import create_metric_card
+    from binance_trade_agent.dashboard.utils.data_fetch import (
+        get_risk_status,
+        get_signals,
+    )
 except Exception as e:
     print(f"Import error: {e}")
     get_signals = None

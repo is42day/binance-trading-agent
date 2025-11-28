@@ -3,23 +3,23 @@
 Command Line Interface for Binance Trading Agent
 Provides interactive commands for testing and controlling the trading system
 """
+import argparse
 import asyncio
 import cmd
-import json
-import sys
 from datetime import datetime
-from typing import Dict, Any, Optional, List
-import argparse
+from typing import Any, Dict, List
+
 from tabulate import tabulate
+
+from ..agents.market_data_agent import MarketDataAgent
+from ..agents.risk_management_agent import EnhancedRiskManagementAgent
+from ..agents.signal_agent import SignalAgent
+from ..agents.trade_execution_agent import TradeExecutionAgent
 
 # Import trading agent components
 from ..core.orchestrator import TradingOrchestrator
 from ..core.portfolio_manager import PortfolioManager
-from ..agents.risk_management_agent import EnhancedRiskManagementAgent
-from ..monitoring import monitoring, correlation_context
-from ..agents.market_data_agent import MarketDataAgent
-from ..agents.signal_agent import SignalAgent
-from ..agents.trade_execution_agent import TradeExecutionAgent
+from ..monitoring import correlation_context, monitoring
 
 
 class TradingCLI(cmd.Cmd):
@@ -130,7 +130,7 @@ Type 'help <command>' for detailed help on specific commands.
             )
 
             if decision.executed:
-                print(f"✅ Order executed successfully!")
+                print("✅ Order executed successfully!")
                 print(f"   Order ID: {decision.order_id}")
                 print(f"   Price: ${decision.execution_price:,.2f}")
                 print(
@@ -152,8 +152,8 @@ Type 'help <command>' for detailed help on specific commands.
                 )
 
             else:
-                print(f"❌ Order rejected")
-                print(f"   Reason: Risk not approved")
+                print("❌ Order rejected")
+                print("   Reason: Risk not approved")
                 print(
                     f"   Signal: {decision.signal_type} (confidence: {decision.confidence:.1%})"
                 )
@@ -181,7 +181,7 @@ Type 'help <command>' for detailed help on specific commands.
             if risk_result["approved"]:
                 result = self.execution_agent.place_sell_order(symbol, quantity)
 
-                print(f"✅ SELL order executed successfully!")
+                print("✅ SELL order executed successfully!")
                 print(f"   Order ID: {result.get('order_id', 'N/A')}")
                 print(f"   Price: ${price:,.2f}")
 
@@ -200,7 +200,7 @@ Type 'help <command>' for detailed help on specific commands.
                 )
 
             else:
-                print(f"❌ SELL order rejected")
+                print("❌ SELL order rejected")
                 print(f"   Reason: {risk_result['reason']}")
 
         except Exception as e:
@@ -341,7 +341,7 @@ Type 'help <command>' for detailed help on specific commands.
                 print("No trades found.")
                 return
 
-            print(f"\n" + "=" * 100)
+            print("\n" + "=" * 100)
             print(f"TRADE HISTORY (Last {len(trades)} trades)")
             print("=" * 100)
 
@@ -390,7 +390,7 @@ Type 'help <command>' for detailed help on specific commands.
             # Generate signal
             signal_result = self.signal_agent.generate_signal(symbol)
 
-            print(f"\n" + "=" * 50)
+            print("\n" + "=" * 50)
             print(f"TRADING SIGNALS - {symbol}")
             print("=" * 50)
             print(f"Current Price: ${price:,.2f}")
@@ -432,7 +432,7 @@ Type 'help <command>' for detailed help on specific commands.
                 portfolio_value=portfolio_value,
             )
 
-            print(f"\n" + "=" * 60)
+            print("\n" + "=" * 60)
             print(
                 f"RISK ASSESSMENT - {side.upper()} {quantity} {symbol} @ ${price:,.2f}"
             )
@@ -446,7 +446,7 @@ Type 'help <command>' for detailed help on specific commands.
             print(f"Reason: {result['reason']}")
 
             if result["warnings"]:
-                print(f"Warnings:")
+                print("Warnings:")
                 for warning in result["warnings"]:
                     print(f"  ⚠️  {warning}")
 
@@ -493,7 +493,7 @@ Type 'help <command>' for detailed help on specific commands.
             except:
                 best_bid = best_ask = spread = 0
 
-            print(f"\n" + "=" * 40)
+            print("\n" + "=" * 40)
             print(f"MARKET DATA - {symbol}")
             print("=" * 40)
             print(f"Current Price: ${price:,.2f}")
@@ -525,7 +525,7 @@ Type 'help <command>' for detailed help on specific commands.
             return
 
         order_id = line.strip()
-        print(f"Cancel order feature not implemented yet.")
+        print("Cancel order feature not implemented yet.")
         print(f"Note: Would cancel order {order_id} via Binance API in production.")
 
     def do_metrics(self, line):
@@ -584,7 +584,7 @@ Type 'help <command>' for detailed help on specific commands.
                 print("No logs found.")
                 return
 
-            print(f"\n" + "=" * 100)
+            print("\n" + "=" * 100)
             print(f"RECENT LOGS ({len(logs)} entries)")
             if level:
                 print(f"Filtered by level: {level}")

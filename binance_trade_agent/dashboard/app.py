@@ -3,11 +3,12 @@ Binance Trading Agent - Plotly Dash Dashboard
 Production-ready financial trading dashboard with real-time data
 """
 
-import dash
-import dash_bootstrap_components as dbc
-from dash import html, dcc, Input, Output, callback
 import os
 import sys
+
+import dash
+import dash_bootstrap_components as dbc
+from dash import Input, Output, callback, dcc, html
 
 # Add parent directory to path for imports
 sys.path.insert(
@@ -19,15 +20,14 @@ sys.path.insert(
 
 from binance_trade_agent.dashboard.components import navbar
 from binance_trade_agent.dashboard.pages import (
-    portfolio,
-    market_data,
-    signals_risk,
-    execute_trade,
-    system_health,
-    logs,
     advanced,
+    execute_trade,
+    logs,
+    market_data,
+    portfolio,
+    signals_risk,
+    system_health,
 )
-
 
 # Initialize the Dash app
 app = dash.Dash(

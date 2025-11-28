@@ -4,14 +4,13 @@ Trading Agent Orchestrator - Coordinates the full trading workflow
 
 import asyncio
 import logging
+from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Dict, Any, Optional, List
-from dataclasses import dataclass, asdict
-import json
+from typing import Any, Dict, List, Optional
 
 from ..agents.market_data_agent import MarketDataAgent
-from ..agents.signal_agent import SignalAgent
 from ..agents.risk_management_agent import RiskManagementAgent
+from ..agents.signal_agent import SignalAgent
 from ..agents.trade_execution_agent import TradeExecutionAgent
 from ..common.config import config
 
@@ -460,7 +459,7 @@ async def demo_orchestration():
 
     orchestrator = TradingOrchestrator()
 
-    print(f"\n1. Current Configuration:")
+    print("\n1. Current Configuration:")
     print(f"   Default Strategy: {orchestrator.signal_agent.current_strategy_name}")
 
     available_strategies = orchestrator.get_available_strategies()
@@ -468,7 +467,7 @@ async def demo_orchestration():
     for name, info in list(available_strategies.items())[:3]:  # Show first 3
         print(f"     - {name}: {info['description']}")
 
-    print(f"\n2. Market Analysis with All Strategies:")
+    print("\n2. Market Analysis with All Strategies:")
     try:
         analysis = await orchestrator.analyze_market_with_all_strategies("BTCUSDT")
         if "error" not in analysis:
@@ -488,7 +487,7 @@ async def demo_orchestration():
     except Exception as e:
         print(f"   Analysis failed: {str(e)}")
 
-    print(f"\n3. Creating Custom Strategy:")
+    print("\n3. Creating Custom Strategy:")
     custom_params = {
         "rsi_period": 21,
         "rsi_overbought": 75,
@@ -501,17 +500,17 @@ async def demo_orchestration():
         "demo_custom", "combined", custom_params
     )
     if success:
-        print(f"   ✓ Custom strategy 'demo_custom' created successfully")
+        print("   ✓ Custom strategy 'demo_custom' created successfully")
 
         # Switch to custom strategy
         if orchestrator.set_strategy("demo_custom"):
-            print(f"   ✓ Switched to custom strategy")
+            print("   ✓ Switched to custom strategy")
         else:
-            print(f"   ✗ Failed to switch to custom strategy")
+            print("   ✗ Failed to switch to custom strategy")
     else:
-        print(f"   ✗ Failed to create custom strategy")
+        print("   ✗ Failed to create custom strategy")
 
-    print(f"\n4. Execute Trading Workflow:")
+    print("\n4. Execute Trading Workflow:")
     # Execute with default strategy
     try:
         decision = await orchestrator.execute_trading_workflow(
@@ -531,7 +530,7 @@ async def demo_orchestration():
     except Exception as e:
         print(f"   Workflow Error: {str(e)}")
 
-    print(f"\n5. Strategy Comparison:")
+    print("\n5. Strategy Comparison:")
     try:
         comparison = orchestrator.compare_strategies_for_symbol("BTCUSDT")
         if "error" not in comparison:
@@ -543,7 +542,7 @@ async def demo_orchestration():
 
             # Show individual strategy results
             strategy_results = comparison.get("strategy_results", {})
-            print(f"   Individual Results:")
+            print("   Individual Results:")
             for strategy_name, result in list(strategy_results.items())[
                 :3
             ]:  # Show first 3
@@ -555,7 +554,7 @@ async def demo_orchestration():
     except Exception as e:
         print(f"   Comparison failed: {str(e)}")
 
-    print(f"\n6. Strategy Performance:")
+    print("\n6. Strategy Performance:")
     try:
         performance = orchestrator.get_strategy_performance_summary()
         if (
@@ -576,27 +575,27 @@ async def demo_orchestration():
                         f"     {strategy_name}: {total} signals, avg confidence: {avg_conf:.1%}"
                     )
         else:
-            print(f"   No performance data available yet")
+            print("   No performance data available yet")
     except Exception as e:
         print(f"   Performance tracking error: {str(e)}")
 
     # Show stats
     stats = orchestrator.get_execution_stats()
-    print(f"\n7. Execution Stats:")
+    print("\n7. Execution Stats:")
     for key, value in stats.items():
         if isinstance(value, float):
             print(f"   {key}: {value:.1%}")
         else:
             print(f"   {key}: {value}")
 
-    print(f"\n=== Enhanced Demo Complete ===")
-    print(f"New Strategy Features:")
-    print(f"- ✓ Multiple modular strategies (RSI, MACD, Combined)")
-    print(f"- ✓ Easy strategy switching and comparison")
-    print(f"- ✓ Custom strategy creation with parameters")
-    print(f"- ✓ Strategy performance tracking")
-    print(f"- ✓ Market analysis with consensus building")
-    print(f"- ✓ Full backward compatibility maintained")
+    print("\n=== Enhanced Demo Complete ===")
+    print("New Strategy Features:")
+    print("- ✓ Multiple modular strategies (RSI, MACD, Combined)")
+    print("- ✓ Easy strategy switching and comparison")
+    print("- ✓ Custom strategy creation with parameters")
+    print("- ✓ Strategy performance tracking")
+    print("- ✓ Market analysis with consensus building")
+    print("- ✓ Full backward compatibility maintained")
 
 
 if __name__ == "__main__":

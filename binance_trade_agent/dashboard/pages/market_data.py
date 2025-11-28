@@ -1,18 +1,19 @@
 """Market Data Page - Real-time price metrics, candlestick charts, technical indicators"""
 
-import dash_bootstrap_components as dbc
-from dash import html, dcc, Input, Output, callback, State
-import plotly.graph_objs as go
 import logging
+
+import dash_bootstrap_components as dbc
 import pandas as pd
+import plotly.graph_objs as go
+from dash import Input, Output, callback, dcc, html
 
 try:
+    from binance_trade_agent.dashboard.components.navbar import create_metric_card
     from binance_trade_agent.dashboard.utils.data_fetch import (
         get_market_data,
         get_ohlcv_data,
         get_order_book,
     )
-    from binance_trade_agent.dashboard.components.navbar import create_metric_card
 except Exception as e:
     print(f"Import error: {e}")
     get_market_data = None

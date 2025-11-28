@@ -1,8 +1,9 @@
 """Portfolio Page - Real-time portfolio overview"""
 
-import dash_bootstrap_components as dbc
-from dash import html, dcc, Input, Output, callback
 import logging
+
+import dash_bootstrap_components as dbc
+from dash import Input, Output, callback, dcc, html
 
 try:
     from binance_trade_agent.dashboard import api_client

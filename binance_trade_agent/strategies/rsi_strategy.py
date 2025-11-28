@@ -4,8 +4,9 @@ RSI (Relative Strength Index) Trading Strategy
 Uses RSI indicator to generate buy/sell signals based on overbought/oversold conditions
 """
 
-from typing import Dict, List, Any
-from .base_strategy import BaseStrategy, StrategyResult, SignalType
+from typing import Any, Dict, List
+
+from .base_strategy import BaseStrategy, SignalType, StrategyResult
 
 
 class RSIStrategy(BaseStrategy):

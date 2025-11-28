@@ -2,8 +2,9 @@
 TradeExecutionAgent: Handles order placement, status, and cancellation via BinanceAPIClient.
 """
 
-from ..clients.binance_client import BinanceAPIClient
 from binance.exceptions import BinanceAPIException
+
+from ..clients.binance_client import BinanceAPIClient
 
 
 class TradeExecutionAgent:
@@ -22,9 +23,9 @@ class TradeExecutionAgent:
         Returns:
             dict: Structured response with order_id and price.
         """
-        from ..core.portfolio_manager import PortfolioManager
-        from datetime import datetime
         import uuid
+
+        from ..core.portfolio_manager import PortfolioManager
 
         try:
             order = self.client.create_order(symbol, side, order_type, quantity, price)

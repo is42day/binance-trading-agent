@@ -4,15 +4,15 @@ Extracted from web_ui.py and adapted for Dash callbacks
 """
 
 from datetime import datetime
-from binance_trade_agent.agents.market_data_agent import MarketDataAgent
-from binance_trade_agent.agents.signal_agent import SignalAgent
-from binance_trade_agent.agents.risk_management_agent import EnhancedRiskManagementAgent
-from binance_trade_agent.agents.trade_execution_agent import TradeExecutionAgent
-from binance_trade_agent.core.portfolio_manager import PortfolioManager
-from binance_trade_agent.core.orchestrator import TradingOrchestrator
-from binance_trade_agent.monitoring import monitoring
-from binance_trade_agent.common.config import config
 
+from binance_trade_agent.agents.market_data_agent import MarketDataAgent
+from binance_trade_agent.agents.risk_management_agent import EnhancedRiskManagementAgent
+from binance_trade_agent.agents.signal_agent import SignalAgent
+from binance_trade_agent.agents.trade_execution_agent import TradeExecutionAgent
+from binance_trade_agent.common.config import config
+from binance_trade_agent.core.orchestrator import TradingOrchestrator
+from binance_trade_agent.core.portfolio_manager import PortfolioManager
+from binance_trade_agent.monitoring import monitoring
 
 # Singleton component cache
 _components = None

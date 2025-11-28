@@ -3,8 +3,9 @@ Test RSI Strategy Implementation
 """
 
 import pytest
-from ...strategies.rsi_strategy import RSIStrategy
+
 from ...strategies.base_strategy import SignalType, StrategyResult
+from ...strategies.rsi_strategy import RSIStrategy
 
 
 class TestRSIStrategy:

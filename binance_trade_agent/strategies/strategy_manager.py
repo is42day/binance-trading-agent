@@ -4,14 +4,15 @@ Strategy Manager
 Manages multiple trading strategies, handles strategy selection, execution, and comparison
 """
 
-from typing import Dict, List, Any, Optional, Type
 import json
 import logging
 from datetime import datetime
-from .base_strategy import BaseStrategy, StrategyResult, SignalType
-from .rsi_strategy import RSIStrategy
-from .macd_strategy import MACDStrategy
+from typing import Any, Dict, List, Optional, Type
+
+from .base_strategy import BaseStrategy, SignalType, StrategyResult
 from .combined_strategy import CombinedStrategy
+from .macd_strategy import MACDStrategy
+from .rsi_strategy import RSIStrategy
 
 
 class StrategyManager:
@@ -105,7 +106,7 @@ class StrategyManager:
         """
         try:
             if not isinstance(strategy, BaseStrategy):
-                raise ValueError(f"Strategy must inherit from BaseStrategy")
+                raise ValueError("Strategy must inherit from BaseStrategy")
 
             self.strategies[name] = strategy
             self.performance_history[name] = []

@@ -3,10 +3,10 @@ API Client for the Dash Dashboard
 Centralizes all HTTP requests to the FastAPI data service
 """
 
-import requests
-import pandas as pd
 import os
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List
+
+import requests
 
 # Get API URL from environment or use host.docker.internal for Docker Desktop
 # When running locally: http://localhost:8000

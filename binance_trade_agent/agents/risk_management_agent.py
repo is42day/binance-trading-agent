@@ -2,12 +2,12 @@
 Enhanced Risk Management Agent with comprehensive risk controls
 """
 
-import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Union
-from dataclasses import dataclass
-from enum import Enum
 import json
+import logging
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 from ..common.config import config
 
@@ -660,7 +660,7 @@ def demo_enhanced_risk_management():
             print(f"Take Profit: ${result['take_profit_price']:.2f}")
 
     # Show risk status
-    print(f"\n--- Risk Status ---")
+    print("\n--- Risk Status ---")
     status = risk_agent.get_risk_status()
     for key, value in status.items():
         print(f"{key}: {value}")

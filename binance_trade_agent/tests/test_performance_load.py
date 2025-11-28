@@ -3,19 +3,17 @@ Performance & Load Testing - Non-Functional Requirements Validation
 Tests API latency, throughput, concurrent user limits, cache performance, and system scalability
 """
 
-import pytest
 import asyncio
-import time
-import statistics
-from datetime import datetime
-from pathlib import Path
-import tempfile
-from typing import List, Dict, Tuple
 import json
+import statistics
+import tempfile
+import time
+from pathlib import Path
 
+import pytest
+
+from binance_trade_agent.clients.redis_cache import InMemoryCache
 from binance_trade_agent.core.portfolio_manager import PortfolioManager
-from binance_trade_agent.clients.redis_cache import RedisCache, InMemoryCache
-
 
 # ============================================================================
 # Performance Benchmark Fixtures
@@ -530,7 +528,6 @@ class TestResourceUsage:
 
     def test_large_portfolio_memory(self):
         """Verify memory usage remains acceptable with large portfolio"""
-        import sys
 
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "mem_test.db"
@@ -555,7 +552,7 @@ class TestResourceUsage:
             assert len(history) == 1000
             assert stats["number_of_trades"] == 1000
 
-            print(f"\nSuccessfully stored 1000 trades")
+            print("\nSuccessfully stored 1000 trades")
             print(f"Positions: {len(positions)}")
             print(f"Stats: {json.dumps(stats, indent=2)}")
 

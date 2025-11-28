@@ -2,15 +2,17 @@
 Integration tests for the complete trading agent workflow
 """
 
-import pytest
 import asyncio
-from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime
-from ..core.orchestrator import TradingOrchestrator, TradeDecision
+from unittest.mock import AsyncMock, patch
+
+import pytest
+
 from ..agents.market_data_agent import MarketDataAgent
-from ..agents.signal_agent import SignalAgent
 from ..agents.risk_management_agent import RiskManagementAgent
+from ..agents.signal_agent import SignalAgent
 from ..agents.trade_execution_agent import TradeExecutionAgent
+from ..core.orchestrator import TradeDecision, TradingOrchestrator
 
 
 class TestAgentFlow:

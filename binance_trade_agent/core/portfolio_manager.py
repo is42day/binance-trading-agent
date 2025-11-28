@@ -4,13 +4,13 @@ Portfolio Management Module - Tracks positions, trades, and P&L using SQLAlchemy
 
 import json
 import logging
-from datetime import datetime
-from typing import Dict, List, Optional, Any
-from decimal import Decimal
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from sqlalchemy import create_engine, Column, String, Float, DateTime
-from sqlalchemy.orm import declarative_base, sessionmaker, Session as SQLAlchemySession
+from sqlalchemy import Column, DateTime, Float, String, create_engine
+from sqlalchemy.orm import Session as SQLAlchemySession
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 # ============================================================================
 # Data Classes
@@ -472,7 +472,7 @@ def demo_portfolio_management():
 
     # Show stats
     stats = portfolio.get_portfolio_stats()
-    print(f"\nPortfolio Stats:")
+    print("\nPortfolio Stats:")
     for key, value in stats.items():
         if isinstance(value, float):
             if "value" in key or "pnl" in key or "fee" in key:
@@ -485,13 +485,13 @@ def demo_portfolio_management():
             print(f"  {key}: {value}")
 
     # Show trade history
-    print(f"\nTrade History (last 5):")
+    print("\nTrade History (last 5):")
     for trade in portfolio.get_trade_history(limit=5):
         print(
             f"  {trade['timestamp']}: {trade['side']} {trade['quantity']} {trade['symbol']} @ ${trade['price']:.2f}"
         )
 
-    print(f"\nPortfolio JSON export available via portfolio.export_to_json()")
+    print("\nPortfolio JSON export available via portfolio.export_to_json()")
 
 
 if __name__ == "__main__":

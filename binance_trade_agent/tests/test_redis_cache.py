@@ -4,14 +4,11 @@ Tests for RedisCache and InMemoryCache fallback mechanisms.
 SLA: Cache operations should complete within 100ms (Redis) or 10ms (In-Memory)
 """
 
-import pytest
 import asyncio
-import json
-from datetime import datetime, timedelta
-from unittest.mock import patch, AsyncMock, MagicMock
-import aioredis
 
-from ..clients.redis_cache import RedisCache, InMemoryCache
+import pytest
+
+from ..clients.redis_cache import InMemoryCache, RedisCache
 
 
 class TestInMemoryCache:

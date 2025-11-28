@@ -2,11 +2,9 @@
 Test Strategy Manager Implementation
 """
 
-import pytest
-from ...strategies.strategy_manager import StrategyManager
 from ...strategies.base_strategy import SignalType, StrategyResult
 from ...strategies.rsi_strategy import RSIStrategy
-from ...strategies.macd_strategy import MACDStrategy
+from ...strategies.strategy_manager import StrategyManager
 
 
 class TestStrategyManager:

@@ -5,17 +5,15 @@ Executes trading workflow repeatedly until time limit or manual stop
 """
 import asyncio
 import logging
-import sys
 import os
+import sys
 from datetime import datetime, timedelta
-from typing import Optional
 
 # Add the parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from binance_trade_agent.core.orchestrator import TradingOrchestrator
 from binance_trade_agent.common.config import config
-from binance_trade_agent.monitoring import monitoring
+from binance_trade_agent.core.orchestrator import TradingOrchestrator
 
 
 class AutonomousTradingLoop:
@@ -81,19 +79,19 @@ class AutonomousTradingLoop:
             else None
         )
 
-        self.logger.info(f"🚀 Starting autonomous trading loop...")
+        self.logger.info("🚀 Starting autonomous trading loop...")
         if end_time:
             self.logger.info(
                 f"   Will run until: {end_time.strftime('%Y-%m-%d %H:%M:%S')}"
             )
         else:
-            self.logger.info(f"   Running indefinitely (press Ctrl+C to stop)")
+            self.logger.info("   Running indefinitely (press Ctrl+C to stop)")
 
         cycle = 0
         while not self.stop_flag:
             # Check if time limit reached
             if end_time and datetime.now() >= end_time:
-                self.logger.info(f"⏰ Time limit reached. Stopping autonomous trading.")
+                self.logger.info("⏰ Time limit reached. Stopping autonomous trading.")
                 break
 
             cycle += 1
@@ -146,7 +144,7 @@ class AutonomousTradingLoop:
                             f"     Time: {exec_time}"
                         )
                     else:
-                        self.logger.info(f"  ⏸️ Trade not executed (risk check failed)")
+                        self.logger.info("  ⏸️ Trade not executed (risk check failed)")
 
                 except Exception as e:
                     self.logger.error(
@@ -155,7 +153,7 @@ class AutonomousTradingLoop:
 
             # Log cycle summary
             elapsed = datetime.now() - self.start_time
-            self.logger.info(f"\n📈 Cycle Summary:")
+            self.logger.info("\n📈 Cycle Summary:")
             self.logger.info(f"   Cycles completed: {cycle}")
             self.logger.info(f"   Trades executed: {self.trades_executed}")
             self.logger.info(f"   Time elapsed: {elapsed}")
@@ -177,7 +175,7 @@ class AutonomousTradingLoop:
         # Final summary
         elapsed = datetime.now() - self.start_time
         self.logger.info(f"\n{'='*70}")
-        self.logger.info(f"🏁 TRADING SESSION COMPLETE")
+        self.logger.info("🏁 TRADING SESSION COMPLETE")
         self.logger.info(f"{'='*70}")
         self.logger.info(f"Total cycles: {cycle}")
         self.logger.info(f"Total trades executed: {self.trades_executed}")

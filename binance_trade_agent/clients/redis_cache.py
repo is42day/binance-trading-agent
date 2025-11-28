@@ -97,7 +97,7 @@ class RedisCache:
                 )
                 self._use_fallback = True
                 self._redis = InMemoryCache(self.ttl)
-                logger.info(f"Fallback initialized. Using in-memory cache.")
+                logger.info("Fallback initialized. Using in-memory cache.")
 
     async def close(self):
         if self._redis:

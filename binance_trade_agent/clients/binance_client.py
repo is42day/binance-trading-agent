@@ -1,7 +1,7 @@
-import os
 import time
+
 from binance.client import Client
-from binance.exceptions import BinanceAPIException
+
 from ..common.config import config
 
 
@@ -147,7 +147,8 @@ class BinanceAPIClient:
         """
         if self.config.demo_mode:
             # Create simple mock klines: [open_time, open, high, low, close, volume, close_time, ...]
-            import time, random
+            import random
+            import time
 
             now = int(time.time() * 1000)
             klines = []

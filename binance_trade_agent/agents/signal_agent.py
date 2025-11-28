@@ -3,12 +3,12 @@
 Enhanced SignalAgent: Uses modular trading strategies for signal generation.
 Supports multiple strategies with easy swapping and testing capabilities.
 """
-import os
 import logging
-from typing import Dict, Any, Optional, List
+import os
+from typing import Any, Dict
+
 from ..common.config import config
-from ..strategies import StrategyManager, BaseStrategy, StrategyResult
-from ..strategies.base_strategy import SignalType
+from ..strategies import StrategyManager, StrategyResult
 
 
 class SignalAgent:
@@ -321,9 +321,9 @@ class SignalAgent:
 
         fast_ema = ema(closes, fast_period)
         slow_ema = ema(closes, slow_period)
-        macd_line = [f - s for f, s in zip(fast_ema[-len(slow_ema) :], slow_ema)]
+        macd_line = [f - s for f, s in zip(fast_ema[-len(slow_ema) :], slow_ema, strict=False)]
         signal_line = ema(macd_line, signal_period)
-        histogram = [m - s for m, s in zip(macd_line[-len(signal_line) :], signal_line)]
+        histogram = [m - s for m, s in zip(macd_line[-len(signal_line) :], signal_line, strict=False)]
 
         return macd_line[-1], signal_line[-1], histogram[-1]
 

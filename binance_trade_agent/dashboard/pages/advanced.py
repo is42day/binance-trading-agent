@@ -2,10 +2,10 @@
 Advanced Page - System controls, risk management, configuration
 """
 
-import dash_bootstrap_components as dbc
-from dash import html, dcc, callback, Input, Output, State, ALL
 from datetime import datetime
-import json
+
+import dash_bootstrap_components as dbc
+from dash import Input, Output, State, callback, dcc, html
 
 layout = dbc.Container(
     [
@@ -617,8 +617,8 @@ def update_status_metrics(n_intervals):
     """Update system status metrics"""
     try:
         from binance_trade_agent.dashboard.utils.data_fetch import (
-            get_system_status,
             get_portfolio_data,
+            get_system_status,
         )
 
         system_status = get_system_status()
@@ -640,7 +640,7 @@ def update_status_metrics(n_intervals):
             f"{pnl_symbol}${daily_pnl:,.2f}",
             "Just now",
         )
-    except Exception as e:
+    except Exception:
         return "Error", "N/A", "N/A", "Error"
 
 

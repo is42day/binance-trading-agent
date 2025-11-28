@@ -3,20 +3,21 @@ FastAPI Data Service for Binance Trading Agent
 Exposes portfolio, risk, and market data to the Dash UI
 """
 
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime
 import logging
 import traceback
+from datetime import datetime
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 logger = logging.getLogger(__name__)
 
 # Import core components
-from ..core.portfolio_manager import PortfolioManager
-from ..agents.risk_management_agent import EnhancedRiskManagementAgent
 from ..agents.market_data_agent import MarketDataAgent
-from ..common.config import config
+from ..agents.risk_management_agent import EnhancedRiskManagementAgent
 from ..clients.redis_cache import RedisCache
+from ..common.config import config
+from ..core.portfolio_manager import PortfolioManager
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -85,7 +86,7 @@ def read_root():
 async def get_portfolio_summary():
     """Get a summary of the portfolio including P&L and value."""
     cache_key = "portfolio:summary"
-    logger.info(f"=== GET /api/v1/portfolio/summary ===")
+    logger.info("=== GET /api/v1/portfolio/summary ===")
     try:
         logger.info(f"Attempting to get cached value for key '{cache_key}'...")
         # 1. Check cache first

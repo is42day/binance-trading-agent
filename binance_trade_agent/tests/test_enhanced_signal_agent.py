@@ -2,10 +2,9 @@
 Test Enhanced Signal Agent with Modular Strategies
 """
 
-import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
+
 from ..agents.signal_agent import SignalAgent
-from ..strategies.base_strategy import SignalType
 
 
 class TestEnhancedSignalAgent:
@@ -276,11 +275,12 @@ class TestEnhancedSignalAgent:
 
     def test_strategy_result_conversion(self):
         """Test conversion of StrategyResult to dictionary format"""
-        from binance_trade_agent.strategies.base_strategy import (
-            StrategyResult,
-            SignalType,
-        )
         from datetime import datetime
+
+        from binance_trade_agent.strategies.base_strategy import (
+            SignalType,
+            StrategyResult,
+        )
 
         # Create a test StrategyResult
         result = StrategyResult(

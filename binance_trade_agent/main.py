@@ -1,9 +1,9 @@
 import asyncio
+import logging
+import os
 import signal
 import sys
-import logging
 from logging.handlers import RotatingFileHandler
-import os
 
 
 async def run_forever(stop_event):

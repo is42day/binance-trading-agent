@@ -3,7 +3,7 @@ Navigation bar component for Dash dashboard
 """
 
 import dash_bootstrap_components as dbc
-from dash import html, dcc
+from dash import html
 
 
 def create_navbar(pages: dict) -> dbc.Navbar:
@@ -160,7 +160,7 @@ def create_metric_card(
     card = dbc.Card(
         dbc.CardBody(card_content),
         style={
-            "border": f"1px solid rgba(255, 145, 77, 0.2)",
+            "border": "1px solid rgba(255, 145, 77, 0.2)",
             "borderLeft": f"3px solid {border_color}",
             "backgroundColor": "#23242a",
             "minHeight": "120px",

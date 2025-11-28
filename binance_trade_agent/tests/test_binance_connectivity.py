@@ -1,5 +1,3 @@
-import os
-import pytest
 from ..clients.binance_client import BinanceAPIClient
 
 

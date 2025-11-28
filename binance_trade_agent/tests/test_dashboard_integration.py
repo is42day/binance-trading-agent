@@ -4,20 +4,15 @@ Tests for dashboard data flow and API integration.
 SLA: Dashboard API calls should timeout/degrade gracefully after 5 seconds
 """
 
-import pytest
-from unittest.mock import patch, MagicMock, Mock
-import time
+from unittest.mock import MagicMock, patch
 
 from ..dashboard.utils.data_fetch import (
     get_market_data,
     get_ohlcv_data,
     get_order_book,
+    get_performance_metrics,
     get_portfolio_data,
     get_trade_history,
-    get_performance_metrics,
-    get_signals,
-    get_risk_status,
-    get_system_status,
 )
 
 

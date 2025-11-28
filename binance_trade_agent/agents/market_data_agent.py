@@ -1,10 +1,10 @@
 # binance_trade_agent/market_data_agent.py
 
 
+
 from ..clients.binance_client import BinanceAPIClient
 from ..clients.redis_cache import RedisCache
 from ..common.config import Config
-import asyncio
 
 
 class MarketDataAgent:

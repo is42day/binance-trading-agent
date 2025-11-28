@@ -1,12 +1,13 @@
 """System Health Page - System status, health metrics, API connectivity"""
 
-import dash_bootstrap_components as dbc
-from dash import html, dcc, Input, Output, callback
 import logging
 
+import dash_bootstrap_components as dbc
+from dash import Input, Output, callback, dcc, html
+
 try:
-    from binance_trade_agent.dashboard.utils.data_fetch import get_system_status
     from binance_trade_agent.dashboard.components.navbar import create_metric_card
+    from binance_trade_agent.dashboard.utils.data_fetch import get_system_status
 except Exception as e:
     print(f"Import error: {e}")
     get_system_status = None

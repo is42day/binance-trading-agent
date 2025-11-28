@@ -4,13 +4,13 @@ Tests for FastAPI endpoints with Redis fallback scenarios.
 SLA: API endpoints should respond within 100ms (P95) / 500ms (P99)
 """
 
-import pytest
-import json
-from unittest.mock import patch, AsyncMock, MagicMock
 from datetime import datetime
+from unittest.mock import patch
 
+import pytest
 from fastapi.testclient import TestClient
-from ..api.api import app, cache, portfolio_manager, risk_agent, market_agent
+
+from ..api.api import app
 
 
 @pytest.fixture

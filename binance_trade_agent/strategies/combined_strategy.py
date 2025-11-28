@@ -4,10 +4,11 @@ Combined Strategy
 Combines multiple indicators (RSI, MACD) to generate more robust trading signals
 """
 
-from typing import Dict, List, Any, Tuple
-from .base_strategy import BaseStrategy, StrategyResult, SignalType
-from .rsi_strategy import RSIStrategy
+from typing import Any, Dict, List, Tuple
+
+from .base_strategy import BaseStrategy, SignalType, StrategyResult
 from .macd_strategy import MACDStrategy
+from .rsi_strategy import RSIStrategy
 
 
 class CombinedStrategy(BaseStrategy):
@@ -37,7 +38,7 @@ class CombinedStrategy(BaseStrategy):
             # Initialize sub-strategies with extracted parameters
             self.rsi_strategy = RSIStrategy(rsi_params if rsi_params else None)
             self.macd_strategy = MACDStrategy(macd_params if macd_params else None)
-        except Exception as e:
+        except Exception:
             # Fallback: always set both sub-strategies to default
             self.rsi_strategy = RSIStrategy()
             self.macd_strategy = MACDStrategy()

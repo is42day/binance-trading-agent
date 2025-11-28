@@ -30,5 +30,11 @@ werkzeug==2.3.7
 fastapi==0.110.0
 uvicorn==0.22.0
 
+# Development & Linting dependencies
+ruff==0.6.8
+black==24.1.1
+isort==5.13.2
+mypy==1.8.0
+
 # Optional: For enhanced monitoring (uncomment if needed)
 # prometheus-client==0.20.0

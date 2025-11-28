@@ -9,16 +9,16 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from mcp.server import Server
-from mcp.types import Tool, TextContent
+from mcp.types import TextContent, Tool
 
 # Import all trading components
 from binance_trade_agent.agents.market_data_agent import MarketDataAgent
-from binance_trade_agent.agents.signal_agent import SignalAgent
 from binance_trade_agent.agents.risk_management_agent import EnhancedRiskManagementAgent
+from binance_trade_agent.agents.signal_agent import SignalAgent
 from binance_trade_agent.agents.trade_execution_agent import TradeExecutionAgent
 from binance_trade_agent.core.orchestrator import TradingOrchestrator
 from binance_trade_agent.core.portfolio_manager import PortfolioManager
-from binance_trade_agent.monitoring import monitoring, correlation_context
+from binance_trade_agent.monitoring import correlation_context, monitoring
 
 
 class EnhancedTradingMCPServer:

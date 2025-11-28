@@ -4,8 +4,9 @@ MACD (Moving Average Convergence Divergence) Trading Strategy
 Uses MACD indicator to generate buy/sell signals based on line crossovers and histogram
 """
 
-from typing import Dict, List, Any, Tuple
-from .base_strategy import BaseStrategy, StrategyResult, SignalType
+from typing import Any, Dict, List, Tuple
+
+from .base_strategy import BaseStrategy, SignalType, StrategyResult
 
 
 class MACDStrategy(BaseStrategy):

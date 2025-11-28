@@ -2,9 +2,11 @@
 Execute Trade Page - Trade form, recent trades, order execution
 """
 
-import dash_bootstrap_components as dbc
-from dash import html, dcc, callback, Input, Output, State, ALL
 import traceback
+
+import dash_bootstrap_components as dbc
+from dash import Input, Output, State, callback, dcc, html
+
 from binance_trade_agent.dashboard.utils.data_fetch import get_trading_components
 
 # Default symbols for trading

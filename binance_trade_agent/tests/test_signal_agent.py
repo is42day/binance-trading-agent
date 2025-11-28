@@ -1,5 +1,4 @@
 # tests/test_signal_agent.py
-import pytest
 from ..agents.signal_agent import SignalAgent
 
 # Sample OHLCV data for tests
