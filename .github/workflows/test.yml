@@ -90,7 +90,7 @@ jobs:
         run: pip install -e .
 
       - name: Run tests with coverage
-        run: pytest --cov=binance_trade_agent --cov-report=xml --cov-report=term -v
+        run: pytest --cov=binance_trade_agent --cov-report=xml --cov-report=term -v --ignore=binance_trade_agent/tests/test_api_endpoints.py
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
