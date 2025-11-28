@@ -286,9 +286,7 @@ def get_system_status():
             {
                 "demo_mode": config.demo_mode,
                 "production_ready": config.is_production_ready(),
-                "trading_mode": (
-                    "production" if config.is_production_ready() else "demo"
-                ),
+                "trading_mode": ("production" if config.is_production_ready() else "demo"),
                 "binance_testnet": config.binance_testnet,
                 "last_updated": datetime.now().isoformat(),
             }

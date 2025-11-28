@@ -1,7 +1,6 @@
 # binance_trade_agent/market_data_agent.py
 
 
-
 from ..clients.binance_client import BinanceAPIClient
 from ..clients.redis_cache import RedisCache
 from ..common.config import Config
@@ -89,9 +88,7 @@ class MarketDataAgent:
             )
         return ohlcv_data
 
-    async def fetch_ohlcv_async(
-        self, symbol: str, interval: str = "1h", limit: int = 100
-    ):
+    async def fetch_ohlcv_async(self, symbol: str, interval: str = "1h", limit: int = 100):
         key = f"ohlcv:{symbol}:{interval}:{limit}"
         cached = await self.cache.get(key)
         if cached is not None:

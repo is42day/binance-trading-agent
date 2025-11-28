@@ -104,9 +104,7 @@ class TestStrategyManager:
 
     def test_single_strategy_analysis(self):
         """Test analysis with single strategy"""
-        result = self.manager.analyze_with_strategy(
-            "rsi_default", self.sample_data, "BTCUSDT"
-        )
+        result = self.manager.analyze_with_strategy("rsi_default", self.sample_data, "BTCUSDT")
 
         assert result is not None
         assert isinstance(result, StrategyResult)

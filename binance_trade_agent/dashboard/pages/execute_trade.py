@@ -36,9 +36,7 @@ layout = dbc.Container(
                     [
                         dbc.Card(
                             [
-                                dbc.CardHeader(
-                                    "📝 Trade Order Form", className="bg-dark"
-                                ),
+                                dbc.CardHeader("📝 Trade Order Form", className="bg-dark"),
                                 dbc.CardBody(
                                     [
                                         # Symbol and Side Selection
@@ -211,9 +209,7 @@ layout = dbc.Container(
                     [
                         dbc.Card(
                             [
-                                dbc.CardHeader(
-                                    "📊 Current Market Info", className="bg-dark"
-                                ),
+                                dbc.CardHeader("📊 Current Market Info", className="bg-dark"),
                                 dbc.CardBody(
                                     [
                                         html.Div(
@@ -326,9 +322,7 @@ layout = dbc.Container(
             ]
         ),
         # Auto-refresh interval
-        dcc.Interval(
-            id="trade-page-interval", interval=30000, n_intervals=0  # 30 seconds
-        ),
+        dcc.Interval(id="trade-page-interval", interval=30000, n_intervals=0),  # 30 seconds
     ],
     fluid=True,
     className="p-4",
@@ -396,9 +390,7 @@ def update_market_info(symbol, n_intervals):
                         html.Div(
                             [
                                 html.Div("24h Volume", className="metric-label"),
-                                html.Div(
-                                    f"${volume_24h:,.0f}", className="metric-value"
-                                ),
+                                html.Div(f"${volume_24h:,.0f}", className="metric-value"),
                             ],
                             className="metric-card mb-3",
                         )
@@ -410,9 +402,7 @@ def update_market_info(symbol, n_intervals):
                         html.Div(
                             [
                                 html.Div("Risk Status", className="metric-label"),
-                                html.Div(
-                                    "✓ Safe", className="metric-value text-success"
-                                ),
+                                html.Div("✓ Safe", className="metric-value text-success"),
                             ],
                             className="metric-card",
                         )
@@ -553,9 +543,7 @@ def update_recent_trades(n_intervals):
                         html.Td(f"{trade.get('quantity', 0):.4f}"),
                         html.Td(f"${trade.get('price', 0):.2f}"),
                         html.Td(pnl_symbol + f"${pnl:.2f}", className=pnl_class),
-                        html.Td(
-                            trade.get("timestamp", "N/A"), style={"fontSize": "0.85rem"}
-                        ),
+                        html.Td(trade.get("timestamp", "N/A"), style={"fontSize": "0.85rem"}),
                     ]
                 )
             )

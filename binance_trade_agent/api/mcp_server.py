@@ -263,12 +263,8 @@ class EnhancedTradingMCPServer:
         async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
             """Handle MCP tool calls"""
             try:
-                with correlation_context(
-                    f"mcp_{name}_{datetime.now().strftime('%H%M%S')}"
-                ):
-                    self.logger.info(
-                        f"MCP tool called: {name}", context={"arguments": arguments}
-                    )
+                with correlation_context(f"mcp_{name}_{datetime.now().strftime('%H%M%S')}"):
+                    self.logger.info(f"MCP tool called: {name}", context={"arguments": arguments})
 
                     if name == "get_market_price":
                         result = await self._get_market_price(**arguments)
@@ -308,14 +304,8 @@ class EnhancedTradingMCPServer:
 
             except Exception as e:
                 error_msg = f"Error in tool {name}: {str(e)}"
-                self.logger.error(
-                    error_msg, context={"arguments": arguments, "error": str(e)}
-                )
-                return [
-                    TextContent(
-                        type="text", text=json.dumps({"error": error_msg}, indent=2)
-                    )
-                ]
+                self.logger.error(error_msg, context={"arguments": arguments, "error": str(e)})
+                return [TextContent(type="text", text=json.dumps({"error": error_msg}, indent=2))]
 
     # Tool implementation methods
     async def _get_market_price(self, symbol: str) -> Dict[str, Any]:
@@ -336,9 +326,7 @@ class EnhancedTradingMCPServer:
             "timestamp": datetime.now().isoformat(),
         }
 
-    async def _generate_trading_signal(
-        self, symbol: str, timeframe: str = "1h"
-    ) -> Dict[str, Any]:
+    async def _generate_trading_signal(self, symbol: str, timeframe: str = "1h") -> Dict[str, Any]:
         """Generate trading signal"""
         signal_result = self.signal_agent.generate_signal(symbol)
         return {
@@ -484,9 +472,7 @@ class EnhancedTradingMCPServer:
         risk_status = self.risk_agent.get_risk_status()
         return {"risk_status": risk_status, "timestamp": datetime.now().isoformat()}
 
-    async def _set_emergency_stop(
-        self, enabled: bool, reason: str = ""
-    ) -> Dict[str, Any]:
+    async def _set_emergency_stop(self, enabled: bool, reason: str = "") -> Dict[str, Any]:
         """Set emergency stop"""
         self.risk_agent.set_emergency_stop(enabled, reason)
         return {
@@ -495,9 +481,7 @@ class EnhancedTradingMCPServer:
             "timestamp": datetime.now().isoformat(),
         }
 
-    async def _update_market_prices(
-        self, symbols: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
+    async def _update_market_prices(self, symbols: Optional[List[str]] = None) -> Dict[str, Any]:
         """Update market prices for portfolio"""
         if not symbols:
             # Get symbols from current positions

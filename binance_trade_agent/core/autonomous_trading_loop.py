@@ -40,9 +40,7 @@ class AutonomousTradingLoop:
             strategy_parameters: Custom strategy parameters
         """
         self.symbols = symbols or ["BTCUSDT", "ETHUSDT"]
-        self.trade_interval = max(
-            trade_interval_seconds, 60
-        )  # Min 60 seconds for testnet
+        self.trade_interval = max(trade_interval_seconds, 60)  # Min 60 seconds for testnet
         self.duration_minutes = duration_minutes
         self.strategy_name = strategy_name or "combined_default"
         self.strategy_parameters = strategy_parameters
@@ -81,9 +79,7 @@ class AutonomousTradingLoop:
 
         self.logger.info("🚀 Starting autonomous trading loop...")
         if end_time:
-            self.logger.info(
-                f"   Will run until: {end_time.strftime('%Y-%m-%d %H:%M:%S')}"
-            )
+            self.logger.info(f"   Will run until: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
         else:
             self.logger.info("   Running indefinitely (press Ctrl+C to stop)")
 
@@ -96,9 +92,7 @@ class AutonomousTradingLoop:
 
             cycle += 1
             self.logger.info(f"\n{'='*70}")
-            self.logger.info(
-                f"Trading Cycle #{cycle} - {datetime.now().strftime('%H:%M:%S')}"
-            )
+            self.logger.info(f"Trading Cycle #{cycle} - {datetime.now().strftime('%H:%M:%S')}")
             self.logger.info(f"{'='*70}")
 
             # Execute trades for each symbol
@@ -147,9 +141,7 @@ class AutonomousTradingLoop:
                         self.logger.info("  ⏸️ Trade not executed (risk check failed)")
 
                 except Exception as e:
-                    self.logger.error(
-                        f"  ❌ Error processing {symbol}: {str(e)}", exc_info=True
-                    )
+                    self.logger.error(f"  ❌ Error processing {symbol}: {str(e)}", exc_info=True)
 
             # Log cycle summary
             elapsed = datetime.now() - self.start_time
@@ -163,9 +155,7 @@ class AutonomousTradingLoop:
                 if end_time and datetime.now() >= end_time:
                     break
 
-                self.logger.info(
-                    f"\n⏳ Waiting {self.trade_interval} seconds before next cycle..."
-                )
+                self.logger.info(f"\n⏳ Waiting {self.trade_interval} seconds before next cycle...")
                 try:
                     await asyncio.sleep(self.trade_interval)
                 except asyncio.CancelledError:

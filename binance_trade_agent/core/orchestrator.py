@@ -36,9 +36,7 @@ class TradeDecision:
 class TradingOrchestrator:
     """Orchestrates the complete trading workflow"""
 
-    def __init__(
-        self, strategy_name: str = None, strategy_parameters: Dict[str, Any] = None
-    ):
+    def __init__(self, strategy_name: str = None, strategy_parameters: Dict[str, Any] = None):
         """
         Initialize TradingOrchestrator with optional strategy configuration
 
@@ -100,9 +98,7 @@ class TradingOrchestrator:
 
             # Step 2: Generate trading signal (with optional strategy override)
             self.logger.info("Step 2: Generating trading signal", extra=extra)
-            signal_result = await self._generate_signal(
-                symbol, correlation_id, strategy_name
-            )
+            signal_result = await self._generate_signal(symbol, correlation_id, strategy_name)
 
             # Step 3: Risk management validation
             self.logger.info("Step 3: Risk management validation", extra=extra)
@@ -126,9 +122,7 @@ class TradingOrchestrator:
             # Step 4: Execute trade if approved
             if risk_approved:
                 self.logger.info("Step 4: Executing trade", extra=extra)
-                execution_result = await self._execute_trade(
-                    trade_decision, correlation_id
-                )
+                execution_result = await self._execute_trade(trade_decision, correlation_id)
 
                 if execution_result:
                     trade_decision.executed = True
@@ -271,12 +265,8 @@ class TradingOrchestrator:
             "total_decisions": total_decisions,
             "approved_trades": approved_trades,
             "executed_trades": executed_trades,
-            "execution_rate": (
-                executed_trades / total_decisions if total_decisions > 0 else 0
-            ),
-            "approval_rate": (
-                approved_trades / total_decisions if total_decisions > 0 else 0
-            ),
+            "execution_rate": (executed_trades / total_decisions if total_decisions > 0 else 0),
+            "approval_rate": (approved_trades / total_decisions if total_decisions > 0 else 0),
         }
 
     async def run_continuous_trading(
@@ -294,9 +284,7 @@ class TradingOrchestrator:
                     quantity = quantities.get(symbol, 0.01)
                     await self.execute_trading_workflow(symbol, quantity)
                 except Exception as e:
-                    self.logger.error(
-                        f"Error in continuous trading for {symbol}: {str(e)}"
-                    )
+                    self.logger.error(f"Error in continuous trading for {symbol}: {str(e)}")
 
             self.logger.info(f"Sleeping for {interval_seconds} seconds")
             await asyncio.sleep(interval_seconds)
@@ -379,9 +367,7 @@ class TradingOrchestrator:
             }
 
         except Exception as e:
-            self.logger.error(
-                f"Market analysis failed for {symbol}: {str(e)}", extra=extra
-            )
+            self.logger.error(f"Market analysis failed for {symbol}: {str(e)}", extra=extra)
             return {"symbol": symbol, "error": str(e), "correlation_id": correlation_id}
 
     def get_strategy_performance_summary(self) -> Dict[str, Any]:
@@ -431,9 +417,7 @@ class TradingOrchestrator:
             sell_signals = signals.count("SELL")
             hold_signals = signals.count("HOLD")
 
-            avg_confidence = (
-                sum(r["confidence"] for r in results) / len(results) if results else 0
-            )
+            avg_confidence = sum(r["confidence"] for r in results) / len(results) if results else 0
 
             return {
                 "strategy_name": strategy_name,
@@ -443,9 +427,7 @@ class TradingOrchestrator:
                 "sell_signals": sell_signals,
                 "hold_signals": hold_signals,
                 "average_confidence": avg_confidence,
-                "results": (
-                    results[-10:] if len(results) > 10 else results
-                ),  # Last 10 for brevity
+                "results": (results[-10:] if len(results) > 10 else results),  # Last 10 for brevity
             }
 
         except Exception as e:
@@ -496,9 +478,7 @@ async def demo_orchestration():
         "macd_slow_period": 22,
     }
 
-    success = orchestrator.create_custom_strategy(
-        "demo_custom", "combined", custom_params
-    )
+    success = orchestrator.create_custom_strategy("demo_custom", "combined", custom_params)
     if success:
         print("   ✓ Custom strategy 'demo_custom' created successfully")
 
@@ -543,9 +523,7 @@ async def demo_orchestration():
             # Show individual strategy results
             strategy_results = comparison.get("strategy_results", {})
             print("   Individual Results:")
-            for strategy_name, result in list(strategy_results.items())[
-                :3
-            ]:  # Show first 3
+            for strategy_name, result in list(strategy_results.items())[:3]:  # Show first 3
                 print(
                     f"     {strategy_name}: {result['signal']} (confidence: {result['confidence']:.1%})"
                 )
@@ -557,23 +535,15 @@ async def demo_orchestration():
     print("\n6. Strategy Performance:")
     try:
         performance = orchestrator.get_strategy_performance_summary()
-        if (
-            performance
-            and not isinstance(performance, dict)
-            or "error" not in performance
-        ):
+        if performance and not isinstance(performance, dict) or "error" not in performance:
             print(
                 f"   Tracked strategies: {len(performance) if isinstance(performance, dict) else 'N/A'}"
             )
             if isinstance(performance, dict):
-                for strategy_name, perf in list(performance.items())[
-                    :2
-                ]:  # Show first 2
+                for strategy_name, perf in list(performance.items())[:2]:  # Show first 2
                     total = perf.get("total_signals", 0)
                     avg_conf = perf.get("average_confidence", 0)
-                    print(
-                        f"     {strategy_name}: {total} signals, avg confidence: {avg_conf:.1%}"
-                    )
+                    print(f"     {strategy_name}: {total} signals, avg confidence: {avg_conf:.1%}")
         else:
             print("   No performance data available yet")
     except Exception as e:

@@ -54,14 +54,11 @@ layout = dbc.Container(
                     [
                         dbc.InputGroup(
                             [
-                                dbc.InputGroupText(
-                                    "Symbol", style={"minWidth": "80px"}
-                                ),
+                                dbc.InputGroupText("Symbol", style={"minWidth": "80px"}),
                                 dcc.Dropdown(
                                     id="symbol-selector",
                                     options=[
-                                        {"label": sym, "value": sym}
-                                        for sym in AVAILABLE_SYMBOLS
+                                        {"label": sym, "value": sym} for sym in AVAILABLE_SYMBOLS
                                     ],
                                     value=DEFAULT_SYMBOL,
                                     style={"minWidth": "150px"},
@@ -200,9 +197,7 @@ layout = dbc.Container(
                                             className="card-title",
                                             style={"color": "#f4f2ee"},
                                         ),
-                                        dcc.Graph(
-                                            id="rsi-chart", style={"minHeight": "300px"}
-                                        ),
+                                        dcc.Graph(id="rsi-chart", style={"minHeight": "300px"}),
                                     ]
                                 )
                             ],
@@ -267,15 +262,9 @@ def update_market_metrics(symbol, n_intervals):
                             label="24h Change",
                             value=f"{data.get('price_change_percent', 0):+.2f}%",
                             delta=f"${data.get('price_change', 0):+,.2f}",
-                            icon=(
-                                "📈"
-                                if data.get("price_change_percent", 0) >= 0
-                                else "📉"
-                            ),
+                            icon=("📈" if data.get("price_change_percent", 0) >= 0 else "📉"),
                             status=(
-                                "success"
-                                if data.get("price_change_percent", 0) >= 0
-                                else "danger"
+                                "success" if data.get("price_change_percent", 0) >= 0 else "danger"
                             ),
                         )
                     ],
@@ -441,19 +430,11 @@ def update_order_book(symbol, n_intervals):
         table_rows.append(
             html.Tr(
                 [
-                    html.Th(
-                        "Bid Price", style={"color": "#27ae60", "textAlign": "right"}
-                    ),
-                    html.Th(
-                        "Bid Qty", style={"color": "#27ae60", "textAlign": "right"}
-                    ),
+                    html.Th("Bid Price", style={"color": "#27ae60", "textAlign": "right"}),
+                    html.Th("Bid Qty", style={"color": "#27ae60", "textAlign": "right"}),
                     html.Th(" ", style={"textAlign": "center"}),
-                    html.Th(
-                        "Ask Price", style={"color": "#e74c3c", "textAlign": "right"}
-                    ),
-                    html.Th(
-                        "Ask Qty", style={"color": "#e74c3c", "textAlign": "right"}
-                    ),
+                    html.Th("Ask Price", style={"color": "#e74c3c", "textAlign": "right"}),
+                    html.Th("Ask Qty", style={"color": "#e74c3c", "textAlign": "right"}),
                 ]
             )
         )

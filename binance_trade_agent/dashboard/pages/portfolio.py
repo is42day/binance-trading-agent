@@ -190,13 +190,9 @@ def update_trades(n_intervals):
         for trade in trades:
             action = trade.get("action", "N/A").upper()
             action_color = (
-                "success"
-                if action == "BUY"
-                else "danger" if action == "SELL" else "secondary"
+                "success" if action == "BUY" else "danger" if action == "SELL" else "secondary"
             )
-            action_icon = (
-                "🟢" if action == "BUY" else "🔴" if action == "SELL" else "⚪"
-            )
+            action_icon = "🟢" if action == "BUY" else "🔴" if action == "SELL" else "⚪"
 
             quantity = trade.get("quantity", 0)
             price = trade.get("price", 0)
@@ -250,9 +246,7 @@ def update_trades(n_intervals):
                                 html.Thead(
                                     html.Tr(
                                         [
-                                            html.Th(
-                                                "Timestamp", style={"width": "20%"}
-                                            ),
+                                            html.Th("Timestamp", style={"width": "20%"}),
                                             html.Th("Symbol", style={"width": "15%"}),
                                             html.Th("Action", style={"width": "15%"}),
                                             html.Th(

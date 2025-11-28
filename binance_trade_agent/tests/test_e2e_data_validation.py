@@ -104,9 +104,7 @@ class TestPortfolioCalculationAccuracy:
 
         # P&L = (42000 - 40000) * 1.0 - 10 - 10 = 2000 - 20 = 1980
         stats = portfolio.get_portfolio_stats()
-        assert (
-            stats["total_pnl"] == 1980.0
-        ), f"Expected P&L 1980, got {stats['total_pnl']}"
+        assert stats["total_pnl"] == 1980.0, f"Expected P&L 1980, got {stats['total_pnl']}"
         assert stats["total_fees"] == 20.0
         assert stats["number_of_trades"] == 2
 
@@ -339,9 +337,7 @@ class TestAPIDataConsistency:
 
         # Expected portfolio value: (2.0 * 43000) + (10.0 * 2200) = 86000 + 22000 = 108000
         expected_value = portfolio.get_portfolio_value()
-        total_positions_value = sum(
-            p["quantity"] * p["current_price"] for p in positions
-        )
+        total_positions_value = sum(p["quantity"] * p["current_price"] for p in positions)
         assert expected_value == total_positions_value
 
         # Expected P&L: unrealized + realized - fees
@@ -355,9 +351,7 @@ class TestAPIDataConsistency:
         portfolio.add_trade("T2", "ETHUSDT", "BUY", 10.0, 2000.0, 1.0)
         portfolio.add_trade("T3", "ADAUSDT", "BUY", 100.0, 0.5, 1.0)
 
-        portfolio.update_market_prices(
-            {"BTCUSDT": 42000.0, "ETHUSDT": 2200.0, "ADAUSDT": 0.6}
-        )
+        portfolio.update_market_prices({"BTCUSDT": 42000.0, "ETHUSDT": 2200.0, "ADAUSDT": 0.6})
 
         # Get positions
         positions = portfolio.get_all_positions()

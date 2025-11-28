@@ -63,9 +63,7 @@ class InMemoryCache:
 
 
 class RedisCache:
-    def __init__(
-        self, host: str = "localhost", port: int = 6379, db: int = 0, ttl: int = 2
-    ):
+    def __init__(self, host: str = "localhost", port: int = 6379, db: int = 0, ttl: int = 2):
         self.host = host
         self.port = port
         self.db = db
@@ -75,9 +73,7 @@ class RedisCache:
 
     async def connect(self):
         if not self._redis and not self._use_fallback:
-            logger.debug(
-                f"Attempting to connect to Redis at {self.host}:{self.port}/{self.db}"
-            )
+            logger.debug(f"Attempting to connect to Redis at {self.host}:{self.port}/{self.db}")
             try:
                 redis_client = await asyncio.wait_for(
                     aioredis.from_url(
@@ -119,9 +115,7 @@ class RedisCache:
                     return value
             return value
         except Exception as e:
-            logger.error(
-                f"Error getting key '{key}' from cache: {type(e).__name__}: {e}"
-            )
+            logger.error(f"Error getting key '{key}' from cache: {type(e).__name__}: {e}")
             raise
 
     async def set(self, key: str, value: Any, ttl: Optional[int] = None):

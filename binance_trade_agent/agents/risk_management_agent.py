@@ -83,8 +83,7 @@ class EnhancedRiskManagementAgent:
             "min_time_between_trades": 5,  # 5 seconds minimum between trades
             # Symbol-specific rules
             "symbol_rules": {
-                symbol: config.get_symbol_risk_config(symbol)
-                for symbol in ["BTCUSDT", "ETHUSDT"]
+                symbol: config.get_symbol_risk_config(symbol) for symbol in ["BTCUSDT", "ETHUSDT"]
             },
             # Market conditions
             "volatility_threshold": risk_config["volatility_threshold"],
@@ -241,15 +240,11 @@ class EnhancedRiskManagementAgent:
         self._check_frequency_limits(assessment)
         self._check_drawdown_limits(assessment, portfolio_value)
         self._check_consecutive_losses(assessment)
-        self._check_symbol_specific_rules(
-            assessment, symbol, quantity, price, portfolio_value
-        )
+        self._check_symbol_specific_rules(assessment, symbol, quantity, price, portfolio_value)
         self._check_volatility_conditions(assessment, symbol, market_data)
 
         # Calculate position sizing recommendations
-        self._calculate_position_sizing(
-            assessment, symbol, side, quantity, price, portfolio_value
-        )
+        self._calculate_position_sizing(assessment, symbol, side, quantity, price, portfolio_value)
 
         # Calculate stop-loss and take-profit levels
         self._calculate_stop_loss_take_profit(assessment, symbol, side, price)
@@ -312,9 +307,7 @@ class EnhancedRiskManagementAgent:
 
         # Check total exposure
         if current_positions:
-            total_exposure = sum(
-                pos.get("value", 0) for pos in current_positions.values()
-            )
+            total_exposure = sum(pos.get("value", 0) for pos in current_positions.values())
             total_exposure_pct = total_exposure / portfolio_value
 
             if total_exposure_pct > self.config["max_total_exposure"]:
@@ -354,9 +347,7 @@ class EnhancedRiskManagementAgent:
                 f"Daily trade limit reached ({self.daily_trades}/{max_daily})"
             )
 
-    def _check_drawdown_limits(
-        self, assessment: RiskAssessment, portfolio_value: float
-    ):
+    def _check_drawdown_limits(self, assessment: RiskAssessment, portfolio_value: float):
         """Check drawdown protection limits"""
         # Update peak portfolio value
         if portfolio_value > self.peak_portfolio_value:
@@ -383,9 +374,7 @@ class EnhancedRiskManagementAgent:
         # Check daily drawdown (simplified - would need start-of-day value)
         daily_dd_limit = self.config["max_daily_drawdown"]
         if self.daily_start_value > 0:
-            daily_drawdown = (
-                self.daily_start_value - portfolio_value
-            ) / self.daily_start_value
+            daily_drawdown = (self.daily_start_value - portfolio_value) / self.daily_start_value
             if daily_drawdown > daily_dd_limit:
                 assessment.warnings.append(
                     f"Daily drawdown {daily_drawdown:.2%} approaching limit {daily_dd_limit:.2%}"
@@ -414,9 +403,7 @@ class EnhancedRiskManagementAgent:
             trade_value = quantity * price
             trade_pct = trade_value / portfolio_value
 
-            max_position = rules.get(
-                "max_position", self.config["max_position_per_symbol"]
-            )
+            max_position = rules.get("max_position", self.config["max_position_per_symbol"])
             if trade_pct > max_position:
                 assessment.warnings.append(
                     f"Trade size {trade_pct:.2%} approaches {symbol} limit {max_position:.2%}"
@@ -445,9 +432,7 @@ class EnhancedRiskManagementAgent:
                         .get(symbol, {})
                         .get("volatility_multiplier", 1.0)
                     )
-                    assessment.recommended_quantity *= 1 / (
-                        1 + volatility * volatility_multiplier
-                    )
+                    assessment.recommended_quantity *= 1 / (1 + volatility * volatility_multiplier)
 
     def _calculate_position_sizing(
         self,
@@ -523,11 +508,7 @@ class EnhancedRiskManagementAgent:
         return {
             "approved": assessment.approved,
             "risk_level": assessment.risk_level.value,
-            "reason": (
-                "; ".join(assessment.reasons)
-                if assessment.reasons
-                else "Trade approved"
-            ),
+            "reason": ("; ".join(assessment.reasons) if assessment.reasons else "Trade approved"),
             "warnings": assessment.warnings,
             "recommended_quantity": assessment.recommended_quantity,
             "max_position_size": assessment.max_position_size,
@@ -563,13 +544,9 @@ class EnhancedRiskManagementAgent:
             "daily_trades": self.daily_trades,
             "current_drawdown": self.current_drawdown,
             "drawdown_pause_until": (
-                self.drawdown_pause_until.isoformat()
-                if self.drawdown_pause_until
-                else None
+                self.drawdown_pause_until.isoformat() if self.drawdown_pause_until else None
             ),
-            "last_trade_time": (
-                self.last_trade_time.isoformat() if self.last_trade_time else None
-            ),
+            "last_trade_time": (self.last_trade_time.isoformat() if self.last_trade_time else None),
             "recent_trades_count": len(self.recent_trades),
             "risk_rules_active": sum(1 for rule in self.risk_rules if rule.enabled),
         }

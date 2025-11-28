@@ -183,9 +183,7 @@ class TestDashboardPortfolioData:
 
         # Assert
         assert isinstance(result, dict)
-        assert (
-            "total_trades" in result or "portfolio_value" in result or "error" in result
-        )
+        assert "total_trades" in result or "portfolio_value" in result or "error" in result
 
 
 class TestDashboardErrorRecovery:
@@ -320,6 +318,7 @@ class TestDashboardCacheInvalidation:
 
         # Act
         from binance_trade_agent.api.api import get_portfolio_summary
+
         result1 = get_portfolio_summary()
         result2 = get_portfolio_summary()
 

@@ -82,8 +82,7 @@ def test_portfolio_manager_persistence_and_pnl(tmp_path):
     trades = pm.get_trade_history()
     # get_trade_history returns a list of dicts
     assert any(
-        t.get("trade_id") == "t1" or (hasattr(t, "trade_id") and t.trade_id == "t1")
-        for t in trades
+        t.get("trade_id") == "t1" or (hasattr(t, "trade_id") and t.trade_id == "t1") for t in trades
     )
 
     # Update market price and verify unrealized PnL calculation

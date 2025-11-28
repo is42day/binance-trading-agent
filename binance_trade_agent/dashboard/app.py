@@ -13,9 +13,7 @@ from dash import Input, Output, callback, dcc, html
 # Add parent directory to path for imports
 sys.path.insert(
     0,
-    os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    ),
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
 )
 
 from binance_trade_agent.dashboard.components import navbar
@@ -100,11 +98,7 @@ app.layout = dbc.Container(
         navbar.create_navbar(PAGES),
         # Main content area
         dbc.Container(
-            [
-                html.Div(
-                    id="page-content", style={"minHeight": "80vh", "padding": "2rem 0"}
-                )
-            ],
+            [html.Div(id="page-content", style={"minHeight": "80vh", "padding": "2rem 0"})],
             fluid=True,
             style={"backgroundColor": "#1a1d23", "color": "#f4f2ee"},
         ),
@@ -124,9 +118,7 @@ app.layout = dbc.Container(
                             style={"color": "#ff914d", "fontWeight": "bold"},
                         ),
                         html.Span(" | ", style={"color": "#666"}),
-                        html.Span(
-                            "Production-ready Trading System", style={"color": "#999"}
-                        ),
+                        html.Span("Production-ready Trading System", style={"color": "#999"}),
                     ],
                     style={
                         "textAlign": "center",
@@ -143,9 +135,7 @@ app.layout = dbc.Container(
             },
         ),
         # Interval for auto-refresh
-        dcc.Interval(
-            id="refresh-interval", interval=30 * 1000, n_intervals=0  # 30 seconds
-        ),
+        dcc.Interval(id="refresh-interval", interval=30 * 1000, n_intervals=0),  # 30 seconds
     ],
     fluid=True,
     style={

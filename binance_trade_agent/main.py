@@ -63,12 +63,8 @@ def main():
             orchestrator = TradingOrchestrator()
             symbol = "BTCUSDT"
             quantity = config.get_default_quantity(symbol)
-            logger.info(
-                f"[TEST MODE] Triggering single trading workflow for {symbol}..."
-            )
-            loop.run_until_complete(
-                orchestrator.execute_trading_workflow(symbol, quantity)
-            )
+            logger.info(f"[TEST MODE] Triggering single trading workflow for {symbol}...")
+            loop.run_until_complete(orchestrator.execute_trading_workflow(symbol, quantity))
 
         loop.run_until_complete(run_forever(stop_event))
     except KeyboardInterrupt:

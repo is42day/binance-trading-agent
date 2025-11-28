@@ -86,20 +86,12 @@ class TestAPILatency:
         p95 = sorted(latencies)[int(len(latencies) * 0.95)]
         p99 = sorted(latencies)[int(len(latencies) * 0.99)]
 
-        print(
-            f"\nget_all_positions latency: P50={p50:.2f}ms, P95={p95:.2f}ms, P99={p99:.2f}ms"
-        )
+        print(f"\nget_all_positions latency: P50={p50:.2f}ms, P95={p95:.2f}ms, P99={p99:.2f}ms")
 
         # Assert SLA compliance
-        assert (
-            p50 < self.SLA_P50_MS
-        ), f"P50 latency {p50:.2f}ms exceeds SLA {self.SLA_P50_MS}ms"
-        assert (
-            p95 < self.SLA_P95_MS
-        ), f"P95 latency {p95:.2f}ms exceeds SLA {self.SLA_P95_MS}ms"
-        assert (
-            p99 < self.SLA_P99_MS
-        ), f"P99 latency {p99:.2f}ms exceeds SLA {self.SLA_P99_MS}ms"
+        assert p50 < self.SLA_P50_MS, f"P50 latency {p50:.2f}ms exceeds SLA {self.SLA_P50_MS}ms"
+        assert p95 < self.SLA_P95_MS, f"P95 latency {p95:.2f}ms exceeds SLA {self.SLA_P95_MS}ms"
+        assert p99 < self.SLA_P99_MS, f"P99 latency {p99:.2f}ms exceeds SLA {self.SLA_P99_MS}ms"
 
     def test_portfolio_get_trade_history_latency(self, populated_portfolio):
         """Measure latency of get_trade_history() with 100 trades"""
@@ -119,9 +111,7 @@ class TestAPILatency:
         p95 = sorted(latencies)[int(len(latencies) * 0.95)]
         p99 = sorted(latencies)[int(len(latencies) * 0.99)]
 
-        print(
-            f"\nget_trade_history latency: P50={p50:.2f}ms, P95={p95:.2f}ms, P99={p99:.2f}ms"
-        )
+        print(f"\nget_trade_history latency: P50={p50:.2f}ms, P95={p95:.2f}ms, P99={p99:.2f}ms")
 
         assert p50 < self.SLA_P50_MS
         assert p95 < self.SLA_P95_MS
@@ -145,9 +135,7 @@ class TestAPILatency:
         p95 = sorted(latencies)[int(len(latencies) * 0.95)]
         p99 = sorted(latencies)[int(len(latencies) * 0.99)]
 
-        print(
-            f"\nget_portfolio_stats latency: P50={p50:.2f}ms, P95={p95:.2f}ms, P99={p99:.2f}ms"
-        )
+        print(f"\nget_portfolio_stats latency: P50={p50:.2f}ms, P95={p95:.2f}ms, P99={p99:.2f}ms")
 
         assert p50 < self.SLA_P50_MS
         assert p95 < self.SLA_P95_MS
@@ -214,9 +202,7 @@ class TestCachePerformance:
         p95 = sorted(latencies)[int(len(latencies) * 0.95)]
         p99 = sorted(latencies)[int(len(latencies) * 0.99)]
 
-        print(
-            f"\nIn-memory cache latency: P50={p50:.4f}ms, P95={p95:.4f}ms, P99={p99:.4f}ms"
-        )
+        print(f"\nIn-memory cache latency: P50={p50:.4f}ms, P95={p95:.4f}ms, P99={p99:.4f}ms")
 
         # In-memory cache should be very fast (<1ms)
         assert p50 < 1.0, f"P50 latency {p50:.4f}ms exceeds 1ms"
@@ -323,9 +309,7 @@ class TestThroughputConcurrency:
             assert len(trades) == total_trades
 
             # Target: >50 trades/second
-            assert (
-                throughput > 50
-            ), f"Throughput {throughput:.1f} trades/s below target 50"
+            assert throughput > 50, f"Throughput {throughput:.1f} trades/s below target 50"
 
     @pytest.mark.asyncio
     async def test_concurrent_reads_under_load(self):
@@ -367,9 +351,7 @@ class TestThroughputConcurrency:
             print(f"\nConcurrent read throughput: {throughput:.1f} reads/second")
 
             # Target: >500 reads/second
-            assert (
-                throughput > 500
-            ), f"Throughput {throughput:.1f} reads/s below target 500"
+            assert throughput > 500, f"Throughput {throughput:.1f} reads/s below target 500"
 
     @pytest.mark.asyncio
     async def test_mixed_workload_throughput(self):
@@ -418,9 +400,7 @@ class TestThroughputConcurrency:
             print(f"Total time: {elapsed:.2f}s for {total_operations} operations")
 
             # Target: >100 ops/second for mixed workload
-            assert (
-                throughput > 100
-            ), f"Throughput {throughput:.1f} ops/s below target 100"
+            assert throughput > 100, f"Throughput {throughput:.1f} ops/s below target 100"
 
 
 # ============================================================================
@@ -468,9 +448,7 @@ class TestScalability:
             growth_rate = measurements[3][1] / measurements[2][1]
             trades_growth = measurements[3][0] / measurements[2][0]
 
-            print(
-                f"Latency growth rate: {growth_rate:.2f}x for {trades_growth:.2f}x trades"
-            )
+            print(f"Latency growth rate: {growth_rate:.2f}x for {trades_growth:.2f}x trades")
 
             # Latency should not grow faster than trades
             assert growth_rate <= trades_growth * 1.5, "Latency scaling is super-linear"
@@ -513,9 +491,7 @@ class TestScalability:
             if len(measurements) >= 2:
                 growth_rate = measurements[-1][1] / measurements[-2][1]
                 positions_growth = measurements[-1][0] / measurements[-2][0]
-                print(
-                    f"Latency growth: {growth_rate:.2f}x for {positions_growth:.2f}x positions"
-                )
+                print(f"Latency growth: {growth_rate:.2f}x for {positions_growth:.2f}x positions")
 
 
 # ============================================================================

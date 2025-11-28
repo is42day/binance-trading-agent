@@ -50,9 +50,7 @@ class StrategyManager:
         try:
             combined_strategy = CombinedStrategy()
             self.register_strategy("combined_default", combined_strategy)
-            self.register_strategy(
-                "combined", combined_strategy
-            )  # Alias for convenience
+            self.register_strategy("combined", combined_strategy)  # Alias for convenience
         except Exception as e:
             self.logger.error(f"Failed to register combined strategy: {str(e)}")
         try:
@@ -268,9 +266,7 @@ class StrategyManager:
                 "confidence": best_strategy[1].confidence,
             },
             "average_confidence": sum(confidences) / len(confidences),
-            "strategy_results": {
-                name: result.to_dict() for name, result in results.items()
-            },
+            "strategy_results": {name: result.to_dict() for name, result in results.items()},
             "recommendation": self._generate_recommendation(
                 consensus, consensus_strength, best_strategy
             ),
@@ -296,9 +292,7 @@ class StrategyManager:
 
         # Find strategy with highest confidence for non-HOLD signals
         non_hold_results = {
-            name: result
-            for name, result in results.items()
-            if result.signal != SignalType.HOLD
+            name: result for name, result in results.items() if result.signal != SignalType.HOLD
         }
 
         if non_hold_results:
@@ -323,9 +317,7 @@ class StrategyManager:
                 "symbol": symbol,
                 "signal": result.signal.value,
                 "confidence": result.confidence,
-                "current_price": (
-                    float(market_data[-1]["close"]) if market_data else None
-                ),
+                "current_price": (float(market_data[-1]["close"]) if market_data else None),
                 "data_points": len(market_data),
                 "indicators": result.indicators,
                 "metadata": result.metadata,
@@ -335,14 +327,12 @@ class StrategyManager:
 
             # Keep only last 1000 records per strategy
             if len(self.performance_history[strategy_name]) > 1000:
-                self.performance_history[strategy_name] = self.performance_history[
-                    strategy_name
-                ][-1000:]
+                self.performance_history[strategy_name] = self.performance_history[strategy_name][
+                    -1000:
+                ]
 
         except Exception as e:
-            self.logger.error(
-                f"Failed to record performance for {strategy_name}: {str(e)}"
-            )
+            self.logger.error(f"Failed to record performance for {strategy_name}: {str(e)}")
 
     def _generate_recommendation(
         self, consensus: SignalType, consensus_strength: float, best_strategy: tuple

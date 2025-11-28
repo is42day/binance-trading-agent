@@ -62,9 +62,7 @@ class TestAPIPortfolioSummary:
         data = response.json()
 
         # Verify response schema
-        assert (
-            "total_value" in data or "number_of_trades" in data or "total_pnl" in data
-        )
+        assert "total_value" in data or "number_of_trades" in data or "total_pnl" in data
 
     def test_api_portfolio_summary_response_schema_valid(self, client):
         """Test that portfolio summary response has expected fields"""

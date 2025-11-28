@@ -84,9 +84,7 @@ class RSIStrategy(BaseStrategy):
     def requires_minimum_data(self) -> int:
         return self.get_parameter("period") + 1
 
-    def analyze(
-        self, market_data: List[Dict[str, Any]], symbol: str = None
-    ) -> StrategyResult:
+    def analyze(self, market_data: List[Dict[str, Any]], symbol: str = None) -> StrategyResult:
         """
         Analyze market data using RSI strategy
 
@@ -158,9 +156,7 @@ class RSIStrategy(BaseStrategy):
         period = self.get_parameter("period")
 
         if len(closes) < period + 1:
-            raise ValueError(
-                f"Need at least {period + 1} data points for RSI calculation"
-            )
+            raise ValueError(f"Need at least {period + 1} data points for RSI calculation")
 
         # Calculate price changes
         deltas = [closes[i] - closes[i - 1] for i in range(1, len(closes))]
@@ -201,9 +197,7 @@ class RSIStrategy(BaseStrategy):
             confidence = min(0.8, (oversold - rsi) / oversold + 0.4)
         elif rsi > extreme_overbought:
             signal = SignalType.SELL
-            confidence = min(
-                0.9, (rsi - extreme_overbought) / (100 - extreme_overbought) + 0.6
-            )
+            confidence = min(0.9, (rsi - extreme_overbought) / (100 - extreme_overbought) + 0.6)
         elif rsi > overbought:
             signal = SignalType.SELL
             confidence = min(0.8, (rsi - overbought) / (100 - overbought) + 0.4)
@@ -212,9 +206,7 @@ class RSIStrategy(BaseStrategy):
             confidence = max(0.1, 1.0 - abs(rsi - 50) / 50)
         return signal, confidence
 
-    def _calculate_levels(
-        self, current_price: float, signal: SignalType, rsi: float
-    ) -> tuple:
+    def _calculate_levels(self, current_price: float, signal: SignalType, rsi: float) -> tuple:
         """Calculate price target, stop loss, and take profit levels"""
 
         # Basic percentage-based levels (can be enhanced with more sophisticated logic)

@@ -85,8 +85,7 @@ layout = dbc.Container(
                                                         ),
                                                         dcc.DatePickerSingle(
                                                             id="log-start-date",
-                                                            date=datetime.now()
-                                                            - timedelta(days=1),
+                                                            date=datetime.now() - timedelta(days=1),
                                                             display_format="YYYY-MM-DD",
                                                             className="form-control",
                                                             style={"width": "100%"},
@@ -199,9 +198,7 @@ layout = dbc.Container(
                             [
                                 html.Div(
                                     [
-                                        html.Div(
-                                            "Total Logs", className="metric-label"
-                                        ),
+                                        html.Div("Total Logs", className="metric-label"),
                                         html.Div(
                                             "0",
                                             id="log-total-count",
@@ -261,9 +258,7 @@ layout = dbc.Container(
                             [
                                 html.Div(
                                     [
-                                        html.Div(
-                                            "Last Updated", className="metric-label"
-                                        ),
+                                        html.Div("Last Updated", className="metric-label"),
                                         html.Div(
                                             "Just now",
                                             id="log-last-update",
@@ -292,11 +287,7 @@ layout = dbc.Container(
                                     [
                                         html.Div(
                                             id="logs-table-container",
-                                            children=[
-                                                dbc.Alert(
-                                                    "Loading logs...", color="info"
-                                                )
-                                            ],
+                                            children=[dbc.Alert("Loading logs...", color="info")],
                                         )
                                     ]
                                 ),
@@ -353,9 +344,7 @@ layout = dbc.Container(
             ]
         ),
         # Auto-refresh interval
-        dcc.Interval(
-            id="log-page-interval", interval=60000, n_intervals=0  # 60 seconds
-        ),
+        dcc.Interval(id="log-page-interval", interval=60000, n_intervals=0),  # 60 seconds
         # Store for pagination
         dcc.Store(id="log-page-store", data={"current_page": 0}),
     ],
@@ -499,9 +488,7 @@ def update_logs(
 
         # Stats
         error_count = len([log for log in filtered_logs if log.get("level") == "ERROR"])
-        warning_count = len(
-            [log for log in filtered_logs if log.get("level") == "WARNING"]
-        )
+        warning_count = len([log for log in filtered_logs if log.get("level") == "WARNING"])
         total_count = len(filtered_logs)
         last_update = datetime.now().strftime("%H:%M:%S")
 
@@ -519,9 +506,7 @@ def generate_sample_logs():
     """Generate sample logs for demonstration"""
     logs = [
         {
-            "timestamp": (datetime.now() - timedelta(minutes=i)).strftime(
-                "%Y-%m-%d %H:%M:%S"
-            ),
+            "timestamp": (datetime.now() - timedelta(minutes=i)).strftime("%Y-%m-%d %H:%M:%S"),
             "level": ["INFO", "WARNING", "ERROR", "DEBUG"][i % 4],
             "message": f"Sample log message #{i}: Operation completed successfully",
             "correlation_id": f'trade_{datetime.now().strftime("%Y%m%d")}_000{i:03d}',

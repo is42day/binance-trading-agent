@@ -29,9 +29,7 @@ layout = dbc.Container(
                     [
                         dbc.Card(
                             [
-                                dbc.CardHeader(
-                                    "🛡️ Risk Management Settings", className="bg-dark"
-                                ),
+                                dbc.CardHeader("🛡️ Risk Management Settings", className="bg-dark"),
                                 dbc.CardBody(
                                     [
                                         dbc.Row(
@@ -333,9 +331,7 @@ layout = dbc.Container(
                     [
                         dbc.Card(
                             [
-                                dbc.CardHeader(
-                                    "📈 Trading Strategy Settings", className="bg-dark"
-                                ),
+                                dbc.CardHeader("📈 Trading Strategy Settings", className="bg-dark"),
                                 dbc.CardBody(
                                     [
                                         dbc.Row(
@@ -526,9 +522,7 @@ layout = dbc.Container(
                     [
                         dbc.Card(
                             [
-                                dbc.CardHeader(
-                                    "💾 Data Management", className="bg-dark"
-                                ),
+                                dbc.CardHeader("💾 Data Management", className="bg-dark"),
                                 dbc.CardBody(
                                     [
                                         dbc.Row(
@@ -596,9 +590,7 @@ layout = dbc.Container(
         # Alerts
         html.Div(id="adv-alert-container"),
         # Auto-refresh interval
-        dcc.Interval(
-            id="adv-page-interval", interval=30000, n_intervals=0  # 30 seconds
-        ),
+        dcc.Interval(id="adv-page-interval", interval=30000, n_intervals=0),  # 30 seconds
     ],
     fluid=True,
     className="p-4",
@@ -624,9 +616,7 @@ def update_status_metrics(n_intervals):
         system_status = get_system_status()
         portfolio_data = get_portfolio_data()
 
-        trading_active = (
-            "🟢 ACTIVE" if system_status.get("trading_active", True) else "🔴 STOPPED"
-        )
+        trading_active = "🟢 ACTIVE" if system_status.get("trading_active", True) else "🔴 STOPPED"
         drawdown = system_status.get("current_drawdown", 0)
         daily_pnl = portfolio_data.get("total_pnl", 0)
 
@@ -671,9 +661,7 @@ def trigger_emergency_stop(n_clicks):
                 html.H4("🛑 Emergency Stop Activated!", className="mb-2"),
                 html.Div("All trading has been halted immediately."),
                 html.Div("All open positions are being closed."),
-                html.Div(
-                    "System will not accept new trades until emergency stop is cleared."
-                ),
+                html.Div("System will not accept new trades until emergency stop is cleared."),
             ],
             color="danger",
             className="mb-3",
@@ -724,6 +712,4 @@ def save_risk_settings(n_clicks, max_pos, stop_loss, max_loss, max_open):
 
         return alert
     except Exception as e:
-        return dbc.Alert(
-            f"Error saving settings: {str(e)}", color="danger", className="mb-3"
-        )
+        return dbc.Alert(f"Error saving settings: {str(e)}", color="danger", className="mb-3")

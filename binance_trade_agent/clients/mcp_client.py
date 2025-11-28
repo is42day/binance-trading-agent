@@ -155,9 +155,7 @@ async def main():
                 await client.test_market_data(symbol)
             elif choice == "2":
                 symbol = input("Enter symbol (default BTCUSDT): ").strip() or "BTCUSDT"
-                indicator = (
-                    input("Enter indicator (rsi/macd, default rsi): ").strip() or "rsi"
-                )
+                indicator = input("Enter indicator (rsi/macd, default rsi): ").strip() or "rsi"
                 await client.test_trading_signal(symbol, indicator)
             elif choice == "3":
                 await client.test_risk_validation()

@@ -42,9 +42,7 @@ def check_dependencies():
 
     if missing:
         logger.error(f"\nMissing packages: {', '.join(missing)}")
-        logger.error(
-            "Install with: pip install -r binance_trade_agent/dashboard/requirements.txt"
-        )
+        logger.error("Install with: pip install -r binance_trade_agent/dashboard/requirements.txt")
         return False
 
     logger.info("All dependencies available ✓")

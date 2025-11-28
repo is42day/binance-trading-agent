@@ -25,14 +25,10 @@ class CombinedStrategy(BaseStrategy):
         try:
             param_dict = parameters or {}
             rsi_params = {
-                k.replace("rsi_", "", 1): v
-                for k, v in param_dict.items()
-                if k.startswith("rsi_")
+                k.replace("rsi_", "", 1): v for k, v in param_dict.items() if k.startswith("rsi_")
             }
             macd_params = {
-                k.replace("macd_", "", 1): v
-                for k, v in param_dict.items()
-                if k.startswith("macd_")
+                k.replace("macd_", "", 1): v for k, v in param_dict.items() if k.startswith("macd_")
             }
 
             # Initialize sub-strategies with extracted parameters
@@ -86,16 +82,12 @@ class CombinedStrategy(BaseStrategy):
         # Add RSI strategy parameters with prefix
         for param_name, param_config in self.rsi_strategy.get_parameters().items():
             params[f"rsi_{param_name}"] = param_config.copy()
-            params[f"rsi_{param_name}"][
-                "description"
-            ] = f"RSI: {param_config['description']}"
+            params[f"rsi_{param_name}"]["description"] = f"RSI: {param_config['description']}"
 
         # Add MACD strategy parameters with prefix
         for param_name, param_config in self.macd_strategy.get_parameters().items():
             params[f"macd_{param_name}"] = param_config.copy()
-            params[f"macd_{param_name}"][
-                "description"
-            ] = f"MACD: {param_config['description']}"
+            params[f"macd_{param_name}"]["description"] = f"MACD: {param_config['description']}"
 
         return params
 
@@ -105,9 +97,7 @@ class CombinedStrategy(BaseStrategy):
             self.macd_strategy.requires_minimum_data(),
         )
 
-    def analyze(
-        self, market_data: List[Dict[str, Any]], symbol: str = None
-    ) -> StrategyResult:
+    def analyze(self, market_data: List[Dict[str, Any]], symbol: str = None) -> StrategyResult:
         """
         Analyze market data using combined RSI and MACD strategy
 
@@ -122,9 +112,7 @@ class CombinedStrategy(BaseStrategy):
             return StrategyResult(
                 signal=SignalType.HOLD,
                 confidence=0.0,
-                metadata={
-                    "error": "Insufficient data for combined strategy calculation"
-                },
+                metadata={"error": "Insufficient data for combined strategy calculation"},
             )
 
         try:
@@ -133,17 +121,13 @@ class CombinedStrategy(BaseStrategy):
             macd_result = self.macd_strategy.analyze(market_data, symbol)
 
             # Combine signals
-            combined_signal, combined_confidence = self._combine_signals(
-                rsi_result, macd_result
-            )
+            combined_signal, combined_confidence = self._combine_signals(rsi_result, macd_result)
 
             # Combine indicators
             combined_indicators = {
                 "rsi": rsi_result.indicators,
                 "macd": macd_result.indicators,
-                "agreement_score": self._calculate_agreement_score(
-                    rsi_result, macd_result
-                ),
+                "agreement_score": self._calculate_agreement_score(rsi_result, macd_result),
             }
 
             # Calculate combined levels
@@ -197,8 +181,7 @@ class CombinedStrategy(BaseStrategy):
             ):
                 # Indicators disagree on direction - return HOLD
                 combined_confidence = (
-                    rsi_result.confidence * rsi_weight
-                    + macd_result.confidence * macd_weight
+                    rsi_result.confidence * rsi_weight + macd_result.confidence * macd_weight
                 ) * 0.5
                 return SignalType.HOLD, combined_confidence
 
@@ -208,8 +191,7 @@ class CombinedStrategy(BaseStrategy):
         # If agreement is too low, return HOLD
         if agreement_score < min_agreement:
             combined_confidence = (
-                rsi_result.confidence * rsi_weight
-                + macd_result.confidence * macd_weight
+                rsi_result.confidence * rsi_weight + macd_result.confidence * macd_weight
             ) * 0.6
             return SignalType.HOLD, combined_confidence
 
@@ -219,21 +201,16 @@ class CombinedStrategy(BaseStrategy):
             final_signal = rsi_result.signal
             # Boost confidence when indicators agree
             base_confidence = (
-                rsi_result.confidence * rsi_weight
-                + macd_result.confidence * macd_weight
+                rsi_result.confidence * rsi_weight + macd_result.confidence * macd_weight
             )
             combined_confidence = min(0.95, base_confidence + confidence_boost)
         else:
             # Indicators disagree or one is HOLD - use weighted approach
             rsi_score = (
-                self._signal_to_score(rsi_result.signal)
-                * rsi_result.confidence
-                * rsi_weight
+                self._signal_to_score(rsi_result.signal) * rsi_result.confidence * rsi_weight
             )
             macd_score = (
-                self._signal_to_score(macd_result.signal)
-                * macd_result.confidence
-                * macd_weight
+                self._signal_to_score(macd_result.signal) * macd_result.confidence * macd_weight
             )
 
             total_score = rsi_score + macd_score
@@ -247,8 +224,7 @@ class CombinedStrategy(BaseStrategy):
 
             # Combined confidence
             combined_confidence = (
-                rsi_result.confidence * rsi_weight
-                + macd_result.confidence * macd_weight
+                rsi_result.confidence * rsi_weight + macd_result.confidence * macd_weight
             ) * agreement_score
 
         return final_signal, combined_confidence
@@ -313,8 +289,7 @@ class CombinedStrategy(BaseStrategy):
 
         if rsi_result.price_target is not None and macd_result.price_target is not None:
             price_target = (
-                rsi_result.price_target * rsi_weight
-                + macd_result.price_target * macd_weight
+                rsi_result.price_target * rsi_weight + macd_result.price_target * macd_weight
             )
         elif rsi_result.price_target is not None:
             price_target = rsi_result.price_target
@@ -322,9 +297,7 @@ class CombinedStrategy(BaseStrategy):
             price_target = macd_result.price_target
 
         if rsi_result.stop_loss is not None and macd_result.stop_loss is not None:
-            stop_loss = (
-                rsi_result.stop_loss * rsi_weight + macd_result.stop_loss * macd_weight
-            )
+            stop_loss = rsi_result.stop_loss * rsi_weight + macd_result.stop_loss * macd_weight
         elif rsi_result.stop_loss is not None:
             stop_loss = rsi_result.stop_loss
         elif macd_result.stop_loss is not None:
@@ -332,8 +305,7 @@ class CombinedStrategy(BaseStrategy):
 
         if rsi_result.take_profit is not None and macd_result.take_profit is not None:
             take_profit = (
-                rsi_result.take_profit * rsi_weight
-                + macd_result.take_profit * macd_weight
+                rsi_result.take_profit * rsi_weight + macd_result.take_profit * macd_weight
             )
         elif rsi_result.take_profit is not None:
             take_profit = rsi_result.take_profit

@@ -228,9 +228,7 @@ class PortfolioManager:
                             position.quantity += quantity
                         else:
                             cover_quantity = abs(position.quantity)
-                            cover_pnl = (
-                                position.average_price - price
-                            ) * cover_quantity
+                            cover_pnl = (position.average_price - price) * cover_quantity
                             position.realized_pnl += cover_pnl
 
                             remaining_quantity = quantity - cover_quantity
@@ -248,9 +246,7 @@ class PortfolioManager:
                             position.quantity -= quantity
                         else:
                             close_quantity = position.quantity
-                            close_pnl = (
-                                price - position.average_price
-                            ) * close_quantity
+                            close_pnl = (price - position.average_price) * close_quantity
                             position.realized_pnl += close_pnl
 
                             remaining_quantity = quantity - close_quantity
@@ -260,9 +256,9 @@ class PortfolioManager:
                             position.realized_pnl -= fee
                     else:
                         # Adding to short position
-                        total_value = (
-                            abs(position.quantity) * position.average_price
-                        ) + (quantity * price)
+                        total_value = (abs(position.quantity) * position.average_price) + (
+                            quantity * price
+                        )
                         total_quantity = abs(position.quantity) + quantity
                         position.average_price = total_value / total_quantity
                         position.quantity = -total_quantity
@@ -371,9 +367,7 @@ class PortfolioManager:
             trades = session.query(TradeORM).all()
 
             total_value = sum(pos.quantity * pos.current_price for pos in positions)
-            total_pnl = sum(
-                (pos.realized_pnl + pos.unrealized_pnl) for pos in positions
-            )
+            total_pnl = sum((pos.realized_pnl + pos.unrealized_pnl) for pos in positions)
             total_fees = sum(trade.fee for trade in trades)
 
             # Calculate win rate
@@ -455,9 +449,7 @@ def demo_portfolio_management():
     ]
 
     for trade_id, symbol, side, quantity, price, fee, order_id, corr_id in trades_data:
-        portfolio.add_trade(
-            trade_id, symbol, side, quantity, price, fee, order_id, corr_id
-        )
+        portfolio.add_trade(trade_id, symbol, side, quantity, price, fee, order_id, corr_id)
 
     # Update market prices
     portfolio.update_market_prices({"BTCUSDT": 51000.0, "ETHUSDT": 3100.0})

@@ -113,9 +113,7 @@ class TestAgentFlow:
             "sell",
         ]:
             # Mock execution for testing
-            with patch.object(
-                self.execution_agent, "place_buy_order"
-            ) as mock_execution:
+            with patch.object(self.execution_agent, "place_buy_order") as mock_execution:
                 mock_execution.return_value = {
                     "order_id": "integration_test_123",
                     "status": "FILLED",
@@ -135,9 +133,7 @@ class TestAgentFlow:
         quantity = 0.001
 
         # Mock execution for testing
-        with patch.object(
-            self.orchestrator.execution_agent, "place_buy_order"
-        ) as mock_buy:
+        with patch.object(self.orchestrator.execution_agent, "place_buy_order") as mock_buy:
             mock_buy.return_value = {
                 "order_id": "orchestrator_test_123",
                 "symbol": symbol,
@@ -147,9 +143,7 @@ class TestAgentFlow:
             }
 
             # Execute workflow
-            decision = await self.orchestrator.execute_trading_workflow(
-                symbol, quantity
-            )
+            decision = await self.orchestrator.execute_trading_workflow(symbol, quantity)
 
             # Validate decision structure
             assert isinstance(decision, TradeDecision)
@@ -176,12 +170,8 @@ class TestAgentFlow:
 
         # Execute workflow with live data (but mock execution)
         with (
-            patch.object(
-                self.orchestrator.execution_agent, "place_buy_order"
-            ) as mock_buy,
-            patch.object(
-                self.orchestrator.execution_agent, "place_sell_order"
-            ) as mock_sell,
+            patch.object(self.orchestrator.execution_agent, "place_buy_order") as mock_buy,
+            patch.object(self.orchestrator.execution_agent, "place_sell_order") as mock_sell,
         ):
 
             mock_buy.return_value = {
@@ -227,9 +217,7 @@ class TestAgentFlow:
         # This should handle errors gracefully
         async def run_test():
             try:
-                decision = await self.orchestrator.execute_trading_workflow(
-                    symbol, quantity
-                )
+                decision = await self.orchestrator.execute_trading_workflow(symbol, quantity)
                 # If it doesn't fail, that's also valid (error handling worked)
                 return True
             except Exception as e:
@@ -272,9 +260,7 @@ class TestAgentFlow:
         # Mock sleep to avoid actual waiting
         with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
             # Mock execution to avoid actual trades
-            with patch.object(
-                self.orchestrator, "execute_trading_workflow"
-            ) as mock_workflow:
+            with patch.object(self.orchestrator, "execute_trading_workflow") as mock_workflow:
                 mock_workflow.return_value = TradeDecision(
                     symbol="BTCUSDT",
                     signal_type="HOLD",

@@ -83,9 +83,7 @@ class BaseStrategy(ABC):
         self._validate_parameters()
 
     @abstractmethod
-    def analyze(
-        self, market_data: List[Dict[str, Any]], symbol: str = None
-    ) -> StrategyResult:
+    def analyze(self, market_data: List[Dict[str, Any]], symbol: str = None) -> StrategyResult:
         """
         Analyze market data and generate trading signal
 
@@ -117,10 +115,7 @@ class BaseStrategy(ABC):
         """Validate strategy parameters"""
         required_params = self.get_parameters()
         for param_name, param_config in required_params.items():
-            if (
-                param_config.get("required", False)
-                and param_name not in self.parameters
-            ):
+            if param_config.get("required", False) and param_name not in self.parameters:
                 raise ValueError(
                     f"Required parameter '{param_name}' missing for strategy '{self.name}'"
                 )
@@ -170,16 +165,12 @@ class BaseStrategy(ABC):
             return {"volatility": 0.0, "risk_level": 0.5}
 
         # Calculate simple volatility
-        closes = [
-            float(candle["close"]) for candle in market_data[-20:]
-        ]  # Last 20 periods
+        closes = [float(candle["close"]) for candle in market_data[-20:]]  # Last 20 periods
         if len(closes) < 2:
             return {"volatility": 0.0, "risk_level": 0.5}
 
         # Simple volatility calculation
-        returns = [
-            (closes[i] - closes[i - 1]) / closes[i - 1] for i in range(1, len(closes))
-        ]
+        returns = [(closes[i] - closes[i - 1]) / closes[i - 1] for i in range(1, len(closes))]
         volatility = (sum(r**2 for r in returns) / len(returns)) ** 0.5
 
         # Risk level based on volatility

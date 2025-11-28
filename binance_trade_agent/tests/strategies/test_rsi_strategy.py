@@ -153,9 +153,7 @@ class TestRSIStrategy:
     def test_sell_signal_generation(self):
         """Test SELL signal generation for overbought conditions"""
         # Create overbought scenario
-        overbought_strategy = RSIStrategy(
-            {"overbought": 60}
-        )  # Lower threshold for testing
+        overbought_strategy = RSIStrategy({"overbought": 60})  # Lower threshold for testing
 
         result = overbought_strategy.analyze(self.sample_data)
 
@@ -252,9 +250,7 @@ class TestRSIStrategy:
     def test_extreme_conditions(self):
         """Test strategy behavior under extreme market conditions"""
         # Test with extreme overbought strategy
-        extreme_strategy = RSIStrategy(
-            {"extreme_oversold": 5, "extreme_overbought": 95}
-        )
+        extreme_strategy = RSIStrategy({"extreme_oversold": 5, "extreme_overbought": 95})
 
         result = extreme_strategy.analyze(self.oversold_data)
 

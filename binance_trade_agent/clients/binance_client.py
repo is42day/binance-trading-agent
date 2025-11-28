@@ -19,9 +19,7 @@ class BinanceAPIClient:
             )
             self.client = None
         else:
-            self.client = Client(
-                self.config.binance_api_key, self.config.binance_api_secret
-            )
+            self.client = Client(self.config.binance_api_key, self.config.binance_api_secret)
             # Use testnet for safety unless explicitly disabled
             if self.config.binance_testnet:
                 self.client.API_URL = "https://testnet.binance.vision/api"
@@ -54,12 +52,10 @@ class BinanceAPIClient:
             base_price = self.get_latest_price(symbol)
             return {
                 "bids": [
-                    [f"{base_price - i * 0.1:.2f}", f"{10 + i}"]
-                    for i in range(min(limit, 5))
+                    [f"{base_price - i * 0.1:.2f}", f"{10 + i}"] for i in range(min(limit, 5))
                 ],
                 "asks": [
-                    [f"{base_price + i * 0.1:.2f}", f"{10 + i}"]
-                    for i in range(min(limit, 5))
+                    [f"{base_price + i * 0.1:.2f}", f"{10 + i}"] for i in range(min(limit, 5))
                 ],
             }
 
@@ -190,17 +186,13 @@ class BinanceAPIClient:
             return klines
 
         try:
-            klines = self.client.get_klines(
-                symbol=symbol, interval=interval, limit=limit
-            )
+            klines = self.client.get_klines(symbol=symbol, interval=interval, limit=limit)
             return klines
         except Exception as ex:
             print(f"Binance API error (get_klines): {ex}")
             raise
 
-    def create_order(
-        self, symbol: str, side: str, order_type: str, quantity: float, price=None
-    ):
+    def create_order(self, symbol: str, side: str, order_type: str, quantity: float, price=None):
         if self.config.demo_mode:
             # Return mock order data
             import time

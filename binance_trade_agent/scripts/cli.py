@@ -125,23 +125,18 @@ Type 'help <command>' for detailed help on specific commands.
         """Execute buy order through orchestrator"""
         try:
             print(f"Placing BUY order: {quantity} {symbol}")
-            decision = await self.orchestrator.execute_trading_workflow(
-                symbol, quantity
-            )
+            decision = await self.orchestrator.execute_trading_workflow(symbol, quantity)
 
             if decision.executed:
                 print("✅ Order executed successfully!")
                 print(f"   Order ID: {decision.order_id}")
                 print(f"   Price: ${decision.execution_price:,.2f}")
-                print(
-                    f"   Signal: {decision.signal_type} (confidence: {decision.confidence:.1%})"
-                )
+                print(f"   Signal: {decision.signal_type} (confidence: {decision.confidence:.1%})")
 
                 # Add to portfolio
                 trade_price = decision.execution_price or decision.price or 0
                 self.portfolio.add_trade(
-                    trade_id=decision.order_id
-                    or f"cli_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                    trade_id=decision.order_id or f"cli_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
                     symbol=symbol,
                     side="BUY",
                     quantity=quantity,
@@ -154,9 +149,7 @@ Type 'help <command>' for detailed help on specific commands.
             else:
                 print("❌ Order rejected")
                 print("   Reason: Risk not approved")
-                print(
-                    f"   Signal: {decision.signal_type} (confidence: {decision.confidence:.1%})"
-                )
+                print(f"   Signal: {decision.signal_type} (confidence: {decision.confidence:.1%})")
 
         except Exception as e:
             print(f"❌ Order failed: {str(e)}")
@@ -412,9 +405,7 @@ Type 'help <command>' for detailed help on specific commands.
         try:
             parts = line.split()
             if len(parts) != 4:
-                print(
-                    "Error: Invalid syntax. Use: risk <symbol> <side> <quantity> <price>"
-                )
+                print("Error: Invalid syntax. Use: risk <symbol> <side> <quantity> <price>")
                 return
 
             symbol = parts[0].upper()
@@ -433,15 +424,11 @@ Type 'help <command>' for detailed help on specific commands.
             )
 
             print("\n" + "=" * 60)
-            print(
-                f"RISK ASSESSMENT - {side.upper()} {quantity} {symbol} @ ${price:,.2f}"
-            )
+            print(f"RISK ASSESSMENT - {side.upper()} {quantity} {symbol} @ ${price:,.2f}")
             print("=" * 60)
 
             status_emoji = "✅" if result["approved"] else "❌"
-            print(
-                f"Status: {status_emoji} {'APPROVED' if result['approved'] else 'REJECTED'}"
-            )
+            print(f"Status: {status_emoji} {'APPROVED' if result['approved'] else 'REJECTED'}")
             print(f"Risk Level: {result['risk_level'].upper()}")
             print(f"Reason: {result['reason']}")
 
@@ -599,9 +586,7 @@ Type 'help <command>' for detailed help on specific commands.
                     "CRITICAL": "🔥",
                     "DEBUG": "🐛",
                 }.get(log["level"], "📝")
-                print(
-                    f"{timestamp} {level_emoji} [{log['correlation_id'][:8]}] {log['message']}"
-                )
+                print(f"{timestamp} {level_emoji} [{log['correlation_id'][:8]}] {log['message']}")
 
             print("=" * 100)
 
@@ -621,21 +606,13 @@ Type 'help <command>' for detailed help on specific commands.
             risk_status = self.risk_agent.get_risk_status()
 
             print("Risk Management:")
-            print(
-                f"  Emergency Stop: {'ACTIVE' if risk_status['emergency_stop'] else 'INACTIVE'}"
-            )
+            print(f"  Emergency Stop: {'ACTIVE' if risk_status['emergency_stop'] else 'INACTIVE'}")
             print(
                 f"  Max Position per Symbol: {self.risk_agent.config['max_position_per_symbol']:.1%}"
             )
-            print(
-                f"  Max Single Trade: {self.risk_agent.config['max_single_trade_size']:.1%}"
-            )
-            print(
-                f"  Default Stop Loss: {self.risk_agent.config['default_stop_loss_pct']:.1%}"
-            )
-            print(
-                f"  Default Take Profit: {self.risk_agent.config['default_take_profit_pct']:.1%}"
-            )
+            print(f"  Max Single Trade: {self.risk_agent.config['max_single_trade_size']:.1%}")
+            print(f"  Default Stop Loss: {self.risk_agent.config['default_stop_loss_pct']:.1%}")
+            print(f"  Default Take Profit: {self.risk_agent.config['default_take_profit_pct']:.1%}")
             print(f"  Max Daily Trades: {self.risk_agent.config['max_trades_per_day']}")
 
             print("=" * 60)
@@ -666,9 +643,7 @@ Type 'help <command>' for detailed help on specific commands.
                 print("All trading is now disabled.")
 
             elif action == "off":
-                confirm = input(
-                    "Are you sure you want to deactivate emergency stop? (yes/no): "
-                )
+                confirm = input("Are you sure you want to deactivate emergency stop? (yes/no): ")
                 if confirm.lower() == "yes":
                     self.risk_agent.set_emergency_stop(False, "CLI command")
                     print("🟢 Emergency stop deactivated")

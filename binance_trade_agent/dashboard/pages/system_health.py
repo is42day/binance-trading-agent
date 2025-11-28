@@ -150,9 +150,7 @@ def update_health_metrics(n_intervals):
         # Get status
         status = health.get("status", "unknown")
         status_color = (
-            "success"
-            if status == "healthy"
-            else "warning" if status == "degraded" else "danger"
+            "success" if status == "healthy" else "warning" if status == "degraded" else "danger"
         )
 
         metrics = dbc.Row(
@@ -175,9 +173,7 @@ def update_health_metrics(n_intervals):
                             value=f"{health.get('trade_error_rate', 0):.2f}%",
                             icon="📊",
                             status=(
-                                "success"
-                                if health.get("trade_error_rate", 0) < 5
-                                else "warning"
+                                "success" if health.get("trade_error_rate", 0) < 5 else "warning"
                             ),
                         )
                     ],
@@ -193,9 +189,7 @@ def update_health_metrics(n_intervals):
                             value=f"{health.get('api_error_rate', 0):.2f}%",
                             icon="🔌",
                             status=(
-                                "success"
-                                if health.get("api_error_rate", 0) < 5
-                                else "warning"
+                                "success" if health.get("api_error_rate", 0) < 5 else "warning"
                             ),
                         )
                     ],

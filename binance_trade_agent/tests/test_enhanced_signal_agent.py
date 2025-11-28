@@ -78,9 +78,7 @@ class TestEnhancedSignalAgent:
         """Test initialization with custom strategy parameters"""
         custom_params = {"type": "rsi", "period": 21, "overbought": 75}
 
-        agent = SignalAgent(
-            strategy_name="test_strategy", strategy_parameters=custom_params
-        )
+        agent = SignalAgent(strategy_name="test_strategy", strategy_parameters=custom_params)
         assert "test_strategy_custom" in agent.get_available_strategies()
 
     def test_signal_generation(self):

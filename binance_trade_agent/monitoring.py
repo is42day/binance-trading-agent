@@ -86,18 +86,14 @@ class MetricsCollector:
             self.counters[key] += value
             self._add_event(name, value, "counter", labels or {})
 
-    def record_gauge(
-        self, name: str, value: float, labels: Optional[Dict[str, str]] = None
-    ):
+    def record_gauge(self, name: str, value: float, labels: Optional[Dict[str, str]] = None):
         """Record a gauge metric"""
         with self._lock:
             key = self._make_key(name, labels)
             self.gauges[key] = value
             self._add_event(name, value, "gauge", labels or {})
 
-    def record_histogram(
-        self, name: str, value: float, labels: Optional[Dict[str, str]] = None
-    ):
+    def record_histogram(self, name: str, value: float, labels: Optional[Dict[str, str]] = None):
         """Record a histogram metric"""
         with self._lock:
             key = self._make_key(name, labels)
@@ -107,9 +103,7 @@ class MetricsCollector:
                 self.histograms[key] = self.histograms[key][-1000:]
             self._add_event(name, value, "histogram", labels or {})
 
-    def record_timing(
-        self, name: str, duration_ms: float, labels: Optional[Dict[str, str]] = None
-    ):
+    def record_timing(self, name: str, duration_ms: float, labels: Optional[Dict[str, str]] = None):
         """Record a timing metric"""
         with self._lock:
             key = self._make_key(name, labels)
@@ -126,9 +120,7 @@ class MetricsCollector:
         label_str = ",".join(f"{k}={v}" for k, v in sorted(labels.items()))
         return f"{name}{{{label_str}}}"
 
-    def _add_event(
-        self, name: str, value: float, event_type: str, labels: Dict[str, str]
-    ):
+    def _add_event(self, name: str, value: float, event_type: str, labels: Dict[str, str]):
         """Add metric event to history"""
         event = MetricEvent(
             name=name,
@@ -144,9 +136,7 @@ class MetricsCollector:
         key = self._make_key(name, labels)
         return self.counters.get(key, 0.0)
 
-    def get_gauge(
-        self, name: str, labels: Optional[Dict[str, str]] = None
-    ) -> Optional[float]:
+    def get_gauge(self, name: str, labels: Optional[Dict[str, str]] = None) -> Optional[float]:
         """Get gauge value"""
         key = self._make_key(name, labels)
         return self.gauges.get(key)
@@ -225,9 +215,7 @@ class StructuredLogger:
 
     def _setup_formatter(self):
         """Setup structured log formatter"""
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
         # Add console handler if not exists
         if not self.logger.handlers:
@@ -286,9 +274,7 @@ class StructuredLogger:
         """Log error message"""
         self._log_with_context("ERROR", message, context, **kwargs)
 
-    def critical(
-        self, message: str, context: Optional[Dict[str, Any]] = None, **kwargs
-    ):
+    def critical(self, message: str, context: Optional[Dict[str, Any]] = None, **kwargs):
         """Log critical message"""
         self._log_with_context("CRITICAL", message, context, **kwargs)
 
@@ -405,9 +391,7 @@ class MonitoringSystem:
         else:
             self.metrics.record_counter("trades_failed", labels=labels)
 
-        self.metrics.record_timing(
-            "trade_execution_duration_ms", duration_ms, labels=labels
-        )
+        self.metrics.record_timing("trade_execution_duration_ms", duration_ms, labels=labels)
         self.metrics.record_histogram("trade_quantity", quantity, labels=labels)
         self.metrics.record_histogram("trade_price", price, labels=labels)
 
@@ -419,9 +403,7 @@ class MonitoringSystem:
 
         self.metrics.record_counter("signals_generated", labels=labels)
         self.metrics.record_histogram("signal_confidence", confidence, labels=labels)
-        self.metrics.record_timing(
-            "signal_generation_duration_ms", duration_ms, labels=labels
-        )
+        self.metrics.record_timing("signal_generation_duration_ms", duration_ms, labels=labels)
 
     def record_risk_assessment(
         self, symbol: str, approved: bool, risk_level: str, duration_ms: float
@@ -434,9 +416,7 @@ class MonitoringSystem:
         else:
             self.metrics.record_counter("risk_rejections", labels=labels)
 
-        self.metrics.record_timing(
-            "risk_assessment_duration_ms", duration_ms, labels=labels
-        )
+        self.metrics.record_timing("risk_assessment_duration_ms", duration_ms, labels=labels)
 
     def update_portfolio_metrics(
         self,
@@ -483,15 +463,9 @@ class MonitoringSystem:
     def get_performance_metrics(self) -> Dict[str, Any]:
         """Get performance metrics"""
         return {
-            "trade_execution": self.metrics.get_timing_stats(
-                "trade_execution_duration_ms"
-            ),
-            "signal_generation": self.metrics.get_timing_stats(
-                "signal_generation_duration_ms"
-            ),
-            "risk_assessment": self.metrics.get_timing_stats(
-                "risk_assessment_duration_ms"
-            ),
+            "trade_execution": self.metrics.get_timing_stats("trade_execution_duration_ms"),
+            "signal_generation": self.metrics.get_timing_stats("signal_generation_duration_ms"),
+            "risk_assessment": self.metrics.get_timing_stats("risk_assessment_duration_ms"),
             "api_calls": self.metrics.get_timing_stats("api_call_duration_ms"),
             "signal_confidence": self.metrics.get_histogram_stats("signal_confidence"),
             "trade_volumes": self.metrics.get_histogram_stats("trade_quantity"),
@@ -537,9 +511,7 @@ def monitor_execution(operation_type: str, include_args: bool = False):
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
-            correlation_id = CorrelationContext.get_correlation_id() or str(
-                uuid.uuid4()
-            )
+            correlation_id = CorrelationContext.get_correlation_id() or str(uuid.uuid4())
             CorrelationContext.set_correlation_id(correlation_id)
 
             logger = monitoring.get_logger(func.__module__)
@@ -648,9 +620,7 @@ def demo_monitoring_system():
         monitoring.record_trade_execution("BTCUSDT", "BUY", 0.001, 50000.0, True, 120.5)
 
         # Log trade event
-        logger.trade_event(
-            "order_filled", "BTCUSDT", {"quantity": 0.001, "price": 50000.0}
-        )
+        logger.trade_event("order_filled", "BTCUSDT", {"quantity": 0.001, "price": 50000.0})
 
         # Simulate API call
         logger.api_call("/api/v3/order", 95.3, 200, {"order_id": "test_123"})

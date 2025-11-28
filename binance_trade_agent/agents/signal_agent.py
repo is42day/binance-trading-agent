@@ -64,9 +64,7 @@ class SignalAgent:
         self.macd_signal_window = config.signal_macd_signal_window
 
         self.logger = logging.getLogger(__name__)
-        self.logger.info(
-            f"SignalAgent initialized with strategy: {self.current_strategy_name}"
-        )
+        self.logger.info(f"SignalAgent initialized with strategy: {self.current_strategy_name}")
 
     def generate_signal(self, symbol: str, strategy_name: str = None) -> Dict[str, Any]:
         """
@@ -106,9 +104,7 @@ class SignalAgent:
             strategy_name = strategy_name or self.current_strategy_name
 
             # Generate signal using strategy manager
-            result = self.strategy_manager.analyze_with_strategy(
-                strategy_name, ohlcv_data, symbol
-            )
+            result = self.strategy_manager.analyze_with_strategy(strategy_name, ohlcv_data, symbol)
 
             if result is None:
                 # Strategy analysis failed - return hold signal
@@ -323,7 +319,9 @@ class SignalAgent:
         slow_ema = ema(closes, slow_period)
         macd_line = [f - s for f, s in zip(fast_ema[-len(slow_ema) :], slow_ema, strict=False)]
         signal_line = ema(macd_line, signal_period)
-        histogram = [m - s for m, s in zip(macd_line[-len(signal_line) :], signal_line, strict=False)]
+        histogram = [
+            m - s for m, s in zip(macd_line[-len(signal_line) :], signal_line, strict=False)
+        ]
 
         return macd_line[-1], signal_line[-1], histogram[-1]
 
@@ -336,9 +334,7 @@ class SignalAgent:
 
     def compute_custom(self, ohlcv, **kwargs):
         """Legacy custom indicator placeholder - DEPRECATED"""
-        self.logger.warning(
-            "compute_custom() is deprecated. Create custom strategies instead."
-        )
+        self.logger.warning("compute_custom() is deprecated. Create custom strategies instead.")
         pass
 
 
@@ -436,9 +432,7 @@ if __name__ == "__main__":
         comparison = agent.compare_strategies("BTCUSDT")
         if "error" not in comparison:
             consensus = comparison["consensus"]
-            print(
-                f"   Consensus: {consensus['signal']} (strength: {consensus['strength']:.1%})"
-            )
+            print(f"   Consensus: {consensus['signal']} (strength: {consensus['strength']:.1%})")
             print(f"   Best Strategy: {comparison['best_strategy']['name']}")
             print(f"   Recommendation: {comparison['recommendation']}")
         else:
@@ -453,9 +447,7 @@ if __name__ == "__main__":
         "macd_slow_period": 22,
     }
 
-    success = agent.create_custom_strategy(
-        "my_custom_strategy", "combined", custom_params
-    )
+    success = agent.create_custom_strategy("my_custom_strategy", "combined", custom_params)
     if success:
         print("   Custom strategy created successfully!")
         agent.set_strategy("my_custom_strategy")
@@ -471,9 +463,7 @@ if __name__ == "__main__":
         # Test legacy methods still work
         rsi_result = agent.compute_signal(sample_ohlcv, indicator="rsi")
         macd_result = agent.compute_signal(sample_ohlcv, indicator="macd")
-        print(
-            f"   Legacy RSI: {rsi_result['signal']} (confidence: {rsi_result['confidence']:.1%})"
-        )
+        print(f"   Legacy RSI: {rsi_result['signal']} (confidence: {rsi_result['confidence']:.1%})")
         print(
             f"   Legacy MACD: {macd_result['signal']} (confidence: {macd_result['confidence']:.1%})"
         )

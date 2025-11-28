@@ -394,27 +394,19 @@ def update_position_limits(n_intervals):
                         "Max Position %",
                         style={"color": "#f4f2ee", "textAlign": "right"},
                     ),
-                    html.Th(
-                        "Stop Loss %", style={"color": "#f4f2ee", "textAlign": "right"}
-                    ),
-                    html.Th(
-                        "Status", style={"color": "#f4f2ee", "textAlign": "center"}
-                    ),
+                    html.Th("Stop Loss %", style={"color": "#f4f2ee", "textAlign": "right"}),
+                    html.Th("Status", style={"color": "#f4f2ee", "textAlign": "center"}),
                 ]
             )
         )
 
         for symbol, limits in symbol_limits.items():
-            status_badge = dbc.Badge(
-                "✓ Active", color="success", style={"fontSize": "0.75rem"}
-            )
+            status_badge = dbc.Badge("✓ Active", color="success", style={"fontSize": "0.75rem"})
 
             rows.append(
                 html.Tr(
                     [
-                        html.Td(
-                            symbol, style={"color": "#b8b4b0", "fontSize": "0.875rem"}
-                        ),
+                        html.Td(symbol, style={"color": "#b8b4b0", "fontSize": "0.875rem"}),
                         html.Td(
                             f"{limits.get('max_position_percent', 5):.1f}%",
                             style={

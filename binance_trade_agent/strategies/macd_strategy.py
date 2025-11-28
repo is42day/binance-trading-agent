@@ -67,9 +67,7 @@ class MACDStrategy(BaseStrategy):
         signal_period = self.get_parameter("signal_period")
         return slow_period + signal_period + 5  # Extra buffer for EMA calculation
 
-    def analyze(
-        self, market_data: List[Dict[str, Any]], symbol: str = None
-    ) -> StrategyResult:
+    def analyze(self, market_data: List[Dict[str, Any]], symbol: str = None) -> StrategyResult:
         """
         Analyze market data using MACD strategy
 
@@ -95,9 +93,7 @@ class MACDStrategy(BaseStrategy):
             macd_line, signal_line, histogram = self._calculate_macd(closes)
 
             # Generate signal
-            signal, confidence = self._generate_signal(
-                macd_line, signal_line, histogram
-            )
+            signal, confidence = self._generate_signal(macd_line, signal_line, histogram)
 
             # Calculate support levels
             current_price = closes[-1]
@@ -158,9 +154,7 @@ class MACDStrategy(BaseStrategy):
         # MACD line = Fast EMA - Slow EMA
         # Align arrays (slow EMA starts later)
         start_idx = len(fast_ema) - len(slow_ema)
-        macd_values = [
-            fast_ema[i + start_idx] - slow_ema[i] for i in range(len(slow_ema))
-        ]
+        macd_values = [fast_ema[i + start_idx] - slow_ema[i] for i in range(len(slow_ema))]
 
         # Signal line = EMA of MACD line
         signal_values = self._calculate_ema(macd_values, signal_period)
@@ -169,8 +163,7 @@ class MACDStrategy(BaseStrategy):
         # Align arrays again
         start_idx = len(macd_values) - len(signal_values)
         histogram_values = [
-            macd_values[i + start_idx] - signal_values[i]
-            for i in range(len(signal_values))
+            macd_values[i + start_idx] - signal_values[i] for i in range(len(signal_values))
         ]
 
         # Return the most recent values
