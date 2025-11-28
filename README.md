@@ -37,6 +37,11 @@ BINANCE_TESTNET=true  # CRITICAL: Never remove this line
 
 ### 3. Start the System (1 command)
 ```bash
+make start
+```
+
+**Or manually (without Makefile)**:
+```bash
 docker build -t binance-trading-agent:latest . -q
 docker rm api dashboard trading-agent -f 2>/dev/null
 docker run -d -p 8000:8000 --env-file .env -v "$(pwd)/data:/app/data" --name api binance-trading-agent:latest python -m binance_trade_agent.api.api
