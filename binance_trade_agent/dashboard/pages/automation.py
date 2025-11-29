@@ -180,9 +180,7 @@ layout = dbc.Container(
                                                     placeholder="BTCUSDT,ETHUSDT",
                                                     value="BTCUSDT",
                                                     className="form-control",
-                                                    style={
-                                                        "marginBottom": "0.5rem"
-                                                    },
+                                                    style={"marginBottom": "0.5rem"},
                                                 ),
                                                 html.Small(
                                                     "Comma-separated list",
@@ -495,9 +493,7 @@ def update_agent_status(n):
     Input("save-risk-btn", "n_clicks"),
     prevent_initial_call=True,
 )
-def handle_agent_control(
-    start_clicks, stop_clicks, restart_clicks, apply_clicks, risk_clicks
-):
+def handle_agent_control(start_clicks, stop_clicks, restart_clicks, apply_clicks, risk_clicks):
     """Handle agent control button clicks."""
     from dash import callback_context
 

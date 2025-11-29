@@ -376,13 +376,7 @@ def update_main_chart(symbol, timeframe, n_intervals):
             height=450,
             xaxis_rangeslider_visible=False,
             showlegend=True,
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="right",
-                x=1
-            ),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             xaxis=dict(
                 gridcolor="rgba(255, 255, 255, 0.05)",
                 showgrid=True,
@@ -433,29 +427,36 @@ def update_market_sentiment(symbol, n_intervals):
         ask_percent = 100 - bid_percent
 
         # Sentiment Bar
-        sentiment_bar = html.Div([
-            html.Div(
-                [
-                    html.Span("Buying Pressure", className="float-start text-success small"),
-                    html.Span("Selling Pressure", className="float-end text-danger small"),
-                ],
-                className="clearfix mb-1"
-            ),
-            dbc.Progress(
-                [
-                    dbc.Progress(value=bid_percent, color="success", bar=True),
-                    dbc.Progress(value=ask_percent, color="danger", bar=True),
-                ],
-                style={"height": "10px", "backgroundColor": "#1a1d23"}
-            ),
-            html.Div(
-                [
-                    html.Span(f"{bid_percent:.1f}%", className="float-start text-success small fw-bold"),
-                    html.Span(f"{ask_percent:.1f}%", className="float-end text-danger small fw-bold"),
-                ],
-                className="clearfix mt-1 mb-4"
-            )
-        ])
+        sentiment_bar = html.Div(
+            [
+                html.Div(
+                    [
+                        html.Span("Buying Pressure", className="float-start text-success small"),
+                        html.Span("Selling Pressure", className="float-end text-danger small"),
+                    ],
+                    className="clearfix mb-1",
+                ),
+                dbc.Progress(
+                    [
+                        dbc.Progress(value=bid_percent, color="success", bar=True),
+                        dbc.Progress(value=ask_percent, color="danger", bar=True),
+                    ],
+                    style={"height": "10px", "backgroundColor": "#1a1d23"},
+                ),
+                html.Div(
+                    [
+                        html.Span(
+                            f"{bid_percent:.1f}%",
+                            className="float-start text-success small fw-bold",
+                        ),
+                        html.Span(
+                            f"{ask_percent:.1f}%", className="float-end text-danger small fw-bold"
+                        ),
+                    ],
+                    className="clearfix mt-1 mb-4",
+                ),
+            ]
+        )
 
         # Top Orders Table
         table_rows = []
@@ -465,25 +466,37 @@ def update_market_sentiment(symbol, n_intervals):
             ask_price = float(asks[i][0])
             ask_qty = float(asks[i][1])
 
-            table_rows.append(html.Tr([
-                html.Td(f"{bid_qty:.4f}", className="text-end text-muted small"),
-                html.Td(f"${bid_price:,.2f}", className="text-end text-success small fw-bold"),
-                html.Td(f"${ask_price:,.2f}", className="text-end text-danger small fw-bold"),
-                html.Td(f"{ask_qty:.4f}", className="text-end text-muted small"),
-            ]))
+            table_rows.append(
+                html.Tr(
+                    [
+                        html.Td(f"{bid_qty:.4f}", className="text-end text-muted small"),
+                        html.Td(
+                            f"${bid_price:,.2f}", className="text-end text-success small fw-bold"
+                        ),
+                        html.Td(
+                            f"${ask_price:,.2f}", className="text-end text-danger small fw-bold"
+                        ),
+                        html.Td(f"{ask_qty:.4f}", className="text-end text-muted small"),
+                    ]
+                )
+            )
 
         order_table = html.Table(
             [
-                html.Thead(html.Tr([
-                    html.Th("Qty", className="text-end text-secondary small"),
-                    html.Th("Bid", className="text-end text-success small"),
-                    html.Th("Ask", className="text-end text-danger small"),
-                    html.Th("Qty", className="text-end text-secondary small"),
-                ])),
-                html.Tbody(table_rows)
+                html.Thead(
+                    html.Tr(
+                        [
+                            html.Th("Qty", className="text-end text-secondary small"),
+                            html.Th("Bid", className="text-end text-success small"),
+                            html.Th("Ask", className="text-end text-danger small"),
+                            html.Th("Qty", className="text-end text-secondary small"),
+                        ]
+                    )
+                ),
+                html.Tbody(table_rows),
             ],
             className="table table-sm table-borderless mb-0",
-            style={"color": "#b8b4b0"}
+            style={"color": "#b8b4b0"},
         )
 
         return html.Div([sentiment_bar, order_table])
@@ -553,31 +566,52 @@ def update_technical_summary(symbol, timeframe, n_intervals):
             rsi_color = "success"
 
         # Build Cards
-        return dbc.Row([
-            dbc.Col([
-                html.Div([
-                    html.H6("Market Trend", className="text-muted mb-2"),
-                    html.H3(trend, className=f"text-{trend_color} mb-0"),
-                    html.Small("Price vs SMA20/50", className="text-muted")
-                ], className="text-center p-3 border rounded border-secondary bg-dark")
-            ], width=4),
-
-            dbc.Col([
-                html.Div([
-                    html.H6("RSI (14)", className="text-muted mb-2"),
-                    html.H3(f"{current_rsi:.1f}", className=f"text-{rsi_color} mb-0"),
-                    html.Small(rsi_status, className=f"text-{rsi_color}")
-                ], className="text-center p-3 border rounded border-secondary bg-dark")
-            ], width=4),
-
-            dbc.Col([
-                html.Div([
-                    html.H6("Volatility (24h)", className="text-muted mb-2"),
-                    html.H3(f"{(df['high'].max() - df['low'].min()) / df['low'].min() * 100:.1f}%", className="text-info mb-0"),
-                    html.Small("High/Low Range", className="text-muted")
-                ], className="text-center p-3 border rounded border-secondary bg-dark")
-            ], width=4),
-        ])
+        return dbc.Row(
+            [
+                dbc.Col(
+                    [
+                        html.Div(
+                            [
+                                html.H6("Market Trend", className="text-muted mb-2"),
+                                html.H3(trend, className=f"text-{trend_color} mb-0"),
+                                html.Small("Price vs SMA20/50", className="text-muted"),
+                            ],
+                            className="text-center p-3 border rounded border-secondary bg-dark",
+                        )
+                    ],
+                    width=4,
+                ),
+                dbc.Col(
+                    [
+                        html.Div(
+                            [
+                                html.H6("RSI (14)", className="text-muted mb-2"),
+                                html.H3(f"{current_rsi:.1f}", className=f"text-{rsi_color} mb-0"),
+                                html.Small(rsi_status, className=f"text-{rsi_color}"),
+                            ],
+                            className="text-center p-3 border rounded border-secondary bg-dark",
+                        )
+                    ],
+                    width=4,
+                ),
+                dbc.Col(
+                    [
+                        html.Div(
+                            [
+                                html.H6("Volatility (24h)", className="text-muted mb-2"),
+                                html.H3(
+                                    f"{(df['high'].max() - df['low'].min()) / df['low'].min() * 100:.1f}%",
+                                    className="text-info mb-0",
+                                ),
+                                html.Small("High/Low Range", className="text-muted"),
+                            ],
+                            className="text-center p-3 border rounded border-secondary bg-dark",
+                        )
+                    ],
+                    width=4,
+                ),
+            ]
+        )
 
     except Exception as e:
         logger.error(f"Technical summary error: {str(e)}")
