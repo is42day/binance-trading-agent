@@ -8,7 +8,7 @@
     "remoteEnv": {
         "PYTHONPATH": "/app"
     },
-    "postCreateCommand": "pip install --upgrade pip && pip install -r requirements.txt",
+    "postCreateCommand": "pip install --upgrade pip && pip install -r requirements.txt && pre-commit install || true",
     "customizations": {
         "vscode": {
             "settings": {

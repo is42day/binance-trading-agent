@@ -115,7 +115,7 @@ class PortfolioManager:
         """Initialize portfolio manager with SQLAlchemy session"""
         self.db_path = db_path
         self.engine = create_engine(f"sqlite:///{db_path}", echo=False)
-        Base.metadata.create_all(self.engine)
+        Base.metadata.create_all(self.engine, checkfirst=True)
         self.SessionLocal = sessionmaker(bind=self.engine)
         self.logger = logging.getLogger(self.__class__.__name__)
 
