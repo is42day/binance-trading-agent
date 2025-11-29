@@ -6,7 +6,7 @@ Control strategy parameters, trading frequency, and risk settings
 from datetime import datetime
 
 import dash_bootstrap_components as dbc
-from dash import Input, Output, State, callback, dcc, html
+from dash import Input, Output, callback, dcc, html
 from dash.exceptions import PreventUpdate
 
 layout = dbc.Container(
@@ -475,8 +475,6 @@ layout = dbc.Container(
 def update_agent_status(n):
     """Update agent status display."""
     try:
-        import requests
-
         # Check if trading-agent is running via API health check or similar
         # Since docker is not available inside container, we'll use a simple flag-based approach
         # For now, assume agent is running if dashboard is up

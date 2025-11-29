@@ -79,26 +79,26 @@ rebuild: stop rm build run
 
 # Development & Testing Commands (run inside container)
 lint:
-	docker run --rm -v "$$(pwd):/app" -w /app $(DOCKER_IMAGE) ruff check binance_trade_agent tests/
+	docker run --rm -v "$(CURDIR):/app" -w /app $(DOCKER_IMAGE) ruff check binance_trade_agent tests/
 
 format:
-	docker run --rm -v "$$(pwd):/app" -w /app $(DOCKER_IMAGE) black . --exclude="venv|.venv|migrations"
+	docker run --rm -v "$(CURDIR):/app" -w /app $(DOCKER_IMAGE) black . --exclude="venv|.venv|migrations"
 
 format-check:
-	docker run --rm -v "$$(pwd):/app" -w /app $(DOCKER_IMAGE) black . --check --exclude="venv|.venv|migrations"
+	docker run --rm -v "$(CURDIR):/app" -w /app $(DOCKER_IMAGE) black . --check --exclude="venv|.venv|migrations"
 
 test:
-	docker run --rm -v "$$(pwd):/app" -w /app $(DOCKER_IMAGE) pytest -v
+	docker run --rm -v "$(CURDIR):/app" -w /app $(DOCKER_IMAGE) pytest -v
 
 test-cov:
-	docker run --rm -v "$$(pwd):/app" -w /app $(DOCKER_IMAGE) pytest --cov=binance_trade_agent tests/
+	docker run --rm -v "$(CURDIR):/app" -w /app $(DOCKER_IMAGE) pytest --cov=binance_trade_agent tests/
 
 isort:
-	docker run --rm -v "$$(pwd):/app" -w /app $(DOCKER_IMAGE) isort binance_trade_agent tests/ --profile black
+	docker run --rm -v "$(CURDIR):/app" -w /app $(DOCKER_IMAGE) isort binance_trade_agent tests/ --profile black
 
 clean:
 	docker system prune -f
-	docker run --rm -v "$$(pwd):/app" -w /app $(DOCKER_IMAGE) sh -c "find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && find . -type f -name '*.pyc' -delete 2>/dev/null || true && rm -rf .pytest_cache .mypy_cache 2>/dev/null || true"
+	docker run --rm -v "$(CURDIR):/app" -w /app $(DOCKER_IMAGE) sh -c "find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && find . -type f -name '*.pyc' -delete 2>/dev/null || true && rm -rf .pytest_cache .mypy_cache 2>/dev/null || true"
 
 logs-api:
 	docker logs -f api

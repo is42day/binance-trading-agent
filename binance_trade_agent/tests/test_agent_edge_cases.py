@@ -47,11 +47,11 @@ def test_trade_execution_place_and_cancel_demo(tmp_path):
     res = te.place_order("BTCUSDT", "BUY", "MARKET", 0.0001)
     assert isinstance(res, dict)
     # In demo mode, should either have orderId or error key
-    assert "orderId" in res or "error" in res
+    assert "order_id" in res or "error" in res
 
     # Cancel in demo should return a dict
-    if "orderId" in res:
-        cancel = te.cancel_order(res.get("orderId", 0), "BTCUSDT")
+    if "order_id" in res:
+        cancel = te.cancel_order(res.get("order_id", 0), "BTCUSDT")
         assert isinstance(cancel, dict)
 
 
@@ -60,7 +60,7 @@ def test_trade_execution_limit_order_missing_price_returns_error():
     res = te.place_order("BTCUSDT", "BUY", "LIMIT", 0.001, price=None)
     # When underlying client requires price for LIMIT, the agent returns an error dict
     assert isinstance(res, dict)
-    assert "error" in res or "orderId" in res
+    assert "error" in res or "order_id" in res
 
 
 def test_portfolio_manager_persistence_and_pnl(tmp_path):

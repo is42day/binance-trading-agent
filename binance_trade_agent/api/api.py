@@ -171,6 +171,8 @@ async def get_market_price(symbol: str):
         await cache.set(cache_key, price)
 
         return {"symbol": symbol_upper, "price": price, "source": "live"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"API error: {e}") from e
 

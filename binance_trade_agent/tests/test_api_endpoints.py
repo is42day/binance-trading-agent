@@ -5,11 +5,12 @@ SLA: API endpoints should respond within 100ms (P95) / 500ms (P99)
 """
 
 from datetime import datetime
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
+from ..api import api as api_module
 from ..api.api import app
 
 
@@ -95,10 +96,12 @@ class TestAPIPortfolioSummary:
         assert source1 in ["cache", "live"]
         assert source2 in ["cache", "live"]
 
-    @patch("binance_trade_agent.api.api.portfolio_manager")
-    def test_api_portfolio_summary_redis_down_fallback(self, mock_portfolio, client):
+    @patch.object(api_module, "cache", new_callable=AsyncMock)
+    @patch.object(api_module, "portfolio_manager")
+    def test_api_portfolio_summary_redis_down_fallback(self, mock_portfolio, mock_cache, client):
         """Test that portfolio endpoint works even if Redis is down"""
         # Arrange
+        mock_cache.get.return_value = None  # Cache miss
         mock_portfolio.get_portfolio_stats.return_value = {
             "total_value": 100000,
             "total_pnl": 5000,
@@ -119,7 +122,7 @@ class TestAPIPortfolioSummary:
 class TestAPIPositions:
     """Tests for /api/v1/portfolio/positions endpoint"""
 
-    @patch("binance_trade_agent.api.api.portfolio_manager")
+    @patch.object(api_module, "portfolio_manager")
     def test_api_positions_endpoint_success(self, mock_portfolio, client):
         """Test GET /api/v1/portfolio/positions returns 200 OK"""
         # Arrange
@@ -136,7 +139,7 @@ class TestAPIPositions:
         assert "positions" in data
         assert isinstance(data["positions"], list)
 
-    @patch("binance_trade_agent.api.api.portfolio_manager")
+    @patch.object(api_module, "portfolio_manager")
     def test_api_positions_endpoint_empty(self, mock_portfolio, client):
         """Test positions endpoint returns empty list when no positions"""
         # Arrange
@@ -154,7 +157,7 @@ class TestAPIPositions:
 class TestAPITradeHistory:
     """Tests for /api/v1/portfolio/trade-history endpoint"""
 
-    @patch("binance_trade_agent.api.api.portfolio_manager")
+    @patch.object(api_module, "portfolio_manager")
     def test_api_trade_history_success(self, mock_portfolio, client):
         """Test GET /api/v1/portfolio/trade-history returns 200 OK"""
         # Arrange
@@ -179,7 +182,7 @@ class TestAPITradeHistory:
         assert isinstance(data["trades"], list)
         assert len(data["trades"]) == 1
 
-    @patch("binance_trade_agent.api.api.portfolio_manager")
+    @patch.object(api_module, "portfolio_manager")
     def test_api_trade_history_with_limit(self, mock_portfolio, client):
         """Test trade-history respects limit parameter"""
         # Arrange
@@ -199,10 +202,12 @@ class TestAPITradeHistory:
 class TestAPIRiskStatus:
     """Tests for /api/v1/risk/status endpoint"""
 
-    @patch("binance_trade_agent.api.api.risk_agent")
-    def test_api_risk_status_success(self, mock_risk, client):
+    @patch.object(api_module, "cache", new_callable=AsyncMock)
+    @patch.object(api_module, "risk_agent")
+    def test_api_risk_status_success(self, mock_risk, mock_cache, client):
         """Test GET /api/v1/risk/status returns 200 OK"""
         # Arrange
+        mock_cache.get.return_value = None
         mock_risk.get_risk_status.return_value = {
             "risk_level": "MEDIUM",
             "approved_positions": 5,
@@ -218,7 +223,7 @@ class TestAPIRiskStatus:
         assert "risk_level" in data
         assert "source" in data
 
-    @patch("binance_trade_agent.api.api.risk_agent")
+    @patch.object(api_module, "risk_agent")
     def test_api_risk_status_caching(self, mock_risk, client):
         """Test that risk status uses caching"""
         # Arrange
@@ -239,10 +244,12 @@ class TestAPIRiskStatus:
 class TestAPIMarketPrice:
     """Tests for /api/v1/market/price/{symbol} endpoint"""
 
-    @patch("binance_trade_agent.api.api.market_agent")
-    def test_api_market_price_success(self, mock_market, client):
+    @patch.object(api_module, "cache", new_callable=AsyncMock)
+    @patch.object(api_module, "market_agent")
+    def test_api_market_price_success(self, mock_market, mock_cache, client):
         """Test GET /api/v1/market/price/BTCUSDT returns correct price"""
         # Arrange
+        mock_cache.get.return_value = None
         mock_market.get_latest_price.return_value = 50000.0
 
         # Act
@@ -255,10 +262,12 @@ class TestAPIMarketPrice:
         assert data["price"] == 50000.0
         assert "source" in data
 
-    @patch("binance_trade_agent.api.api.market_agent")
-    def test_api_market_price_symbol_normalization(self, mock_market, client):
+    @patch.object(api_module, "cache", new_callable=AsyncMock)
+    @patch.object(api_module, "market_agent")
+    def test_api_market_price_symbol_normalization(self, mock_market, mock_cache, client):
         """Test that symbol is normalized to uppercase"""
         # Arrange
+        mock_cache.get.return_value = None
         mock_market.get_latest_price.return_value = 100.0
 
         # Act
@@ -271,10 +280,12 @@ class TestAPIMarketPrice:
         # Verify agent was called with uppercase symbol
         mock_market.get_latest_price.assert_called_with("ETHUSDT")
 
-    @patch("binance_trade_agent.api.api.market_agent")
-    def test_api_market_price_not_found(self, mock_market, client):
+    @patch.object(api_module, "cache", new_callable=AsyncMock)
+    @patch.object(api_module, "market_agent")
+    def test_api_market_price_not_found(self, mock_market, mock_cache, client):
         """Test market price endpoint returns 404 for unknown symbol"""
         # Arrange
+        mock_cache.get.return_value = None
         mock_market.get_latest_price.return_value = None
 
         # Act
@@ -283,7 +294,7 @@ class TestAPIMarketPrice:
         # Assert
         assert response.status_code == 404
 
-    @patch("binance_trade_agent.api.api.market_agent")
+    @patch.object(api_module, "market_agent")
     def test_api_market_price_caching_behavior(self, mock_market, client):
         """Test that market prices are cached"""
         # Arrange
@@ -332,10 +343,12 @@ class TestAPISystemConfig:
 class TestAPIErrorHandling:
     """Tests for API error handling"""
 
-    @patch("binance_trade_agent.api.api.portfolio_manager")
-    def test_api_portfolio_endpoint_exception_handling(self, mock_portfolio, client):
+    @patch.object(api_module, "cache", new_callable=AsyncMock)
+    @patch.object(api_module, "portfolio_manager")
+    def test_api_portfolio_endpoint_exception_handling(self, mock_portfolio, mock_cache, client):
         """Test that exceptions are handled gracefully"""
         # Arrange
+        mock_cache.get.return_value = None
         mock_portfolio.get_portfolio_stats.side_effect = Exception("DB error")
 
         # Act
@@ -347,10 +360,12 @@ class TestAPIErrorHandling:
         data = response.json()
         assert "detail" in data
 
-    @patch("binance_trade_agent.api.api.market_agent")
-    def test_api_market_price_endpoint_exception_handling(self, mock_market, client):
+    @patch.object(api_module, "cache", new_callable=AsyncMock)
+    @patch.object(api_module, "market_agent")
+    def test_api_market_price_endpoint_exception_handling(self, mock_market, mock_cache, client):
         """Test market price endpoint error handling"""
         # Arrange
+        mock_cache.get.return_value = None
         mock_market.get_latest_price.side_effect = Exception("API error")
 
         # Act
@@ -363,10 +378,12 @@ class TestAPIErrorHandling:
 class TestAPIConcurrentRequests:
     """Tests for API behavior under concurrent load"""
 
-    @patch("binance_trade_agent.api.api.portfolio_manager")
-    def test_api_multiple_requests_to_same_endpoint(self, mock_portfolio, client):
+    @patch.object(api_module, "cache", new_callable=AsyncMock)
+    @patch.object(api_module, "portfolio_manager")
+    def test_api_multiple_requests_to_same_endpoint(self, mock_portfolio, mock_cache, client):
         """Test that API handles multiple requests correctly"""
         # Arrange
+        mock_cache.get.return_value = None
         mock_portfolio.get_portfolio_stats.return_value = {
             "total_value": 100000,
             "total_pnl": 5000,
