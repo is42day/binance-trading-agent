@@ -1063,6 +1063,56 @@ textarea.form-control {
     margin: var(--spacing-sm) 0;
 }
 
+/* Dash Dropdown (dcc.Dropdown) Styling */
+.Select-control {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.Select-input > input {
+    color: var(--text-primary) !important;
+}
+
+.Select-input > input::placeholder {
+    color: var(--text-tertiary) !important;
+}
+
+.Select-placeholder {
+    color: var(--text-tertiary) !important;
+}
+
+.Select-value {
+    color: var(--text-primary) !important;
+}
+
+.Select-menu-outer {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+    box-shadow: var(--shadow-md) !important;
+}
+
+.Select-option {
+    color: var(--text-primary) !important;
+    background-color: var(--bg-card) !important;
+    padding: var(--spacing-md) var(--spacing-lg) !important;
+}
+
+.Select-option:hover {
+    background-color: var(--bg-hover) !important;
+    color: var(--text-primary) !important;
+}
+
+.Select-option.is-selected {
+    background-color: var(--primary-color) !important;
+    color: white !important;
+}
+
+.Select-option.is-focused {
+    background-color: var(--bg-hover) !important;
+    color: var(--text-primary) !important;
+}
+
 /* ============================================
    STATUS INDICATORS & ELEMENTS
    ============================================ */

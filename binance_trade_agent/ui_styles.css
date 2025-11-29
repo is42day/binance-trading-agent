@@ -326,6 +326,113 @@
     box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
 }
 
+/* Dropdown Component Styles */
+.Select {
+    color: var(--color-text-primary) !important;
+}
+
+.Select-control {
+    background: var(--color-bg-tertiary) !important;
+    border: 1px solid var(--color-border-medium) !important;
+    border-radius: var(--radius-md) !important;
+    color: var(--color-text-primary) !important;
+}
+
+.Select-control:focus {
+    border-color: var(--color-info) !important;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1) !important;
+}
+
+.Select-input > input {
+    color: var(--color-text-primary) !important;
+}
+
+.Select-placeholder {
+    color: var(--color-text-tertiary) !important;
+}
+
+.Select-menu-outer {
+    background: var(--color-bg-secondary) !important;
+    border: 1px solid var(--color-border-medium) !important;
+    border-radius: var(--radius-md) !important;
+}
+
+.Select-option {
+    color: var(--color-text-primary) !important;
+    background: var(--color-bg-secondary) !important;
+    padding: 10px var(--grid-spacing-sm) !important;
+}
+
+.Select-option:hover {
+    background: var(--color-bg-tertiary) !important;
+    color: var(--color-text-primary) !important;
+}
+
+.Select-option.is-selected {
+    background: var(--color-info) !important;
+    color: white !important;
+}
+
+/* Dash Dropdown Component */
+.dash-dropdown {
+    color: var(--color-text-primary) !important;
+}
+
+.Select-control {
+    background-color: var(--color-bg-tertiary) !important;
+}
+
+.Select-control input {
+    color: var(--color-text-primary) !important;
+}
+
+.Select-value-label {
+    color: var(--color-text-primary) !important;
+}
+
+/* Additional styles for dcc.Dropdown */
+.dcc-dropdown,
+.Select-control,
+.react-select__control {
+    background-color: var(--color-bg-tertiary) !important;
+    border-color: var(--color-border-medium) !important;
+    color: var(--color-text-primary) !important;
+}
+
+.dcc-dropdown input,
+.Select-control input,
+.react-select__input input {
+    color: var(--color-text-primary) !important;
+}
+
+.dcc-dropdown .Select-value,
+.Select-value {
+    color: var(--color-text-primary) !important;
+}
+
+.dcc-dropdown .Select-menu,
+.Select-menu {
+    background-color: var(--color-bg-secondary) !important;
+}
+
+.dcc-dropdown .Select-option,
+.Select-option {
+    color: var(--color-text-primary) !important;
+    background-color: var(--color-bg-secondary) !important;
+}
+
+.dcc-dropdown .Select-option:hover,
+.Select-option:hover {
+    background-color: var(--color-bg-tertiary) !important;
+    color: var(--color-text-primary) !important;
+}
+
+.dcc-dropdown .Select-option.is-selected,
+.Select-option.is-selected {
+    background-color: var(--color-info) !important;
+    color: #ffffff !important;
+}
+
 .form-group__help {
     margin-top: 4px;
     font-size: var(--font-size-xs);
