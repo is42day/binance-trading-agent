@@ -4,6 +4,7 @@ Exposes portfolio, risk, and market data to the Dash UI
 """
 
 import logging
+import os
 import traceback
 from datetime import datetime
 
@@ -36,7 +37,8 @@ app.add_middleware(
 
 # Initialize components
 # Use web_portfolio.db which is shared with the dashboard and trading agent
-portfolio_manager = PortfolioManager(db_path="/app/data/web_portfolio.db")
+db_path = os.getenv("DB_PATH", "/app/data/web_portfolio.db")
+portfolio_manager = PortfolioManager(db_path=db_path)
 risk_agent = EnhancedRiskManagementAgent()
 market_agent = MarketDataAgent()
 cache = RedisCache(host="redis")  # Use the service name from docker-compose
@@ -171,6 +173,8 @@ async def get_market_price(symbol: str):
         await cache.set(cache_key, price)
 
         return {"symbol": symbol_upper, "price": price, "source": "live"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"API error: {e}") from e
 

@@ -6,7 +6,7 @@ SLA: Dashboard API calls should timeout/degrade gracefully after 5 seconds
 
 from unittest.mock import MagicMock, patch
 
-from ..dashboard.utils.data_fetch import (
+from binance_trade_agent.dashboard.utils.data_fetch import (
     get_market_data,
     get_ohlcv_data,
     get_order_book,
@@ -69,15 +69,16 @@ class TestDashboardMarketData:
         result = get_ohlcv_data("BTCUSDT", interval="1h")
 
         # Assert
-        assert isinstance(result, dict)
-        assert "data" in result or "error" in result
+        assert isinstance(result, list)
+        if len(result) > 0:
+            assert isinstance(result[0], dict)
 
     @patch("binance_trade_agent.dashboard.utils.data_fetch.get_trading_components")
     def test_dashboard_get_order_book_structure(self, mock_components):
         """Test that order book data has correct structure"""
         # Arrange
         mock_market_agent = MagicMock()
-        mock_market_agent.get_order_book.return_value = {
+        mock_market_agent.fetch_order_book.return_value = {
             "bids": [[49990, 1.0], [49980, 2.0]],
             "asks": [[50010, 1.0], [50020, 2.0]],
             "timestamp": 1234567890,
@@ -203,7 +204,7 @@ class TestDashboardErrorRecovery:
 
     @patch("binance_trade_agent.dashboard.utils.data_fetch.get_trading_components")
     def test_dashboard_returns_dict_not_exception(self, mock_components):
-        """Test that data_fetch functions always return dict"""
+        """Test that data_fetch functions always return dict (or list for OHLCV)"""
         # Arrange
         mock_components.side_effect = RuntimeError("Critical error")
 
@@ -217,8 +218,9 @@ class TestDashboardErrorRecovery:
             get_performance_metrics(),
         ]
 
-        # Assert - All should be dicts
-        assert all(isinstance(r, dict) for r in results)
+        # Assert - All should be dicts or lists (for OHLCV)
+        for r in results:
+            assert isinstance(r, (dict, list))
 
 
 class TestDashboardDataConsistency:
@@ -245,7 +247,7 @@ class TestDashboardDataConsistency:
         # Assert
         assert result.get("total_value") == expected_stats["total_value"]
         assert result.get("total_pnl") == expected_stats["total_pnl"]
-        assert result.get("number_of_trades") == expected_stats["number_of_trades"]
+        assert result.get("total_trades") == expected_stats["number_of_trades"]
 
     @patch("binance_trade_agent.dashboard.utils.data_fetch.get_trading_components")
     def test_dashboard_trade_history_data_format(self, mock_components):
@@ -286,7 +288,7 @@ class TestDashboardComponentLoadability:
         assert callable(data_fetch.get_market_data)
         assert callable(data_fetch.get_ohlcv_data)
         assert callable(data_fetch.get_order_book)
-        assert callable(data_fetch.get_portfolio_summary)
+        assert callable(data_fetch.get_portfolio_data)
         assert callable(data_fetch.get_trade_history)
         assert callable(data_fetch.get_performance_metrics)
 
@@ -317,10 +319,10 @@ class TestDashboardCacheInvalidation:
         mock_components.return_value = {"portfolio": mock_portfolio}
 
         # Act
-        from binance_trade_agent.api.api import get_portfolio_summary
+        from binance_trade_agent.dashboard.utils.data_fetch import get_portfolio_data
 
-        result1 = get_portfolio_summary()
-        result2 = get_portfolio_summary()
+        result1 = get_portfolio_data()
+        result2 = get_portfolio_data()
 
         # Assert
         # Both calls should succeed

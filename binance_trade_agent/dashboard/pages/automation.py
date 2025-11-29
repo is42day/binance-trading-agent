@@ -6,7 +6,7 @@ Control strategy parameters, trading frequency, and risk settings
 from datetime import datetime
 
 import dash_bootstrap_components as dbc
-from dash import Input, Output, State, callback, dcc, html
+from dash import Input, Output, callback, dcc, html
 from dash.exceptions import PreventUpdate
 
 layout = dbc.Container(
@@ -180,9 +180,7 @@ layout = dbc.Container(
                                                     placeholder="BTCUSDT,ETHUSDT",
                                                     value="BTCUSDT",
                                                     className="form-control",
-                                                    style={
-                                                        "marginBottom": "0.5rem"
-                                                    },
+                                                    style={"marginBottom": "0.5rem"},
                                                 ),
                                                 html.Small(
                                                     "Comma-separated list",
@@ -475,8 +473,6 @@ layout = dbc.Container(
 def update_agent_status(n):
     """Update agent status display."""
     try:
-        import requests
-
         # Check if trading-agent is running via API health check or similar
         # Since docker is not available inside container, we'll use a simple flag-based approach
         # For now, assume agent is running if dashboard is up
@@ -497,9 +493,7 @@ def update_agent_status(n):
     Input("save-risk-btn", "n_clicks"),
     prevent_initial_call=True,
 )
-def handle_agent_control(
-    start_clicks, stop_clicks, restart_clicks, apply_clicks, risk_clicks
-):
+def handle_agent_control(start_clicks, stop_clicks, restart_clicks, apply_clicks, risk_clicks):
     """Handle agent control button clicks."""
     from dash import callback_context
 

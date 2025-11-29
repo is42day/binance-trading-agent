@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 # Default symbol
 DEFAULT_SYMBOL = "BTCUSDT"
 AVAILABLE_SYMBOLS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"]
+AVAILABLE_TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h", "1d"]
+DEFAULT_TIMEFRAME = "1h"
 
 layout = dbc.Container(
     [
@@ -47,7 +49,7 @@ layout = dbc.Container(
             ],
             className="mb-4",
         ),
-        # Symbol Selector
+        # Controls Row (Symbol + Timeframe)
         dbc.Row(
             [
                 dbc.Col(
@@ -61,14 +63,32 @@ layout = dbc.Container(
                                         {"label": sym, "value": sym} for sym in AVAILABLE_SYMBOLS
                                     ],
                                     value=DEFAULT_SYMBOL,
-                                    style={"minWidth": "150px"},
+                                    style={"minWidth": "120px"},
                                 ),
                             ],
-                            style={"maxWidth": "300px"},
+                            className="me-3",
                         )
                     ],
-                    width=12,
-                )
+                    width="auto",
+                ),
+                dbc.Col(
+                    [
+                        dbc.InputGroup(
+                            [
+                                dbc.InputGroupText("Timeframe", style={"minWidth": "100px"}),
+                                dcc.Dropdown(
+                                    id="timeframe-selector",
+                                    options=[
+                                        {"label": tf, "value": tf} for tf in AVAILABLE_TIMEFRAMES
+                                    ],
+                                    value=DEFAULT_TIMEFRAME,
+                                    style={"minWidth": "100px"},
+                                ),
+                            ],
+                        )
+                    ],
+                    width="auto",
+                ),
             ],
             className="mb-4",
         ),
@@ -93,7 +113,7 @@ layout = dbc.Container(
             ],
             className="mb-4",
         ),
-        # Charts Row
+        # Main Chart and Market Sentiment
         dbc.Row(
             [
                 dbc.Col(
@@ -103,13 +123,14 @@ layout = dbc.Container(
                                 dbc.CardBody(
                                     [
                                         html.H5(
-                                            "Price Chart (1h)",
+                                            "Price Trend",
                                             className="card-title",
                                             style={"color": "#f4f2ee"},
                                         ),
                                         dcc.Graph(
-                                            id="candlestick-chart",
-                                            style={"minHeight": "400px"},
+                                            id="main-chart",
+                                            style={"minHeight": "450px"},
+                                            config={"displayModeBar": False},
                                         ),
                                     ]
                                 )
@@ -122,6 +143,7 @@ layout = dbc.Container(
                     ],
                     lg=8,
                     md=12,
+                    className="mb-4",
                 ),
                 dbc.Col(
                     [
@@ -130,33 +152,28 @@ layout = dbc.Container(
                                 dbc.CardBody(
                                     [
                                         html.H5(
-                                            "Order Book",
+                                            "Market Sentiment",
                                             className="card-title",
                                             style={"color": "#f4f2ee"},
                                         ),
-                                        html.Div(
-                                            id="order-book-table",
-                                            style={
-                                                "maxHeight": "400px",
-                                                "overflowY": "auto",
-                                            },
-                                        ),
+                                        html.Div(id="market-sentiment-content"),
                                     ]
                                 )
                             ],
                             style={
                                 "backgroundColor": "#23242a",
-                                "borderColor": "rgba(255, 145, 77, 0.2",
+                                "borderColor": "rgba(255, 145, 77, 0.2)",
+                                "height": "100%",
                             },
                         )
                     ],
                     lg=4,
                     md=12,
+                    className="mb-4",
                 ),
             ],
-            className="mb-4",
         ),
-        # Volume and Indicators Row
+        # Technical Summary Row
         dbc.Row(
             [
                 dbc.Col(
@@ -166,14 +183,11 @@ layout = dbc.Container(
                                 dbc.CardBody(
                                     [
                                         html.H5(
-                                            "Volume (24h)",
+                                            "Technical Summary",
                                             className="card-title",
                                             style={"color": "#f4f2ee"},
                                         ),
-                                        dcc.Graph(
-                                            id="volume-chart",
-                                            style={"minHeight": "300px"},
-                                        ),
+                                        html.Div(id="technical-summary-content"),
                                     ]
                                 )
                             ],
@@ -183,38 +197,13 @@ layout = dbc.Container(
                             },
                         )
                     ],
-                    lg=6,
-                    md=12,
-                ),
-                dbc.Col(
-                    [
-                        dbc.Card(
-                            [
-                                dbc.CardBody(
-                                    [
-                                        html.H5(
-                                            "RSI (14)",
-                                            className="card-title",
-                                            style={"color": "#f4f2ee"},
-                                        ),
-                                        dcc.Graph(id="rsi-chart", style={"minHeight": "300px"}),
-                                    ]
-                                )
-                            ],
-                            style={
-                                "backgroundColor": "#23242a",
-                                "borderColor": "rgba(255, 145, 77, 0.2)",
-                            },
-                        )
-                    ],
-                    lg=6,
-                    md=12,
+                    width=12,
                 ),
             ],
             className="mb-4",
         ),
-        # Auto-refresh interval
-        dcc.Interval(id="market-timer", interval=60000, n_intervals=0),
+        # Auto-refresh interval (10s)
+        dcc.Interval(id="market-timer", interval=10000, n_intervals=0),
     ],
     fluid=True,
     style={"paddingBottom": "3rem"},
@@ -312,20 +301,22 @@ def update_market_metrics(symbol, n_intervals):
         return dbc.Alert(f"Error: {str(e)}", color="danger")
 
 
-# Callback for candlestick chart
+# Callback for main chart (Price only, simplified)
 @callback(
-    Output("candlestick-chart", "figure"),
+    Output("main-chart", "figure"),
     Input("symbol-selector", "value"),
+    Input("timeframe-selector", "value"),
     Input("market-timer", "n_intervals"),
     prevent_initial_call=False,
 )
-def update_candlestick(symbol, n_intervals):
-    """Update candlestick chart"""
+def update_main_chart(symbol, timeframe, n_intervals):
+    """Update main chart with Price and SMAs"""
     try:
         if get_ohlcv_data is None:
             return go.Figure().add_annotation(text="Data unavailable")
 
-        data = get_ohlcv_data(symbol, interval="1h", limit=48)
+        # Fetch data
+        data = get_ohlcv_data(symbol, interval=timeframe, limit=100)
 
         if isinstance(data, dict) and "error" in data:
             return go.Figure().add_annotation(text=f"Error: {data['error']}")
@@ -335,9 +326,10 @@ def update_candlestick(symbol, n_intervals):
 
         df = pd.DataFrame(data)
 
-        # Create candlestick chart with SMA
+        # Create simple chart
         fig = go.Figure()
 
+        # Candlestick
         fig.add_trace(
             go.Candlestick(
                 x=df["timestamp"],
@@ -345,23 +337,21 @@ def update_candlestick(symbol, n_intervals):
                 high=df["high"],
                 low=df["low"],
                 close=df["close"],
-                name="OHLC",
-                hovertemplate="<b>%{x}</b><br>O: $%{open:.2f}<br>H: $%{high:.2f}<br>L: $%{low:.2f}<br>C: $%{close:.2f}",
+                name="Price",
                 increasing_line_color="#27ae60",
                 decreasing_line_color="#e74c3c",
             )
         )
 
-        # Add SMA20 and SMA50
+        # SMAs
         if len(df) >= 20:
             sma20 = df["close"].rolling(window=20).mean()
             fig.add_trace(
                 go.Scatter(
                     x=df["timestamp"],
                     y=sma20,
-                    name="SMA20",
-                    line=dict(color="#3498db", width=2),
-                    hovertemplate="SMA20: $%{y:.2f}",
+                    name="SMA 20",
+                    line=dict(color="#3498db", width=1.5),
                 )
             )
 
@@ -371,45 +361,51 @@ def update_candlestick(symbol, n_intervals):
                 go.Scatter(
                     x=df["timestamp"],
                     y=sma50,
-                    name="SMA50",
-                    line=dict(color="#e67e22", width=2),
-                    hovertemplate="SMA50: $%{y:.2f}",
+                    name="SMA 50",
+                    line=dict(color="#e67e22", width=1.5),
                 )
             )
 
         fig.update_layout(
-            title=f"{symbol} Price Chart (1h) - Last 48 Hours",
-            yaxis_title="Price (USDT)",
-            xaxis_title="Time",
             template="plotly_dark",
             hovermode="x unified",
-            paper_bgcolor="#1a1d23",
+            paper_bgcolor="#23242a",
             plot_bgcolor="#23242a",
             font=dict(color="#f4f2ee"),
-            xaxis=dict(gridcolor="rgba(255, 145, 77, 0.1)"),
-            yaxis=dict(gridcolor="rgba(255, 145, 77, 0.1)"),
-            height=400,
+            margin=dict(l=40, r=40, t=20, b=40),
+            height=450,
+            xaxis_rangeslider_visible=False,
+            showlegend=True,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            xaxis=dict(
+                gridcolor="rgba(255, 255, 255, 0.05)",
+                showgrid=True,
+            ),
+            yaxis=dict(
+                gridcolor="rgba(255, 255, 255, 0.05)",
+                showgrid=True,
+            ),
         )
 
         return fig
 
     except Exception as e:
-        logger.error(f"Candlestick error: {str(e)}")
+        logger.error(f"Main chart error: {str(e)}")
         return go.Figure().add_annotation(text=f"Error: {str(e)}")
 
 
-# Callback for order book
+# Callback for market sentiment (Order Book + Ratio)
 @callback(
-    Output("order-book-table", "children"),
+    Output("market-sentiment-content", "children"),
     Input("symbol-selector", "value"),
     Input("market-timer", "n_intervals"),
     prevent_initial_call=False,
 )
-def update_order_book(symbol, n_intervals):
-    """Update order book table"""
+def update_market_sentiment(symbol, n_intervals):
+    """Update market sentiment display"""
     try:
         if get_order_book is None:
-            return dbc.Alert("Order book unavailable", color="warning")
+            return dbc.Alert("Data unavailable", color="warning")
 
         data = get_order_book(symbol, limit=10)
 
@@ -417,230 +413,206 @@ def update_order_book(symbol, n_intervals):
             return dbc.Alert(f"Error: {data['error']}", color="danger")
 
         if not data:
-            return dbc.Alert("No order book data", color="info")
+            return dbc.Alert("No data available", color="info")
 
-        # Separate bids and asks
         bids = data.get("bids", [])
         asks = data.get("asks", [])
 
-        # Build table
-        table_rows = []
+        # Calculate pressure
+        total_bid_qty = sum([float(x[1]) for x in bids])
+        total_ask_qty = sum([float(x[1]) for x in asks])
+        total_qty = total_bid_qty + total_ask_qty
 
-        # Add header
-        table_rows.append(
-            html.Tr(
-                [
-                    html.Th("Bid Price", style={"color": "#27ae60", "textAlign": "right"}),
-                    html.Th("Bid Qty", style={"color": "#27ae60", "textAlign": "right"}),
-                    html.Th(" ", style={"textAlign": "center"}),
-                    html.Th("Ask Price", style={"color": "#e74c3c", "textAlign": "right"}),
-                    html.Th("Ask Qty", style={"color": "#e74c3c", "textAlign": "right"}),
-                ]
-            )
+        bid_percent = (total_bid_qty / total_qty * 100) if total_qty > 0 else 50
+        ask_percent = 100 - bid_percent
+
+        # Sentiment Bar
+        sentiment_bar = html.Div(
+            [
+                html.Div(
+                    [
+                        html.Span("Buying Pressure", className="float-start text-success small"),
+                        html.Span("Selling Pressure", className="float-end text-danger small"),
+                    ],
+                    className="clearfix mb-1",
+                ),
+                dbc.Progress(
+                    [
+                        dbc.Progress(value=bid_percent, color="success", bar=True),
+                        dbc.Progress(value=ask_percent, color="danger", bar=True),
+                    ],
+                    style={"height": "10px", "backgroundColor": "#1a1d23"},
+                ),
+                html.Div(
+                    [
+                        html.Span(
+                            f"{bid_percent:.1f}%",
+                            className="float-start text-success small fw-bold",
+                        ),
+                        html.Span(
+                            f"{ask_percent:.1f}%", className="float-end text-danger small fw-bold"
+                        ),
+                    ],
+                    className="clearfix mt-1 mb-4",
+                ),
+            ]
         )
 
-        # Add bids and asks
-        max_rows = max(len(bids), len(asks))
-        for i in range(max_rows):
-            bid_price = f"${float(bids[i][0]):,.2f}" if i < len(bids) else ""
-            bid_qty = f"{float(bids[i][1]):.4f}" if i < len(bids) else ""
-            ask_price = f"${float(asks[i][0]):,.2f}" if i < len(asks) else ""
-            ask_qty = f"{float(asks[i][1]):.4f}" if i < len(asks) else ""
+        # Top Orders Table
+        table_rows = []
+        for i in range(min(5, len(bids), len(asks))):
+            bid_price = float(bids[i][0])
+            bid_qty = float(bids[i][1])
+            ask_price = float(asks[i][0])
+            ask_qty = float(asks[i][1])
 
             table_rows.append(
                 html.Tr(
                     [
+                        html.Td(f"{bid_qty:.4f}", className="text-end text-muted small"),
                         html.Td(
-                            bid_price,
-                            style={
-                                "color": "#27ae60",
-                                "textAlign": "right",
-                                "fontSize": "0.875rem",
-                            },
+                            f"${bid_price:,.2f}", className="text-end text-success small fw-bold"
                         ),
                         html.Td(
-                            bid_qty,
-                            style={
-                                "color": "#27ae60",
-                                "textAlign": "right",
-                                "fontSize": "0.875rem",
-                            },
+                            f"${ask_price:,.2f}", className="text-end text-danger small fw-bold"
                         ),
-                        html.Td("", style={"textAlign": "center"}),
-                        html.Td(
-                            ask_price,
-                            style={
-                                "color": "#e74c3c",
-                                "textAlign": "right",
-                                "fontSize": "0.875rem",
-                            },
-                        ),
-                        html.Td(
-                            ask_qty,
-                            style={
-                                "color": "#e74c3c",
-                                "textAlign": "right",
-                                "fontSize": "0.875rem",
-                            },
-                        ),
+                        html.Td(f"{ask_qty:.4f}", className="text-end text-muted small"),
                     ]
                 )
             )
 
-        return html.Table(
-            table_rows,
-            style={
-                "width": "100%",
-                "borderCollapse": "collapse",
-                "fontSize": "0.875rem",
-            },
+        order_table = html.Table(
+            [
+                html.Thead(
+                    html.Tr(
+                        [
+                            html.Th("Qty", className="text-end text-secondary small"),
+                            html.Th("Bid", className="text-end text-success small"),
+                            html.Th("Ask", className="text-end text-danger small"),
+                            html.Th("Qty", className="text-end text-secondary small"),
+                        ]
+                    )
+                ),
+                html.Tbody(table_rows),
+            ],
+            className="table table-sm table-borderless mb-0",
+            style={"color": "#b8b4b0"},
         )
 
+        return html.Div([sentiment_bar, order_table])
+
     except Exception as e:
-        logger.error(f"Order book error: {str(e)}")
+        logger.error(f"Sentiment error: {str(e)}")
         return dbc.Alert(f"Error: {str(e)}", color="danger")
 
 
-# Callback for volume chart
+# Callback for Technical Summary
 @callback(
-    Output("volume-chart", "figure"),
+    Output("technical-summary-content", "children"),
     Input("symbol-selector", "value"),
+    Input("timeframe-selector", "value"),
     Input("market-timer", "n_intervals"),
     prevent_initial_call=False,
 )
-def update_volume_chart(symbol, n_intervals):
-    """Update volume chart"""
+def update_technical_summary(symbol, timeframe, n_intervals):
+    """Update technical summary"""
     try:
         if get_ohlcv_data is None:
-            return go.Figure().add_annotation(text="Data unavailable")
+            return dbc.Alert("Data unavailable", color="warning")
 
-        data = get_ohlcv_data(symbol, interval="1h", limit=48)
+        data = get_ohlcv_data(symbol, interval=timeframe, limit=100)
 
         if isinstance(data, dict) and "error" in data:
-            return go.Figure().add_annotation(text=f"Error: {data['error']}")
+            return dbc.Alert(f"Error: {data['error']}", color="danger")
 
         if not data:
-            return go.Figure().add_annotation(text="No data available")
+            return dbc.Alert("No data available", color="info")
 
         df = pd.DataFrame(data)
 
-        fig = go.Figure()
+        # Calculate Indicators
+        current_price = df["close"].iloc[-1]
 
-        # Color bars based on price movement
-        colors = [
-            "#27ae60" if (df["close"].iloc[i] >= df["open"].iloc[i]) else "#e74c3c"
-            for i in range(len(df))
-        ]
-
-        fig.add_trace(
-            go.Bar(
-                x=df["timestamp"],
-                y=df["volume"],
-                name="Volume",
-                marker=dict(color=colors),
-                hovertemplate="<b>%{x}</b><br>Volume: %{y:.0f}",
-            )
-        )
-
-        fig.update_layout(
-            title="Trading Volume (24h)",
-            yaxis_title="Volume",
-            xaxis_title="Time",
-            template="plotly_dark",
-            hovermode="x",
-            paper_bgcolor="#1a1d23",
-            plot_bgcolor="#23242a",
-            font=dict(color="#f4f2ee"),
-            xaxis=dict(gridcolor="rgba(255, 145, 77, 0.1)"),
-            yaxis=dict(gridcolor="rgba(255, 145, 77, 0.1)"),
-            height=300,
-            showlegend=False,
-        )
-
-        return fig
-
-    except Exception as e:
-        logger.error(f"Volume chart error: {str(e)}")
-        return go.Figure().add_annotation(text=f"Error: {str(e)}")
-
-
-# Callback for RSI chart
-@callback(
-    Output("rsi-chart", "figure"),
-    Input("symbol-selector", "value"),
-    Input("market-timer", "n_intervals"),
-    prevent_initial_call=False,
-)
-def update_rsi_chart(symbol, n_intervals):
-    """Update RSI chart"""
-    try:
-        if get_ohlcv_data is None:
-            return go.Figure().add_annotation(text="Data unavailable")
-
-        data = get_ohlcv_data(symbol, interval="1h", limit=48)
-
-        if isinstance(data, dict) and "error" in data:
-            return go.Figure().add_annotation(text=f"Error: {data['error']}")
-
-        if not data:
-            return go.Figure().add_annotation(text="No data available")
-
-        df = pd.DataFrame(data)
-
-        # Calculate RSI (14 period)
+        # RSI
         delta = df["close"].diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
         rs = gain / loss
         rsi = 100 - (100 / (1 + rs))
+        current_rsi = rsi.iloc[-1]
 
-        fig = go.Figure()
+        # SMAs
+        sma20 = df["close"].rolling(window=20).mean().iloc[-1]
+        sma50 = df["close"].rolling(window=50).mean().iloc[-1]
 
-        fig.add_trace(
-            go.Scatter(
-                x=df["timestamp"],
-                y=rsi,
-                name="RSI(14)",
-                line=dict(color="#3498db", width=2),
-                fill="tozeroy",
-                fillcolor="rgba(52, 152, 219, 0.2)",
-                hovertemplate="<b>%{x}</b><br>RSI: %{y:.2f}",
-            )
+        # Determine Trend
+        trend = "NEUTRAL"
+        trend_color = "warning"
+        if current_price > sma20 > sma50:
+            trend = "BULLISH"
+            trend_color = "success"
+        elif current_price < sma20 < sma50:
+            trend = "BEARISH"
+            trend_color = "danger"
+
+        # RSI Status
+        rsi_status = "NEUTRAL"
+        rsi_color = "info"
+        if current_rsi > 70:
+            rsi_status = "OVERBOUGHT"
+            rsi_color = "danger"
+        elif current_rsi < 30:
+            rsi_status = "OVERSOLD"
+            rsi_color = "success"
+
+        # Build Cards
+        return dbc.Row(
+            [
+                dbc.Col(
+                    [
+                        html.Div(
+                            [
+                                html.H6("Market Trend", className="text-muted mb-2"),
+                                html.H3(trend, className=f"text-{trend_color} mb-0"),
+                                html.Small("Price vs SMA20/50", className="text-muted"),
+                            ],
+                            className="text-center p-3 border rounded border-secondary bg-dark",
+                        )
+                    ],
+                    width=4,
+                ),
+                dbc.Col(
+                    [
+                        html.Div(
+                            [
+                                html.H6("RSI (14)", className="text-muted mb-2"),
+                                html.H3(f"{current_rsi:.1f}", className=f"text-{rsi_color} mb-0"),
+                                html.Small(rsi_status, className=f"text-{rsi_color}"),
+                            ],
+                            className="text-center p-3 border rounded border-secondary bg-dark",
+                        )
+                    ],
+                    width=4,
+                ),
+                dbc.Col(
+                    [
+                        html.Div(
+                            [
+                                html.H6("Volatility (24h)", className="text-muted mb-2"),
+                                html.H3(
+                                    f"{(df['high'].max() - df['low'].min()) / df['low'].min() * 100:.1f}%",
+                                    className="text-info mb-0",
+                                ),
+                                html.Small("High/Low Range", className="text-muted"),
+                            ],
+                            className="text-center p-3 border rounded border-secondary bg-dark",
+                        )
+                    ],
+                    width=4,
+                ),
+            ]
         )
-
-        # Add overbought/oversold levels
-        fig.add_hline(
-            y=70,
-            line_dash="dash",
-            line_color="#e74c3c",
-            annotation_text="Overbought (70)",
-            annotation_position="right",
-        )
-        fig.add_hline(
-            y=30,
-            line_dash="dash",
-            line_color="#27ae60",
-            annotation_text="Oversold (30)",
-            annotation_position="right",
-        )
-
-        fig.update_layout(
-            title="Relative Strength Index (14)",
-            yaxis_title="RSI",
-            xaxis_title="Time",
-            yaxis=dict(range=[0, 100], gridcolor="rgba(255, 145, 77, 0.1)"),
-            template="plotly_dark",
-            hovermode="x",
-            paper_bgcolor="#1a1d23",
-            plot_bgcolor="#23242a",
-            font=dict(color="#f4f2ee"),
-            xaxis=dict(gridcolor="rgba(255, 145, 77, 0.1)"),
-            height=300,
-            showlegend=False,
-        )
-
-        return fig
 
     except Exception as e:
-        logger.error(f"RSI chart error: {str(e)}")
-        return go.Figure().add_annotation(text=f"Error: {str(e)}")
+        logger.error(f"Technical summary error: {str(e)}")
+        return dbc.Alert(f"Error: {str(e)}", color="danger")
