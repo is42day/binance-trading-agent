@@ -88,10 +88,10 @@ format-check:
 	docker run --rm -v "$(CURDIR):/app" -w /app $(DOCKER_IMAGE) black . --check --exclude="venv|.venv|migrations"
 
 test:
-	docker run --rm -v "$(CURDIR):/app" -w /app $(DOCKER_IMAGE) pytest -v
+	docker run --rm -v "$(CURDIR):/app" -w /app -e DB_PATH=/tmp/test_portfolio.db $(DOCKER_IMAGE) pytest -v
 
 test-cov:
-	docker run --rm -v "$(CURDIR):/app" -w /app $(DOCKER_IMAGE) pytest --cov=binance_trade_agent tests/
+	docker run --rm -v "$(CURDIR):/app" -w /app -e DB_PATH=/tmp/test_portfolio.db $(DOCKER_IMAGE) pytest --cov=binance_trade_agent tests/
 
 isort:
 	docker run --rm -v "$(CURDIR):/app" -w /app $(DOCKER_IMAGE) isort binance_trade_agent tests/ --profile black
