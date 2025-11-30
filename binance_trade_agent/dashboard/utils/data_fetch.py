@@ -3,6 +3,7 @@ Data fetching utilities for Dash dashboard
 Extracted from web_ui.py and adapted for Dash callbacks
 """
 
+import asyncio
 from datetime import datetime
 
 from binance_trade_agent.agents.market_data_agent import MarketDataAgent
@@ -10,12 +11,93 @@ from binance_trade_agent.agents.risk_management_agent import EnhancedRiskManagem
 from binance_trade_agent.agents.signal_agent import SignalAgent
 from binance_trade_agent.agents.trade_execution_agent import TradeExecutionAgent
 from binance_trade_agent.common.config import config
+from binance_trade_agent.core.autonomous_trading_loop import AutonomousTradingLoop
 from binance_trade_agent.core.orchestrator import TradingOrchestrator
 from binance_trade_agent.core.portfolio_manager import PortfolioManager
 from binance_trade_agent.monitoring import monitoring
 
 # Singleton component cache
 _components = None
+
+# Agent state management
+_agent_state = {
+    "is_running": False,
+    "start_time": None,
+    "stop_time": None,
+    "task": None,
+    "trading_loop": None,
+}
+
+
+def get_agent_state():
+    """Get current agent state"""
+    return _agent_state
+
+
+def start_agent(symbols=None, interval=120, strategy="combined_default"):
+    """Start the autonomous trading agent"""
+    global _agent_state
+    
+    if _agent_state["is_running"]:
+        return {"success": False, "message": "Agent is already running"}
+    
+    try:
+        # Create autonomous trading loop
+        trading_loop = AutonomousTradingLoop(
+            symbols=symbols or ["BTCUSDT", "ETHUSDT"],
+            trade_interval_seconds=interval,
+            duration_minutes=0,  # Run indefinitely
+            strategy_name=strategy,
+        )
+        
+        # Create async task for the loop
+        loop = asyncio.get_event_loop()
+        task = loop.create_task(trading_loop.run())
+        
+        _agent_state["is_running"] = True
+        _agent_state["start_time"] = datetime.now()
+        _agent_state["stop_time"] = None
+        _agent_state["task"] = task
+        _agent_state["trading_loop"] = trading_loop
+        
+        return {"success": True, "message": "Agent started successfully"}
+    except Exception as e:
+        return {"success": False, "message": f"Failed to start agent: {str(e)}"}
+
+
+def stop_agent():
+    """Stop the autonomous trading agent"""
+    global _agent_state
+    
+    if not _agent_state["is_running"]:
+        return {"success": False, "message": "Agent is not running"}
+    
+    try:
+        # Set stop flag on trading loop
+        if _agent_state["trading_loop"]:
+            _agent_state["trading_loop"].stop_flag = True
+        
+        # Cancel the task
+        if _agent_state["task"]:
+            _agent_state["task"].cancel()
+        
+        _agent_state["is_running"] = False
+        _agent_state["stop_time"] = datetime.now()
+        _agent_state["task"] = None
+        _agent_state["trading_loop"] = None
+        
+        return {"success": True, "message": "Agent stopped successfully"}
+    except Exception as e:
+        return {"success": False, "message": f"Failed to stop agent: {str(e)}"}
+
+
+def restart_agent(symbols=None, interval=120, strategy="combined_default"):
+    """Restart the autonomous trading agent"""
+    stop_result = stop_agent()
+    if not stop_result["success"] and "not running" not in stop_result["message"]:
+        return stop_result
+    
+    return start_agent(symbols, interval, strategy)
 
 
 def get_trading_components():
@@ -267,7 +349,7 @@ def get_system_status():
     """Get comprehensive system health status
 
     Returns:
-        dict: System health data including uptime, error rates, trading mode
+        dict: System health data including uptime, error rates, trading mode, trading_active, current_drawdown
     """
     try:
         # Get basic health data from monitoring
@@ -281,6 +363,20 @@ def get_system_status():
                 "api_error_rate": 0.0,
             }
 
+        # Get agent state
+        agent_state = get_agent_state()
+        
+        # Get risk management status
+        try:
+            components = get_trading_components()
+            risk_agent = components["risk_agent"]
+            risk_status = risk_agent.get_risk_status()
+            current_drawdown = risk_status.get("current_drawdown", 0)
+            emergency_stop = risk_status.get("emergency_stop", False)
+        except Exception:
+            current_drawdown = 0
+            emergency_stop = False
+
         # Enhance with system information
         health_data.update(
             {
@@ -288,6 +384,9 @@ def get_system_status():
                 "production_ready": config.is_production_ready(),
                 "trading_mode": ("production" if config.is_production_ready() else "demo"),
                 "binance_testnet": config.binance_testnet,
+                "trading_active": agent_state["is_running"] and not emergency_stop,
+                "current_drawdown": current_drawdown,
+                "emergency_stop": emergency_stop,
                 "last_updated": datetime.now().isoformat(),
             }
         )

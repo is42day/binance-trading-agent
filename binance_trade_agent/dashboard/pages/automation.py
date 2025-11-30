@@ -6,7 +6,7 @@ Control strategy parameters, trading frequency, and risk settings
 from datetime import datetime
 
 import dash_bootstrap_components as dbc
-from dash import Input, Output, callback, dcc, html
+from dash import Input, Output, State, callback, dcc, html
 from dash.exceptions import PreventUpdate
 
 layout = dbc.Container(
@@ -473,15 +473,20 @@ layout = dbc.Container(
 def update_agent_status(n):
     """Update agent status display."""
     try:
-        # Check if trading-agent is running via API health check or similar
-        # Since docker is not available inside container, we'll use a simple flag-based approach
-        # For now, assume agent is running if dashboard is up
-        status_display = html.Span("🟢 Running", className="text-success")
+        from binance_trade_agent.dashboard.utils.data_fetch import get_agent_state
+        
+        agent_state = get_agent_state()
+        
+        if agent_state["is_running"]:
+            status_display = html.Span("🟢 Running", className="text-success")
+        else:
+            status_display = html.Span("🔴 Stopped", className="text-danger")
+        
         current_time = datetime.now().strftime("%H:%M:%S")
         return status_display, current_time
 
     except Exception as e:
-        return html.Span("⚠️  Unable to determine", className="text-warning"), "--:--:--"
+        return html.Span("⚠️  Error checking status", className="text-warning"), "--:--:--"
 
 
 @callback(
@@ -491,11 +496,16 @@ def update_agent_status(n):
     Input("restart-agent-btn", "n_clicks"),
     Input("apply-settings-btn", "n_clicks"),
     Input("save-risk-btn", "n_clicks"),
+    State("strategy-selector", "value"),
+    State("symbols-input", "value"),
+    State("interval-slider", "value"),
     prevent_initial_call=True,
 )
-def handle_agent_control(start_clicks, stop_clicks, restart_clicks, apply_clicks, risk_clicks):
+def handle_agent_control(start_clicks, stop_clicks, restart_clicks, apply_clicks, risk_clicks, 
+                        strategy, symbols_str, interval):
     """Handle agent control button clicks."""
     from dash import callback_context
+    from binance_trade_agent.dashboard.utils.data_fetch import start_agent, stop_agent, restart_agent
 
     if not callback_context.triggered:
         raise PreventUpdate
@@ -505,21 +515,40 @@ def handle_agent_control(start_clicks, stop_clicks, restart_clicks, apply_clicks
     try:
         message = ""
         color = "info"
+        result = None
+        
+        # Parse symbols from comma-separated string
+        symbols = [s.strip().upper() for s in (symbols_str or "BTCUSDT").split(",") if s.strip()]
 
         if button_id == "start-agent-btn":
-            message = "✅ Start command sent to agent (docker: make start)"
-            color = "success"
+            result = start_agent(symbols=symbols, interval=interval, strategy=strategy)
+            if result["success"]:
+                message = f"✅ Agent started successfully with {len(symbols)} symbol(s)"
+                color = "success"
+            else:
+                message = f"❌ Failed to start agent: {result['message']}"
+                color = "danger"
 
         elif button_id == "stop-agent-btn":
-            message = "⏸️  Stop command sent to agent (docker: make stop)"
-            color = "warning"
+            result = stop_agent()
+            if result["success"]:
+                message = "⏸️  Agent stopped successfully"
+                color = "warning"
+            else:
+                message = f"❌ Failed to stop agent: {result['message']}"
+                color = "danger"
 
         elif button_id == "restart-agent-btn":
-            message = "🔄 Restart command sent to agent (docker: make restart)"
-            color = "info"
+            result = restart_agent(symbols=symbols, interval=interval, strategy=strategy)
+            if result["success"]:
+                message = f"🔄 Agent restarted successfully with {len(symbols)} symbol(s)"
+                color = "info"
+            else:
+                message = f"❌ Failed to restart agent: {result['message']}"
+                color = "danger"
 
         elif button_id == "apply-settings-btn":
-            message = "💾 Settings applied (requires agent restart to take effect)"
+            message = "💾 Settings applied (restart agent for changes to take effect)"
             color = "info"
 
         elif button_id == "save-risk-btn":
@@ -533,12 +562,8 @@ def handle_agent_control(start_clicks, stop_clicks, restart_clicks, apply_clicks
             True,
             html.Div(
                 [
-                    html.H5("✓ Success", className="mb-2"),
+                    html.H5("✓ Success" if "success" in color else "⚠️ Notice", className="mb-2"),
                     html.P(message, className="mb-0"),
-                    html.Small(
-                        "Note: Docker commands should be run from your host machine",
-                        className="text-muted d-block mt-2",
-                    ),
                 ],
                 style={"color": "white"},
             ),
