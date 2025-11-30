@@ -52,9 +52,7 @@ def create_kpi_card(
     ]
 
     if tag:
-        header_content.append(
-            html.Span(tag, className="kpi-card__tag")
-        )
+        header_content.append(html.Span(tag, className="kpi-card__tag"))
 
     # Build delta display
     delta_element = None

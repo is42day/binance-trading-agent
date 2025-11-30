@@ -474,14 +474,14 @@ def update_agent_status(n):
     """Update agent status display."""
     try:
         from binance_trade_agent.dashboard.utils.data_fetch import get_agent_state
-        
+
         agent_state = get_agent_state()
-        
+
         if agent_state["is_running"]:
             status_display = html.Span("🟢 Running", className="text-success")
         else:
             status_display = html.Span("🔴 Stopped", className="text-danger")
-        
+
         current_time = datetime.now().strftime("%H:%M:%S")
         return status_display, current_time
 
@@ -501,11 +501,23 @@ def update_agent_status(n):
     State("interval-slider", "value"),
     prevent_initial_call=True,
 )
-def handle_agent_control(start_clicks, stop_clicks, restart_clicks, apply_clicks, risk_clicks, 
-                        strategy, symbols_str, interval):
+def handle_agent_control(
+    start_clicks,
+    stop_clicks,
+    restart_clicks,
+    apply_clicks,
+    risk_clicks,
+    strategy,
+    symbols_str,
+    interval,
+):
     """Handle agent control button clicks."""
     from dash import callback_context
-    from binance_trade_agent.dashboard.utils.data_fetch import start_agent, stop_agent, restart_agent
+    from binance_trade_agent.dashboard.utils.data_fetch import (
+        start_agent,
+        stop_agent,
+        restart_agent,
+    )
 
     if not callback_context.triggered:
         raise PreventUpdate
@@ -516,7 +528,7 @@ def handle_agent_control(start_clicks, stop_clicks, restart_clicks, apply_clicks
         message = ""
         color = "info"
         result = None
-        
+
         # Parse symbols from comma-separated string
         symbols = [s.strip().upper() for s in (symbols_str or "BTCUSDT").split(",") if s.strip()]
 

@@ -667,7 +667,9 @@ def trigger_emergency_stop(n_clicks):
 
         return alert
     except Exception as e:
-        return dbc.Alert(f"Error activating emergency stop: {str(e)}", color="danger", className="mb-3")
+        return dbc.Alert(
+            f"Error activating emergency stop: {str(e)}", color="danger", className="mb-3"
+        )
 
 
 # Callback: Save Settings

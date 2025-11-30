@@ -37,10 +37,10 @@ def get_agent_state():
 def start_agent(symbols=None, interval=120, strategy="combined_default"):
     """Start the autonomous trading agent"""
     global _agent_state
-    
+
     if _agent_state["is_running"]:
         return {"success": False, "message": "Agent is already running"}
-    
+
     try:
         # Create autonomous trading loop
         trading_loop = AutonomousTradingLoop(
@@ -49,17 +49,17 @@ def start_agent(symbols=None, interval=120, strategy="combined_default"):
             duration_minutes=0,  # Run indefinitely
             strategy_name=strategy,
         )
-        
+
         # Create async task for the loop
         loop = asyncio.get_event_loop()
         task = loop.create_task(trading_loop.run())
-        
+
         _agent_state["is_running"] = True
         _agent_state["start_time"] = datetime.now()
         _agent_state["stop_time"] = None
         _agent_state["task"] = task
         _agent_state["trading_loop"] = trading_loop
-        
+
         return {"success": True, "message": "Agent started successfully"}
     except Exception as e:
         return {"success": False, "message": f"Failed to start agent: {str(e)}"}
@@ -68,24 +68,24 @@ def start_agent(symbols=None, interval=120, strategy="combined_default"):
 def stop_agent():
     """Stop the autonomous trading agent"""
     global _agent_state
-    
+
     if not _agent_state["is_running"]:
         return {"success": False, "message": "Agent is not running"}
-    
+
     try:
         # Set stop flag on trading loop
         if _agent_state["trading_loop"]:
             _agent_state["trading_loop"].stop_flag = True
-        
+
         # Cancel the task
         if _agent_state["task"]:
             _agent_state["task"].cancel()
-        
+
         _agent_state["is_running"] = False
         _agent_state["stop_time"] = datetime.now()
         _agent_state["task"] = None
         _agent_state["trading_loop"] = None
-        
+
         return {"success": True, "message": "Agent stopped successfully"}
     except Exception as e:
         return {"success": False, "message": f"Failed to stop agent: {str(e)}"}
@@ -96,7 +96,7 @@ def restart_agent(symbols=None, interval=120, strategy="combined_default"):
     stop_result = stop_agent()
     if not stop_result["success"] and "not running" not in stop_result["message"]:
         return stop_result
-    
+
     return start_agent(symbols, interval, strategy)
 
 
@@ -365,7 +365,7 @@ def get_system_status():
 
         # Get agent state
         agent_state = get_agent_state()
-        
+
         # Get risk management status
         try:
             components = get_trading_components()
