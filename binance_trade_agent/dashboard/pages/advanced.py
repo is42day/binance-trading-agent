@@ -652,7 +652,7 @@ def trigger_emergency_stop(n_clicks):
         risk_agent = components["risk_agent"]
 
         # Trigger emergency stop
-        risk_agent.activate_emergency_stop()
+        risk_agent.set_emergency_stop(True, "Emergency stop triggered from dashboard")
 
         alert = dbc.Alert(
             [
@@ -667,7 +667,9 @@ def trigger_emergency_stop(n_clicks):
 
         return alert
     except Exception as e:
-        return dbc.Alert(f"Error: {str(e)}", color="danger", className="mb-3")
+        return dbc.Alert(
+            f"Error activating emergency stop: {str(e)}", color="danger", className="mb-3"
+        )
 
 
 # Callback: Save Settings
