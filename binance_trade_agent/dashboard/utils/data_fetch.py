@@ -4,6 +4,7 @@ Extracted from web_ui.py and adapted for Dash callbacks
 """
 
 import asyncio
+import threading
 from datetime import datetime
 
 from binance_trade_agent.agents.market_data_agent import MarketDataAgent
@@ -50,8 +51,21 @@ def start_agent(symbols=None, interval=120, strategy="combined_default"):
             strategy_name=strategy,
         )
 
-        # Create async task for the loop
-        loop = asyncio.get_event_loop()
+        # Create or get event loop (handle thread context)
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No running loop, try to get the current one
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_closed():
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+            except RuntimeError:
+                # No event loop in this thread, create a new one
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
         task = loop.create_task(trading_loop.run())
 
         _agent_state["is_running"] = True

@@ -111,16 +111,26 @@ class TestEmergencyStopFunctionality:
         }
 
         # Should allow trade initially
-        assessment = risk_agent.assess_trade(trade_proposal)
+        assessment = risk_agent.validate_trade(
+            symbol=trade_proposal["symbol"],
+            side=trade_proposal["side"],
+            quantity=trade_proposal["quantity"],
+            price=trade_proposal["price"],
+        )
         # Note: assessment might be rejected for other risk reasons, but not emergency stop
 
         # Activate emergency stop
         risk_agent.set_emergency_stop(True, "Test emergency stop")
 
         # Should reject trade now
-        assessment_after = risk_agent.assess_trade(trade_proposal)
-        assert assessment_after.approved is False
-        assert any("Emergency stop" in reason for reason in assessment_after.reasons)
+        assessment_after = risk_agent.validate_trade(
+            symbol=trade_proposal["symbol"],
+            side=trade_proposal["side"],
+            quantity=trade_proposal["quantity"],
+            price=trade_proposal["price"],
+        )
+        assert assessment_after["approved"] is False
+        assert "Emergency stop" in assessment_after["reason"]
 
     @patch("binance_trade_agent.dashboard.utils.data_fetch.EnhancedRiskManagementAgent")
     def test_emergency_stop_can_be_cleared(self, mock_risk_agent_class):
@@ -194,9 +204,14 @@ class TestEmergencyStopIntegration:
         }
 
         # Assessment should reject
-        assessment = risk_agent.assess_trade(trade_proposal)
-        assert assessment.approved is False
-        assert "Emergency stop" in str(assessment.reasons)
+        assessment = risk_agent.validate_trade(
+            symbol=trade_proposal["symbol"],
+            side=trade_proposal["side"],
+            quantity=trade_proposal["quantity"],
+            price=trade_proposal["price"],
+        )
+        assert assessment["approved"] is False
+        assert "Emergency stop" in assessment["reason"]
 
     @patch("binance_trade_agent.dashboard.utils.data_fetch._components")
     def test_emergency_stop_uses_singleton_risk_agent(self, mock_components):
