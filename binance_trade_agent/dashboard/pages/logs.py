@@ -16,11 +16,20 @@ logger = logging.getLogger(__name__)
 # Log levels
 LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR"]
 LOGS_PER_PAGE = 50
-LOG_DIR = Path(__file__).resolve().parents[3] / "logs"
+
+# Determine log directory - handle both Docker and local environments
+_logs_candidates = [
+    Path(__file__).resolve().parents[3] / "logs",  # Local: /Users/.../binance-trading-agent/logs
+    Path("/app/logs"),  # Docker: /app/logs
+    Path("./logs"),  # Fallback: relative to cwd
+]
+LOG_DIR = next((p for p in _logs_candidates if p.exists()), _logs_candidates[0])
 LOG_FILE_PATHS = [LOG_DIR / "agent.log", LOG_DIR / "auto_trading.log"]
 
+logger.info(f"Using log directory: {LOG_DIR} (exists={LOG_DIR.exists()})")
 
-def read_log_files(limit: int = 100) -> list:
+
+def read_log_files(limit: int = 200) -> list:
     """Read recent log entries from log files"""
     results = []
     try:
@@ -28,6 +37,8 @@ def read_log_files(limit: int = 100) -> list:
             if not path.exists():
                 logger.debug(f"Log file not found: {path}")
                 continue
+
+
             try:
                 with open(path, "r", encoding="utf-8", errors="ignore") as f:
                     lines = f.readlines()[-limit:]
@@ -188,33 +199,38 @@ layout = dbc.Container(
                                                             "Log Level",
                                                             className="text-secondary font-weight-bold",
                                                         ),
-                                                        dcc.Dropdown(
-                                                            id="log-level-filter",
-                                                            options=[
-                                                                {
-                                                                    "label": "All Levels",
-                                                                    "value": "ALL",
-                                                                },
-                                                                {
-                                                                    "label": "🔴 ERROR",
-                                                                    "value": "ERROR",
-                                                                },
-                                                                {
-                                                                    "label": "🟡 WARNING",
-                                                                    "value": "WARNING",
-                                                                },
-                                                                {
-                                                                    "label": "🟢 INFO",
-                                                                    "value": "INFO",
-                                                                },
-                                                                {
-                                                                    "label": "⚪ DEBUG",
-                                                                    "value": "DEBUG",
-                                                                },
-                                                            ],
-                                                            value="ALL",
-                                                            clearable=False,
-                                                            className="form-control",
+                                                        html.Div(
+                                                            dcc.Dropdown(
+                                                                id="log-level-filter",
+                                                                options=[
+                                                                    {
+                                                                        "label": "All Levels",
+                                                                        "value": "ALL",
+                                                                    },
+                                                                    {
+                                                                        "label": "🔴 ERROR",
+                                                                        "value": "ERROR",
+                                                                    },
+                                                                    {
+                                                                        "label": "🟡 WARNING",
+                                                                        "value": "WARNING",
+                                                                    },
+                                                                    {
+                                                                        "label": "🟢 INFO",
+                                                                        "value": "INFO",
+                                                                    },
+                                                                    {
+                                                                        "label": "⚪ DEBUG",
+                                                                        "value": "DEBUG",
+                                                                    },
+                                                                ],
+                                                                value="ALL",
+                                                                clearable=False,
+                                                                style={"width": "100%"},
+                                                            ),
+                                                            style={
+                                                                "width": "100%",
+                                                            },
                                                         ),
                                                     ],
                                                     md=3,
@@ -326,11 +342,24 @@ layout = dbc.Container(
                                 ),
                             ],
                             className="mb-4",
+                            style={"overflow": "visible"},
                         )
                     ],
                     width=12,
                 )
             ]
+        ),
+        # Action Alert
+        dbc.Row(
+            [
+                dbc.Col(
+                    [
+                        html.Div(id="log-action-alert")
+                    ],
+                    width=12,
+                )
+            ],
+            className="mb-3",
         ),
         # Stats Section
         dbc.Row(
@@ -529,7 +558,7 @@ def update_logs(
 ):
     """Update logs table with filtering and pagination"""
     try:
-        # Get sample logs (in production, this would query actual log storage)
+        # Get logs
         sample_logs = generate_sample_logs()
 
         # Apply filters
@@ -669,27 +698,19 @@ def update_logs(
 
 
 def generate_sample_logs():
-    """Generate logs from real files, monitoring system, and sample data"""
-    # Try to get real logs from files (read more to get recent entries)
+    """Generate logs from real files and monitoring system"""
+    # Get real logs from files
     real_logs = read_log_files(limit=200)
     
-    # Try to get logs from monitoring system
+    # Get logs from monitoring system
     monitoring_logs = read_monitoring_events(limit=50)
     
-    # Generate minimal sample logs for demonstration (optional, mostly for testing)
-    sample_logs = [
-        {
-            "timestamp": (datetime.now() - timedelta(minutes=i)).strftime("%Y-%m-%d %H:%M:%S"),
-            "level": ["INFO", "WARNING", "ERROR", "DEBUG"][i % 4],
-            "message": f"Sample log message #{i}: Operation completed successfully",
-            "correlation_id": f'trade_{datetime.now().strftime("%Y%m%d")}_000{i:03d}',
-            "module": "binance_trade_agent.dashboard"
-        }
-        for i in range(5)  # Minimal samples, focus on real data
-    ]
+    # Combine all log sources
+    logs = real_logs + monitoring_logs
     
-    # Combine all log sources (real first, monitoring, then sample)
-    logs = real_logs + monitoring_logs + sample_logs
+    # Sort by timestamp descending (newest first)
+    logs.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+    
     return logs
 
 
@@ -758,3 +779,43 @@ def _logs_to_csv(logs: list) -> str:
         ])
     
     return output.getvalue()
+
+
+@callback(
+    Output("log-action-alert", "children"),
+    Input("log-clear-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+def clear_logs(n_clicks):
+    """Clear old logs from log files"""
+    try:
+        cleared_files = []
+        for path in LOG_FILE_PATHS:
+            if path.exists():
+                try:
+                    # Keep only the last 50 lines (most recent)
+                    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                        lines = f.readlines()
+                    
+                    # Keep last 50 lines
+                    recent_lines = lines[-50:] if len(lines) > 50 else lines
+                    
+                    # Write back to file
+                    with open(path, "w", encoding="utf-8") as f:
+                        f.writelines(recent_lines)
+                    
+                    cleared_files.append(path.name)
+                    logger.info(f"Cleared {path.name}: removed {len(lines) - len(recent_lines)} lines")
+                except Exception as e:
+                    logger.warning(f"Error clearing {path.name}: {e}")
+        
+        if cleared_files:
+            message = f"✅ Cleared logs from: {', '.join(cleared_files)}"
+            return dbc.Alert(message, color="success", className="mb-0")
+        else:
+            message = "ℹ️ No log files to clear"
+            return dbc.Alert(message, color="info", className="mb-0")
+    
+    except Exception as e:
+        logger.error(f"Error in clear_logs: {e}")
+        return dbc.Alert(f"❌ Error clearing logs: {str(e)}", color="danger", className="mb-0")
