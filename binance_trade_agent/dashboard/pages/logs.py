@@ -670,21 +670,22 @@ def update_logs(
 
 def generate_sample_logs():
     """Generate logs from real files, monitoring system, and sample data"""
-    # Try to get real logs from files
-    real_logs = read_log_files(limit=30)
+    # Try to get real logs from files (read more to get recent entries)
+    real_logs = read_log_files(limit=200)
     
     # Try to get logs from monitoring system
-    monitoring_logs = read_monitoring_events(limit=20)
+    monitoring_logs = read_monitoring_events(limit=50)
     
-    # Generate minimal sample logs for demonstration
+    # Generate minimal sample logs for demonstration (optional, mostly for testing)
     sample_logs = [
         {
             "timestamp": (datetime.now() - timedelta(minutes=i)).strftime("%Y-%m-%d %H:%M:%S"),
             "level": ["INFO", "WARNING", "ERROR", "DEBUG"][i % 4],
             "message": f"Sample log message #{i}: Operation completed successfully",
             "correlation_id": f'trade_{datetime.now().strftime("%Y%m%d")}_000{i:03d}',
+            "module": "binance_trade_agent.dashboard"
         }
-        for i in range(10)
+        for i in range(5)  # Minimal samples, focus on real data
     ]
     
     # Combine all log sources (real first, monitoring, then sample)
