@@ -35,18 +35,41 @@ def read_log_files(limit: int = 100) -> list:
                 for line in lines:
                     if not line.strip():
                         continue
-                    # Parse log line: "2024-01-01 12:00:00,123 - LEVEL - message"
-                    parts = line.strip().split(" - ", 2)
-                    if len(parts) >= 2:
-                        timestamp = parts[0]
-                        level = parts[1] if len(parts) > 1 else "INFO"
-                        message = parts[2] if len(parts) > 2 else ""
-                        results.append({
-                            "timestamp": timestamp,
-                            "level": level.strip(),
-                            "message": message.strip(),
-                            "correlation_id": "N/A"
-                        })
+                    # Parse log line - handle two formats:
+                    # Format 1: "2024-01-01 12:00:00,123 - LEVEL - message"
+                    # Format 2: "2024-01-01 12:00:00,123 - module.name - LEVEL - message"
+                    parts = line.strip().split(" - ")
+                    if len(parts) < 2:
+                        continue
+                    
+                    timestamp = parts[0]
+                    
+                    # Detect format by checking if parts[1] is a log level
+                    LOG_LEVEL_KEYWORDS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+                    
+                    if parts[1].upper() in LOG_LEVEL_KEYWORDS:
+                        # Format 1: timestamp - LEVEL - message
+                        level = parts[1]
+                        message = " - ".join(parts[2:]) if len(parts) > 2 else ""
+                        module = "unknown"
+                    else:
+                        # Format 2: timestamp - module - LEVEL - message
+                        module = parts[1]
+                        if len(parts) >= 3 and parts[2].upper() in LOG_LEVEL_KEYWORDS:
+                            level = parts[2]
+                            message = " - ".join(parts[3:]) if len(parts) > 3 else ""
+                        else:
+                            # Fallback if format is unexpected
+                            level = "INFO"
+                            message = " - ".join(parts[1:])
+                    
+                    results.append({
+                        "timestamp": timestamp,
+                        "level": level.strip().upper(),
+                        "message": message.strip(),
+                        "correlation_id": "N/A",
+                        "module": module
+                    })
             except Exception as e:
                 logger.warning(f"Error reading {path}: {e}")
                 continue
@@ -564,6 +587,9 @@ def update_logs(
                 level = log.get("level", "INFO")
                 color_class = level_color_map.get(level, "text-secondary")
                 icon = level_icon_map.get(level, "●")
+                module = log.get("module", "N/A")
+                # Shorten module name for display (last part after last dot)
+                module_short = module.split(".")[-1] if module != "N/A" else "N/A"
 
                 rows.append(
                     html.Tr(
@@ -575,21 +601,31 @@ def update_logs(
                             ),
                             html.Td(
                                 log.get("message", ""),
-                                style={"width": "55%", "fontSize": "0.9rem"},
+                                style={"width": "45%", "fontSize": "0.9rem"},
                             ),
                             html.Td(
-                                log.get("correlation_id", "N/A"),
-                                className="text-primary",
+                                module_short,
+                                className="text-info",
                                 style={
-                                    "width": "20%",
+                                    "width": "15%",
                                     "fontSize": "0.85rem",
                                     "fontFamily": "monospace",
+                                    "title": module,  # Full module name on hover
                                 },
                             ),
                             html.Td(
                                 log.get("timestamp", "N/A"),
                                 className="text-secondary",
                                 style={"width": "17%", "fontSize": "0.85rem"},
+                            ),
+                            html.Td(
+                                log.get("correlation_id", "N/A"),
+                                className="text-muted",
+                                style={
+                                    "width": "15%",
+                                    "fontSize": "0.8rem",
+                                    "fontFamily": "monospace",
+                                },
                             ),
                         ]
                     )
@@ -601,9 +637,10 @@ def update_logs(
                         html.Tr(
                             [
                                 html.Th("Level", style={"width": "8%"}),
-                                html.Th("Message", style={"width": "55%"}),
-                                html.Th("Correlation ID", style={"width": "20%"}),
+                                html.Th("Message", style={"width": "45%"}),
+                                html.Th("Module", style={"width": "15%"}),
                                 html.Th("Timestamp", style={"width": "17%"}),
+                                html.Th("Correlation ID", style={"width": "15%"}),
                             ]
                         )
                     ),
@@ -707,13 +744,14 @@ def _logs_to_csv(logs: list) -> str:
     writer = csv.writer(output)
     
     # Write header
-    writer.writerow(["Timestamp", "Level", "Message", "Correlation ID"])
+    writer.writerow(["Timestamp", "Level", "Module", "Message", "Correlation ID"])
     
     # Write log rows
     for log in logs:
         writer.writerow([
             log.get("timestamp", ""),
             log.get("level", ""),
+            log.get("module", ""),
             log.get("message", ""),
             log.get("correlation_id", ""),
         ])
