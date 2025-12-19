@@ -128,6 +128,68 @@ Beautiful Dash-based UI with:
 
 ---
 
+## 🗄️ Database: SQLite → PostgreSQL Migration
+
+### Production-Grade Database Support
+
+The system now supports **PostgreSQL** for multi-writer safety and production reliability, while maintaining backward compatibility with SQLite for local development.
+
+### Database Configuration
+
+**Option 1: PostgreSQL (Recommended for Production)**
+```bash
+# Set in .env or environment
+DATABASE_URL=postgresql+psycopg2://trading_user:password@postgres:5432/binance_trading
+```
+
+**Option 2: SQLite (Local Development)**
+```bash
+# Set in .env or environment
+DB_PATH=/app/data/portfolio.db
+```
+
+### Quick Start with PostgreSQL
+
+1. **Start PostgreSQL**
+```bash
+make db-up
+# Or: docker-compose up -d postgres
+```
+
+2. **Run Migrations**
+```bash
+make migrate
+# Or: alembic upgrade head
+```
+
+3. **Migrate Existing SQLite Data (Optional)**
+```bash
+make migrate-sqlite
+# Or: python -m binance_trade_agent.scripts.migrate_sqlite_to_postgres
+```
+
+4. **Start Trading System**
+```bash
+docker-compose up -d
+```
+
+### Migration Features
+
+- **Idempotent**: Can run multiple times safely
+- **Validation**: Compares row counts before/after
+- **Safety**: Confirmation prompts, preserves existing data
+- **Batch Processing**: Handles large datasets efficiently
+
+### PostgreSQL Benefits
+
+✅ **Multi-writer safety** - No more "database is locked" errors  
+✅ **ACID transactions** - Consistent concurrent writes  
+✅ **Schema migrations** - Alembic for version control  
+✅ **Production-grade** - Connection pooling, health checks  
+✅ **Better performance** - Optimized indexes for trading queries
+
+---
+
 ## 🏗️ Architecture
 
 ```
@@ -155,7 +217,8 @@ Beautiful Dash-based UI with:
 - **Trading**: Binance API (python-binance)
 - **Web UI**: Dash (Plotly)
 - **API**: FastAPI
-- **Database**: SQLAlchemy + SQLite
+- **Database**: SQLAlchemy ORM + PostgreSQL (production) / SQLite (dev)
+- **Migrations**: Alembic
 - **Deployment**: Docker + Docker Compose
 - **Monitoring**: Custom logging system with correlation tracking
 - **Testing**: Pytest + pytest-asyncio

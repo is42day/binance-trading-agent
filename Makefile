@@ -98,6 +98,30 @@ isort:
 
 clean:
 	docker system prune -f
+
+# Database Management (PostgreSQL migration targets)
+db-up:
+	@echo "🚀 Starting PostgreSQL..."
+	docker-compose up -d postgres
+	@echo "⏳ Waiting for PostgreSQL to be healthy..."
+	@timeout 30 sh -c 'until docker-compose exec -T postgres pg_isready -U trading_user -d binance_trading; do sleep 1; done' || echo "Timeout waiting for PostgreSQL"
+	@echo "✅ PostgreSQL is ready"
+
+db-down:
+	@echo "🛑 Stopping PostgreSQL..."
+	docker-compose stop postgres
+	@echo "✅ PostgreSQL stopped"
+
+migrate:
+	@echo "🔄 Running database migrations..."
+	alembic upgrade head
+	@echo "✅ Migrations complete"
+
+migrate-sqlite:
+	@echo "🔄 Migrating data from SQLite to PostgreSQL..."
+	@echo "⚠️  Make sure PostgreSQL is running (make db-up) and migrations are applied (make migrate)"
+	python -m binance_trade_agent.scripts.migrate_sqlite_to_postgres
+	@echo "✅ Migration complete"
 	docker run --rm -v "$(CURDIR):/app" -w /app $(DOCKER_IMAGE) sh -c "find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && find . -type f -name '*.pyc' -delete 2>/dev/null || true && rm -rf .pytest_cache .mypy_cache 2>/dev/null || true"
 
 logs-api:
