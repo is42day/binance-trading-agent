@@ -11,7 +11,7 @@ from alembic import context
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Import ORM Base and models from correct location
-from binance_trade_agent.core.portfolio_manager import Base, PositionORM, TradeORM
+from binance_trade_agent.core.portfolio_manager import Base, PositionORM, TradeORM, HeartbeatORM
 from binance_trade_agent.core import db
 
 # this is the Alembic Config object, which provides

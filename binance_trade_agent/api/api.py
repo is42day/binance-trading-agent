@@ -10,12 +10,14 @@ from datetime import datetime
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text, inspect
 
 from ..agents.market_data_agent import MarketDataAgent
 from ..agents.risk_management_agent import EnhancedRiskManagementAgent
 from ..clients.redis_cache import RedisCache
 from ..common.config import config
 from ..core.portfolio_manager import PortfolioManager
+from ..core import db
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +83,65 @@ def read_root():
         "timestamp": datetime.now().isoformat(),
         "message": "Binance Trading Agent API is running.",
     }
+
+
+@app.get("/health")
+def health_check():
+    """
+    Health check endpoint for orchestration and monitoring.
+    
+    Checks:
+    1. Database connectivity (can connect to DB)
+    2. Schema presence (trades and positions tables exist)
+    3. Basic system readiness
+    
+    Returns 200 if all checks pass, 503 if any check fails.
+    """
+    health_status = {
+        "status": "unknown",
+        "timestamp": datetime.now().isoformat(),
+        "checks": {
+            "database": "pending",
+            "schema": "pending",
+        },
+    }
+    
+    try:
+        # Check 1: Database connectivity
+        try:
+            session = db.get_session()
+            # Simple connectivity test
+            session.execute(text("SELECT 1"))
+            health_status["checks"]["database"] = "healthy"
+        except Exception as e:
+            health_status["checks"]["database"] = f"unhealthy: {str(e)}"
+            raise
+        
+        # Check 2: Schema presence (verify required tables exist)
+        try:
+            inspector = inspect(db.get_engine())
+            tables = inspector.get_table_names()
+            
+            required_tables = {"trades", "positions"}
+            missing_tables = required_tables - set(tables)
+            
+            if missing_tables:
+                health_status["checks"]["schema"] = f"incomplete: missing tables {missing_tables}"
+                raise Exception(f"Schema incomplete: missing tables {missing_tables}")
+            
+            health_status["checks"]["schema"] = "healthy"
+        except Exception as e:
+            health_status["checks"]["schema"] = f"unhealthy: {str(e)}"
+            raise
+        
+        # All checks passed
+        health_status["status"] = "healthy"
+        return health_status
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        health_status["status"] = "unhealthy"
+        return health_status
 
 
 @app.get("/api/v1/portfolio/summary")

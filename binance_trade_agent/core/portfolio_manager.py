@@ -147,6 +147,33 @@ class TradeORM(Base):
         }
 
 
+class HeartbeatORM(Base):
+    """ORM model for service heartbeat monitoring"""
+
+    __tablename__ = "heartbeat"
+
+    service_name = Column(String, primary_key=True)
+    last_update = Column(DateTime, nullable=False)
+    status = Column(String, nullable=False, default="healthy")
+    details = Column(String, nullable=True)  # JSON-encoded details
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert ORM object to dictionary"""
+        details = {}
+        if self.details:
+            try:
+                details = json.loads(self.details)
+            except (json.JSONDecodeError, TypeError):
+                details = {"raw": self.details}
+        
+        return {
+            "service_name": self.service_name,
+            "last_update": self.last_update.isoformat() if self.last_update else None,
+            "status": self.status,
+            "details": details,
+        }
+
+
 # ============================================================================
 # Portfolio Manager - SQLAlchemy-Based Implementation
 # ============================================================================
@@ -499,6 +526,82 @@ class PortfolioManager:
             session.query(TradeORM).delete()
             session.commit()
             self.logger.info("Portfolio cleared")
+        finally:
+            session.close()
+
+    # ========================================================================
+    # Heartbeat Management - Service Liveness Monitoring
+    # ========================================================================
+
+    @retry_on_db_error(max_retries=3, backoff_seconds=0.5)
+    def update_heartbeat(self, service_name: str, status: str = "healthy", details: Optional[Dict[str, Any]] = None):
+        """
+        Update or create a heartbeat record for a service.
+        
+        Args:
+            service_name: Name of the service (e.g., "trading-agent", "api", "dashboard")
+            status: Status string (e.g., "healthy", "degraded", "unhealthy")
+            details: Optional dict with additional details (will be JSON-encoded)
+        """
+        session = self.session_factory()
+        try:
+            with session.begin():
+                details_json = json.dumps(details) if details else None
+                
+                # Try to update existing heartbeat
+                heartbeat = session.query(HeartbeatORM).filter(
+                    HeartbeatORM.service_name == service_name
+                ).first()
+                
+                if heartbeat:
+                    heartbeat.last_update = datetime.now()
+                    heartbeat.status = status
+                    heartbeat.details = details_json
+                else:
+                    # Create new heartbeat
+                    heartbeat = HeartbeatORM(
+                        service_name=service_name,
+                        last_update=datetime.now(),
+                        status=status,
+                        details=details_json,
+                    )
+                    session.add(heartbeat)
+                
+                logger.debug(f"Updated heartbeat for {service_name}: {status}")
+        finally:
+            session.close()
+
+    def get_heartbeat(self, service_name: str) -> Optional[Dict[str, Any]]:
+        """
+        Get the latest heartbeat record for a service.
+        
+        Args:
+            service_name: Name of the service
+            
+        Returns:
+            Dictionary with heartbeat data, or None if not found
+        """
+        session = self.session_factory()
+        try:
+            heartbeat = session.query(HeartbeatORM).filter(
+                HeartbeatORM.service_name == service_name
+            ).first()
+            
+            return heartbeat.to_dict() if heartbeat else None
+        finally:
+            session.close()
+
+    def get_all_heartbeats(self) -> List[Dict[str, Any]]:
+        """
+        Get all heartbeat records from all services.
+        
+        Returns:
+            List of heartbeat dictionaries
+        """
+        session = self.session_factory()
+        try:
+            heartbeats = session.query(HeartbeatORM).all()
+            return [hb.to_dict() for hb in heartbeats]
         finally:
             session.close()
 
