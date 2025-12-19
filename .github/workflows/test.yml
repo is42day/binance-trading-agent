@@ -13,7 +13,13 @@ on:
   workflow_dispatch:
 
 env:
+  # Use in-memory SQLite for unit tests (no Postgres needed)
+  DATABASE_URL: sqlite:///:memory:
   BINANCE_API_URL: https://testnet.binance.vision
+  BINANCE_API_KEY: dummy_key_for_ci
+  BINANCE_API_SECRET: dummy_secret_for_ci
+  LOG_LEVEL: WARNING
+  PYTHONPATH: /home/runner/work/binance-trading-agent/binance-trading-agent
 
 permissions:
   contents: read
@@ -43,13 +49,16 @@ jobs:
       - name: Install dev dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install black ruff mypy
+          pip install black ruff mypy types-redis types-requests
+
+      - name: Install package in editable mode
+        run: pip install -e .
 
       - name: Check code formatting with black
-        run: black --check .
+        run: black --check binance_trade_agent tests
 
       - name: Lint with ruff
-        run: ruff check .
+        run: ruff check binance_trade_agent tests
 
       - name: Type check with mypy
         run: mypy binance_trade_agent
@@ -84,16 +93,28 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest-cov
+          pip install pytest pytest-cov pytest-asyncio
 
       - name: Install package in editable mode
         run: pip install -e .
 
       - name: Create test database directory
-        run: mkdir -p data && touch data/test_portfolio.db
+        run: mkdir -p data logs
 
-      - name: Run tests with coverage
-        run: pytest --cov=binance_trade_agent --cov-report=xml --cov-report=term -v --ignore=binance_trade_agent/tests/test_api_endpoints.py
+      - name: Run unit tests with coverage
+        env:
+          # Force SQLite for unit tests
+          DATABASE_URL: sqlite:///:memory:
+        run: |
+          pytest binance_trade_agent/tests/ \
+            --cov=binance_trade_agent \
+            --cov-report=xml \
+            --cov-report=term \
+            -v \
+            --tb=short \
+            -m "not integration" \
+            --ignore=binance_trade_agent/tests/test_api_endpoints.py \
+            --ignore=binance_trade_agent/tests/test_dashboard_integration.py
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -112,6 +133,75 @@ jobs:
             coverage.xml
             .coverage
           retention-days: 7
+
+  integration:
+    name: Integration Tests (Postgres + Redis)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: binance_trading
+          POSTGRES_USER: trading_user
+          POSTGRES_PASSWORD: trading_pass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U trading_user -d binance_trading"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+      redis:
+        image: redis:7.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio
+
+      - name: Install package in editable mode
+        run: pip install -e .
+
+      - name: Create directories
+        run: mkdir -p data logs
+
+      - name: Run migrations
+        env:
+          DATABASE_URL: postgresql+psycopg2://trading_user:trading_pass@localhost:5432/binance_trading
+        run: alembic upgrade head
+
+      - name: Run integration tests
+        env:
+          DATABASE_URL: postgresql+psycopg2://trading_user:trading_pass@localhost:5432/binance_trading
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          BINANCE_API_KEY: dummy_key_for_ci
+          BINANCE_API_SECRET: dummy_secret_for_ci
+          BINANCE_API_URL: https://testnet.binance.vision
+          LOG_LEVEL: WARNING
+        run: |
+          pytest binance_trade_agent/tests/test_api_endpoints.py \
+            binance_trade_agent/tests/test_dashboard_integration.py \
+            -v \
+            --tb=short
 
   security:
     name: Security Scan
