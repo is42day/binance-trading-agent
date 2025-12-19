@@ -4,11 +4,14 @@ Portfolio Management Module - Tracks positions, trades, and P&L using SQLAlchemy
 
 import json
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from functools import wraps
+from typing import Any, Callable, Dict, List, Optional
 
 from sqlalchemy import Column, DateTime, Float, String
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.orm import declarative_base
 
@@ -17,6 +20,45 @@ from binance_trade_agent.core import db
 # ============================================================================
 # Data Classes
 # ============================================================================
+
+
+def retry_on_db_error(max_retries: int = 3, backoff_seconds: float = 0.5):
+    """
+    Decorator to retry database operations on transient errors.
+    
+    Useful for handling connection resets, serialization failures, etc.
+    Only retries OperationalError (connection issues), not data integrity errors.
+    
+    Args:
+        max_retries: Maximum number of retry attempts
+        backoff_seconds: Initial backoff time (doubles each retry)
+    """
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            retries = 0
+            current_backoff = backoff_seconds
+            
+            while retries < max_retries:
+                try:
+                    return func(*args, **kwargs)
+                except OperationalError as e:
+                    retries += 1
+                    if retries >= max_retries:
+                        raise  # Give up after max retries
+                    
+                    # Log and retry with backoff
+                    logger = logging.getLogger(__name__)
+                    logger.warning(
+                        f"Database operational error (attempt {retries}/{max_retries}): {e}. "
+                        f"Retrying in {current_backoff}s..."
+                    )
+                    time.sleep(current_backoff)
+                    current_backoff *= 2  # Exponential backoff
+                    
+            return func(*args, **kwargs)  # Final attempt
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -147,6 +189,7 @@ class PortfolioManager:
         """Get a new database session"""
         return self.SessionLocal()
 
+    @retry_on_db_error(max_retries=3, backoff_seconds=0.5)
     def add_trade(
         self,
         trade_id: str,
@@ -159,31 +202,39 @@ class PortfolioManager:
         correlation_id: Optional[str] = None,
         pnl: Optional[float] = None,
     ) -> TradeORM:
-        """Add a new trade to the portfolio"""
+        """
+        Add a new trade to the portfolio and update position atomically.
+        
+        Uses a single transaction to ensure consistency between trade insertion
+        and position updates. This prevents partial updates in concurrent scenarios.
+        """
         session = self.get_session()
         try:
-            trade = TradeORM(
-                trade_id=trade_id,
-                symbol=symbol,
-                side=side,
-                quantity=quantity,
-                price=price,
-                fee=fee,
-                timestamp=datetime.now(),
-                order_id=order_id,
-                correlation_id=correlation_id,
-                pnl=pnl,
-            )
-            session.add(trade)
-            session.commit()
+            # Use session.begin() for explicit transaction control
+            with session.begin():
+                trade = TradeORM(
+                    trade_id=trade_id,
+                    symbol=symbol,
+                    side=side,
+                    quantity=quantity,
+                    price=price,
+                    fee=fee,
+                    timestamp=datetime.now(),
+                    order_id=order_id,
+                    correlation_id=correlation_id,
+                    pnl=pnl,
+                )
+                session.add(trade)
+                
+                # Update position in same transaction (atomic operation)
+                self._update_position_from_trade(session, trade)
+                
+            # Transaction automatically committed if no exception
             self.logger.info(f"Added trade: {side} {quantity} {symbol} @ ${price:.2f}")
-
-            # Update position based on trade (pass the TradeORM object, not dict)
-            self._update_position_from_trade(session, trade)
-
             return trade
+            
         except Exception as e:
-            session.rollback()
+            # Transaction automatically rolled back on exception
             self.logger.error(f"Error adding trade: {str(e)}")
             raise
         finally:
