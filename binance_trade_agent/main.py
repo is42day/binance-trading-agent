@@ -3,11 +3,12 @@ import logging
 import os
 import signal
 import sys
-from logging.handlers import RotatingFileHandler
+
+from .common.logging_config import setup_logging, get_logger
 
 
 async def run_forever(stop_event):
-    logger = logging.getLogger("binance_agent")
+    logger = get_logger(__name__)
     try:
         logger.info("Binance Trade Agent started. Waiting for events...")
         # This loop keeps the process alive until stop_event is set
@@ -19,24 +20,14 @@ async def run_forever(stop_event):
 
 
 def main():
-
-    # Setup root logger (console + file)
-    log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "logs")
-    os.makedirs(log_dir, exist_ok=True)
-    log_file = os.path.join(log_dir, "agent.log")
-    logger = logging.getLogger("binance_agent")
-    logger.setLevel(logging.INFO)
-    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-    # Console handler
-    ch = logging.StreamHandler()
-    ch.setFormatter(formatter)
-    # Rotating file handler
-    fh = RotatingFileHandler(log_file, maxBytes=2 * 1024 * 1024, backupCount=3)
-    fh.setFormatter(formatter)
-    # Avoid duplicate handlers
-    if not logger.hasHandlers():
-        logger.addHandler(ch)
-        logger.addHandler(fh)
+    # Setup structured logging
+    setup_logging(
+        service_name="trading-agent",
+        log_level=os.getenv("LOG_LEVEL", "INFO"),
+        use_json=os.getenv("LOG_FORMAT", "plain").lower() == "json",
+    )
+    
+    logger = get_logger(__name__)
 
     from .common.config import config
 
