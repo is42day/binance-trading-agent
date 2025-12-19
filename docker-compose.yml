@@ -1,3 +1,5 @@
+version: "3.8"
+
 services:
   # PostgreSQL database for production-grade multi-writer support
   postgres:
@@ -21,8 +23,112 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # One-shot migration service: runs alembic upgrade head and exits
+  # Other services depend on this to ensure schema is present before they start
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: binance-migrate
+    command: >
+      sh -c "alembic upgrade head && echo '[MIGRATE] Schema migration completed successfully'"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-trading_user}:${POSTGRES_PASSWORD:-trading_pass_CHANGE_ME}@postgres:5432/${POSTGRES_DB:-binance_trading}
+      - PYTHONPATH=/app
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    networks:
+      - trading-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"  # One-shot: don't restart on exit
+
+  # FastAPI service: data access, trading operations API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: binance-api
+    command: >
+      sh -c "python -m binance_trade_agent.api.api"
+    environment:
+      - BINANCE_API_KEY=${BINANCE_API_KEY:-}
+      - BINANCE_API_SECRET=${BINANCE_API_SECRET:-}
+      - BINANCE_API_URL=${BINANCE_API_URL:-https://testnet.binance.vision}
+      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-trading_user}:${POSTGRES_PASSWORD:-trading_pass_CHANGE_ME}@postgres:5432/${POSTGRES_DB:-binance_trading}
+      - DB_POOL_SIZE=${DB_POOL_SIZE:-5}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-10}
+      - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-30}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - PYTHONPATH=/app
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./config.toml:/app/config.toml:ro
+    networks:
+      - trading-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Dash Dashboard service: real-time UI
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: binance-dashboard
+    command: >
+      sh -c "cd /app/binance_trade_agent/dashboard && python run.py"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-trading_user}:${POSTGRES_PASSWORD:-trading_pass_CHANGE_ME}@postgres:5432/${POSTGRES_DB:-binance_trading}
+      - DB_POOL_SIZE=${DB_POOL_SIZE:-5}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-10}
+      - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-30}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - PYTHONPATH=/app
+      - REDIS_HOST=redis
+    ports:
+      - "8050:8050"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./config.toml:/app/config.toml:ro
+    networks:
+      - trading-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8050/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # Trading Agent service: autonomous trading loop and MCP server
   trading-agent:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile
       target: production
@@ -40,37 +146,43 @@ services:
       - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-10}
       - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-30}
     ports:
-      - "8081:8080"  # MCP Server (changed to avoid port conflict)
-      - "9091:9090"  # Monitoring/Metrics (changed to avoid prometheus conflict)
-      - "8050:8050"  # Dash Dashboard
-      - "8000:8000"  # FastAPI Data Service
+      - "8081:8080"  # MCP Server
     volumes:
-      - ./data:/app/data  # Persist SQLite databases (for migration/fallback)
-      - ./logs:/app/logs  # Persist logs
-      - ./config.toml:/app/config.toml:ro  # Configuration
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./config.toml:/app/config.toml:ro
     networks:
       - trading-network
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_started
     restart: unless-stopped
-    # Health check removed - MCP server uses stdio, not HTTP
+    # Note: MCP server uses stdio, health checks via metrics or logs
+    env_file:
+      - .env
 
   redis:
     image: redis:7.2-alpine
-    container_name: redis
+    container_name: binance-redis
     ports:
       - "6379:6379"
     restart: unless-stopped
     networks:
       - trading-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   # Optional: Prometheus for metrics collection
   prometheus:
     image: prom/prometheus:latest
-    container_name: prometheus
+    container_name: binance-prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -80,7 +192,7 @@ services:
       - '--web.enable-lifecycle'
     restart: unless-stopped
     ports:
-      - "9091:9090"
+      - "9090:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -92,7 +204,7 @@ services:
   # Optional: Grafana for visualization
   grafana:
     image: grafana/grafana:latest
-    container_name: grafana
+    container_name: binance-grafana
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -105,6 +217,8 @@ services:
       - trading-network
     profiles:
       - monitoring
+    depends_on:
+      - prometheus
 
 volumes:
   postgres_data:  # PostgreSQL data persistence

@@ -30,6 +30,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Non-root user
 RUN groupadd -r trading && useradd -r -g trading trading
 
+# Install runtime dependencies (netcat for connection checks)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    netcat-openbsd \
+  && rm -rf /var/lib/apt/lists/*
+
 # Bring in virtualenv with ownership set during copy
 COPY --from=builder --chown=trading:trading /opt/venv /opt/venv
 
@@ -44,6 +49,10 @@ RUN mkdir -p /app/data /app/logs && chown -R trading:trading /app
 
 # Copy application code (already owned by 'trading')
 COPY --chown=trading:trading . .
+
+# Copy entrypoint script and make it executable (as root before switching users)
+COPY --chown=trading:trading entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 # Make the package importable for runtime/tests
 RUN pip install --no-cache-dir -e .
@@ -69,5 +78,6 @@ ENV PYTHONPATH=/app \
 # Drop privileges
 USER trading
 
-# Entrypoint
-CMD ["supervisord", "-c", "/app/supervisord.conf"]
+# Entrypoint: Handle database setup and start services
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD []
