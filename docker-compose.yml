@@ -56,8 +56,9 @@ services:
       dockerfile: Dockerfile
       target: production
     container_name: binance-api
+    entrypoint: ["/bin/sh", "-c"]
     command: >
-      sh -c "python -m binance_trade_agent.api.api"
+      "uvicorn binance_trade_agent.api.api:app --host 0.0.0.0 --port 8000"
     environment:
       - BINANCE_API_KEY=${BINANCE_API_KEY:-}
       - BINANCE_API_SECRET=${BINANCE_API_SECRET:-}
@@ -96,8 +97,9 @@ services:
       dockerfile: Dockerfile
       target: production
     container_name: binance-dashboard
+    entrypoint: ["/bin/sh", "-c"]
     command: >
-      sh -c "cd /app/binance_trade_agent/dashboard && python run.py"
+      "cd /app/binance_trade_agent/dashboard && python run.py"
     environment:
       - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-trading_user}:${POSTGRES_PASSWORD:-trading_pass_CHANGE_ME}@postgres:5432/${POSTGRES_DB:-binance_trading}
       - DB_POOL_SIZE=${DB_POOL_SIZE:-5}
@@ -140,6 +142,9 @@ services:
       dockerfile: Dockerfile
       target: production
     container_name: binance-trading-agent
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "python -m binance_trade_agent.main"
     environment:
       - BINANCE_API_KEY=${BINANCE_API_KEY:-}
       - BINANCE_API_SECRET=${BINANCE_API_SECRET:-}
