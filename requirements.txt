@@ -10,6 +10,9 @@ httpx==0.27.0
 redis==5.0.3
 # aioredis is included in redis>=5.0, no separate package needed
 
+# Database drivers
+psycopg2-binary==2.9.9  # PostgreSQL driver for SQLAlchemy
+
 # Additional dependencies for enhanced features
 numpy==1.26.4
 pandas==2.2.2

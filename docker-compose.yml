@@ -1,4 +1,26 @@
 services:
+  # PostgreSQL database for production-grade multi-writer support
+  postgres:
+    image: postgres:16-alpine
+    container_name: binance-postgres
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-binance_trading}
+      - POSTGRES_USER=${POSTGRES_USER:-trading_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-trading_pass_CHANGE_ME}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - trading-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trading_user} -d ${POSTGRES_DB:-binance_trading}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   trading-agent:
     build: 
       context: .
@@ -13,17 +35,26 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - PYTHONPATH=/app
       - REDIS_HOST=redis
+      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-trading_user}:${POSTGRES_PASSWORD:-trading_pass_CHANGE_ME}@postgres:5432/${POSTGRES_DB:-binance_trading}
+      - DB_POOL_SIZE=${DB_POOL_SIZE:-5}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-10}
+      - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-30}
     ports:
       - "8081:8080"  # MCP Server (changed to avoid port conflict)
       - "9091:9090"  # Monitoring/Metrics (changed to avoid prometheus conflict)
       - "8050:8050"  # Dash Dashboard
       - "8000:8000"  # FastAPI Data Service
     volumes:
-      - ./data:/app/data  # Persist SQLite databases
+      - ./data:/app/data  # Persist SQLite databases (for migration/fallback)
       - ./logs:/app/logs  # Persist logs
       - ./config.toml:/app/config.toml:ro  # Configuration
     networks:
       - trading-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     restart: unless-stopped
     # Health check removed - MCP server uses stdio, not HTTP
 
@@ -76,6 +107,7 @@ services:
       - monitoring
 
 volumes:
+  postgres_data:  # PostgreSQL data persistence
   prometheus_data:
   grafana_data:
 
