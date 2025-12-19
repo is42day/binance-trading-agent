@@ -150,67 +150,77 @@ class SQLiteToPostgresMigrator:
         finally:
             postgres_session.close()
 
-    def migrate_trades(self, batch_size: int = 100) -> int:
+    def migrate_trades(self, batch_size: int = 500) -> int:
         """
-        Migrate trades from SQLite to PostgreSQL.
+        Migrate trades from SQLite to PostgreSQL using bulk operations.
+        
+        Uses PostgreSQL ON CONFLICT DO NOTHING for idempotent behavior.
+        This is significantly faster than per-row checks for large datasets.
 
         Args:
-            batch_size: Number of rows to process at once
+            batch_size: Number of rows to bulk insert at once
 
         Returns:
             Number of trades migrated
         """
-        logger.info("Migrating trades...")
+        logger.info("Migrating trades (using bulk operations)...")
         sqlite_session = self.SQLiteSession()
         postgres_session = self.PostgresSession()
 
         migrated_count = 0
-        skipped_count = 0
 
         try:
-            # Get all trades from SQLite
+            # Get all trades from SQLite (load once, no per-row checks)
             sqlite_trades = sqlite_session.query(TradeORM).all()
             total = len(sqlite_trades)
-            logger.info(f"Found {total} trades in SQLite")
+            logger.info(f"Found {total} trades in SQLite, bulk loading...")
 
-            # Process in batches
+            if total == 0:
+                logger.info("No trades to migrate")
+                return 0
+
+            # Prepare trade data for bulk insert
+            trade_data = []
+            for trade in sqlite_trades:
+                trade_data.append({
+                    "trade_id": trade.trade_id,
+                    "symbol": trade.symbol,
+                    "side": trade.side,
+                    "quantity": trade.quantity,
+                    "price": trade.price,
+                    "fee": trade.fee,
+                    "timestamp": trade.timestamp,
+                    "order_id": trade.order_id,
+                    "correlation_id": trade.correlation_id,
+                    "pnl": trade.pnl,
+                })
+
+            # Process in batches for memory efficiency
             for i in range(0, total, batch_size):
-                batch = sqlite_trades[i : i + batch_size]
-
-                with postgres_session.begin():
-                    for trade in batch:
-                        # Check if trade already exists (by trade_id)
-                        existing = (
-                            postgres_session.query(TradeORM)
-                            .filter_by(trade_id=trade.trade_id)
-                            .first()
+                batch = trade_data[i : i + batch_size]
+                
+                try:
+                    with postgres_session.begin():
+                        # Use bulk insert with ON CONFLICT DO NOTHING
+                        # This handles idempotency: if trade_id exists, skip it
+                        postgres_session.execute(
+                            text("""
+                                INSERT INTO trades 
+                                (trade_id, symbol, side, quantity, price, fee, timestamp, order_id, correlation_id, pnl)
+                                VALUES (:trade_id, :symbol, :side, :quantity, :price, :fee, :timestamp, :order_id, :correlation_id, :pnl)
+                                ON CONFLICT (trade_id) DO NOTHING
+                            """),
+                            batch
                         )
+                        migrated_count += len(batch)
+                        
+                    logger.info(f"Bulk inserted batch: {i + len(batch)}/{total} trades...")
+                    
+                except Exception as batch_error:
+                    logger.error(f"Error in batch {i}-{i+len(batch)}: {batch_error}")
+                    raise
 
-                        if existing:
-                            skipped_count += 1
-                            continue
-
-                        # Create new trade object (don't reuse SQLite object)
-                        new_trade = TradeORM(
-                            trade_id=trade.trade_id,
-                            symbol=trade.symbol,
-                            side=trade.side,
-                            quantity=trade.quantity,
-                            price=trade.price,
-                            fee=trade.fee,
-                            timestamp=trade.timestamp,
-                            order_id=trade.order_id,
-                            correlation_id=trade.correlation_id,
-                            pnl=trade.pnl,
-                        )
-                        postgres_session.add(new_trade)
-                        migrated_count += 1
-
-                logger.info(f"Migrated {migrated_count}/{total} trades...")
-
-            logger.info(
-                f"✅ Trades migration complete: {migrated_count} migrated, {skipped_count} skipped (already exist)"
-            )
+            logger.info(f"✅ Trades migration complete: {migrated_count} inserted (duplicates skipped via ON CONFLICT)")
             return migrated_count
 
         except Exception as e:
@@ -223,7 +233,10 @@ class SQLiteToPostgresMigrator:
 
     def migrate_positions(self, batch_size: int = 100) -> int:
         """
-        Migrate positions from SQLite to PostgreSQL.
+        Migrate positions from SQLite to PostgreSQL using upsert pattern.
+        
+        Uses PostgreSQL ON CONFLICT DO UPDATE for idempotent behavior.
+        Positions are replaced entirely (not merged) with latest data.
 
         Args:
             batch_size: Number of rows to process at once
@@ -231,63 +244,70 @@ class SQLiteToPostgresMigrator:
         Returns:
             Number of positions migrated
         """
-        logger.info("Migrating positions...")
+        logger.info("Migrating positions (using upsert pattern)...")
         sqlite_session = self.SQLiteSession()
         postgres_session = self.PostgresSession()
 
         migrated_count = 0
-        updated_count = 0
 
         try:
             # Get all positions from SQLite
             sqlite_positions = sqlite_session.query(PositionORM).all()
             total = len(sqlite_positions)
-            logger.info(f"Found {total} positions in SQLite")
+            logger.info(f"Found {total} positions in SQLite, bulk loading...")
+
+            if total == 0:
+                logger.info("No positions to migrate")
+                return 0
+
+            # Prepare position data for bulk upsert
+            position_data = []
+            for position in sqlite_positions:
+                position_data.append({
+                    "symbol": position.symbol,
+                    "side": position.side,
+                    "quantity": position.quantity,
+                    "average_price": position.average_price,
+                    "current_price": position.current_price,
+                    "unrealized_pnl": position.unrealized_pnl,
+                    "realized_pnl": position.realized_pnl,
+                    "timestamp": position.timestamp,
+                })
 
             # Process in batches
             for i in range(0, total, batch_size):
-                batch = sqlite_positions[i : i + batch_size]
-
-                with postgres_session.begin():
-                    for position in batch:
-                        # Check if position already exists (by symbol)
-                        existing = (
-                            postgres_session.query(PositionORM)
-                            .filter_by(symbol=position.symbol)
-                            .first()
+                batch = position_data[i : i + batch_size]
+                
+                try:
+                    with postgres_session.begin():
+                        # Use upsert: ON CONFLICT DO UPDATE
+                        # If position with same symbol exists, replace entire row
+                        postgres_session.execute(
+                            text("""
+                                INSERT INTO positions 
+                                (symbol, side, quantity, average_price, current_price, unrealized_pnl, realized_pnl, timestamp)
+                                VALUES (:symbol, :side, :quantity, :average_price, :current_price, :unrealized_pnl, :realized_pnl, :timestamp)
+                                ON CONFLICT (symbol) DO UPDATE SET
+                                    side = EXCLUDED.side,
+                                    quantity = EXCLUDED.quantity,
+                                    average_price = EXCLUDED.average_price,
+                                    current_price = EXCLUDED.current_price,
+                                    unrealized_pnl = EXCLUDED.unrealized_pnl,
+                                    realized_pnl = EXCLUDED.realized_pnl,
+                                    timestamp = EXCLUDED.timestamp
+                            """),
+                            batch
                         )
+                        migrated_count += len(batch)
+                        
+                    logger.info(f"Upserted batch: {i + len(batch)}/{total} positions...")
+                    
+                except Exception as batch_error:
+                    logger.error(f"Error in batch {i}-{i+len(batch)}: {batch_error}")
+                    raise
 
-                        if existing:
-                            # Update existing position with latest data
-                            existing.side = position.side
-                            existing.quantity = position.quantity
-                            existing.average_price = position.average_price
-                            existing.current_price = position.current_price
-                            existing.unrealized_pnl = position.unrealized_pnl
-                            existing.realized_pnl = position.realized_pnl
-                            existing.timestamp = position.timestamp
-                            updated_count += 1
-                        else:
-                            # Create new position
-                            new_position = PositionORM(
-                                symbol=position.symbol,
-                                side=position.side,
-                                quantity=position.quantity,
-                                average_price=position.average_price,
-                                current_price=position.current_price,
-                                unrealized_pnl=position.unrealized_pnl,
-                                realized_pnl=position.realized_pnl,
-                                timestamp=position.timestamp,
-                            )
-                            postgres_session.add(new_position)
-                            migrated_count += 1
-
-                logger.info(f"Processed {migrated_count + updated_count}/{total} positions...")
-
-            logger.info(
-                f"✅ Positions migration complete: {migrated_count} created, {updated_count} updated"
-            )
-            return migrated_count + updated_count
+            logger.info(f"✅ Positions migration complete: {migrated_count} upserted")
+            return migrated_count
 
         except Exception as e:
             logger.error(f"Error migrating positions: {e}")
