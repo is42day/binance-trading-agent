@@ -20,39 +20,68 @@ SYMBOL_INFO_CACHE = {}
 
 
 def get_symbol_info(symbol):
-    """Get exchange info for symbol (mock for now, should fetch from Binance)"""
+    """
+    Get exchange info for symbol (mock for now, should fetch from Binance)
+    Returns dict with constraints and a 'available' flag indicating if data is real
+    """
     if symbol in SYMBOL_INFO_CACHE:
         return SYMBOL_INFO_CACHE[symbol]
     
-    # Mock data - in production, fetch from exchange_info endpoint
-    info = {
-        "BTCUSDT": {"tick_size": 0.01, "step_size": 0.00001, "min_notional": 10.0, "min_qty": 0.00001},
-        "ETHUSDT": {"tick_size": 0.01, "step_size": 0.0001, "min_notional": 10.0, "min_qty": 0.0001},
-        "BNBUSDT": {"tick_size": 0.01, "step_size": 0.001, "min_notional": 10.0, "min_qty": 0.001},
-        "SOLUSDT": {"tick_size": 0.01, "step_size": 0.01, "min_notional": 10.0, "min_qty": 0.01},
-        "ADAUSDT": {"tick_size": 0.0001, "step_size": 1.0, "min_notional": 10.0, "min_qty": 1.0},
+    # Mock data - in production, fetch from Binance exchangeInfo endpoint
+    # TODO: Implement dynamic fetching from Binance API with TTL cache (1h)
+    known_symbols = {
+        "BTCUSDT": {"tick_size": 0.01, "step_size": 0.00001, "min_notional": 10.0, "min_qty": 0.00001, "available": True},
+        "ETHUSDT": {"tick_size": 0.01, "step_size": 0.0001, "min_notional": 10.0, "min_qty": 0.0001, "available": True},
+        "BNBUSDT": {"tick_size": 0.01, "step_size": 0.001, "min_notional": 10.0, "min_qty": 0.001, "available": True},
+        "SOLUSDT": {"tick_size": 0.01, "step_size": 0.01, "min_notional": 10.0, "min_qty": 0.01, "available": True},
+        "ADAUSDT": {"tick_size": 0.0001, "step_size": 1.0, "min_notional": 10.0, "min_qty": 1.0, "available": True},
     }
     
-    SYMBOL_INFO_CACHE[symbol] = info.get(symbol, {
-        "tick_size": 0.01, "step_size": 0.001, "min_notional": 10.0, "min_qty": 0.001
-    })
+    if symbol in known_symbols:
+        SYMBOL_INFO_CACHE[symbol] = known_symbols[symbol]
+    else:
+        # Symbol not in our mock data - return conservative defaults with warning flag
+        SYMBOL_INFO_CACHE[symbol] = {
+            "tick_size": 0.01, 
+            "step_size": 0.001, 
+            "min_notional": 10.0, 
+            "min_qty": 0.001,
+            "available": False  # Flag: constraints are not verified
+        }
+    
     return SYMBOL_INFO_CACHE[symbol]
 
 
 def format_quantity(qty, step_size):
-    """Format quantity to match step size"""
+    """
+    Format quantity to match step size (rounds DOWN for safety)
+    Returns: (formatted_qty, was_adjusted)
+    """
     if not qty or not step_size:
-        return qty
+        return qty, False
+    
+    original_qty = qty
     precision = len(str(step_size).split('.')[-1]) if '.' in str(step_size) else 0
-    return float(Decimal(str(qty)).quantize(Decimal(str(step_size)), rounding=ROUND_DOWN))
+    adjusted_qty = float(Decimal(str(qty)).quantize(Decimal(str(step_size)), rounding=ROUND_DOWN))
+    
+    was_adjusted = abs(original_qty - adjusted_qty) > 1e-10
+    return adjusted_qty, was_adjusted
 
 
 def format_price(price, tick_size):
-    """Format price to match tick size"""
+    """
+    Format price to match tick size (rounds DOWN for safety)
+    Returns: (formatted_price, was_adjusted)
+    """
     if not price or not tick_size:
-        return price
+        return price, False
+    
+    original_price = price
     precision = len(str(tick_size).split('.')[-1]) if '.' in str(tick_size) else 0
-    return float(Decimal(str(price)).quantize(Decimal(str(tick_size)), rounding=ROUND_DOWN))
+    adjusted_price = float(Decimal(str(price)).quantize(Decimal(str(tick_size)), rounding=ROUND_DOWN))
+    
+    was_adjusted = abs(original_price - adjusted_price) > 1e-10
+    return adjusted_price, was_adjusted
 
 
 layout = dbc.Container(
@@ -604,6 +633,7 @@ def validate_and_preview(symbol, side, order_type, quantity, price, market_price
     """Continuously validate inputs and show trade preview"""
     errors = []
     warnings = []
+    adjustments = []
     
     # Get symbol info for validation
     symbol_info = get_symbol_info(symbol)
@@ -611,30 +641,54 @@ def validate_and_preview(symbol, side, order_type, quantity, price, market_price
     step_size = symbol_info.get("step_size", 0.001)
     min_notional = symbol_info.get("min_notional", 10.0)
     min_qty = symbol_info.get("min_qty", 0.001)
+    constraints_available = symbol_info.get("available", False)
+    
+    # WARNING: Exchange constraints not verified
+    if not constraints_available:
+        warnings.append(
+            "⚠️ Exchange constraints not available for this symbol. "
+            "Values will be validated at execution time by Binance."
+        )
     
     # Update hints
     price_hint = f"Tick size: {tick_size} | Current: ${market_price:.2f}"
     qty_hint = f"Step size: {step_size} | Min qty: {min_qty} | Min notional: ${min_notional}"
     
-    # Validate quantity
-    if not quantity or quantity <= 0:
+    # Auto-adjust quantity for step size (round down for safety)
+    adjusted_quantity = quantity
+    qty_was_adjusted = False
+    if quantity and step_size:
+        adjusted_quantity, qty_was_adjusted = format_quantity(quantity, step_size)
+        if qty_was_adjusted:
+            adjustments.append(
+                f"Quantity adjusted to {adjusted_quantity:.8f} (step size: {step_size}) - rounded down for safety"
+            )
+    
+    # Auto-adjust price for tick size (round down for safety)
+    adjusted_price = price
+    price_was_adjusted = False
+    if order_type == "LIMIT" and price and tick_size:
+        adjusted_price, price_was_adjusted = format_price(price, tick_size)
+        if price_was_adjusted:
+            adjustments.append(
+                f"Price adjusted to {adjusted_price:.8f} (tick size: {tick_size}) - rounded down for safety"
+            )
+    
+    # Validate adjusted quantity
+    if not adjusted_quantity or adjusted_quantity <= 0:
         errors.append("Quantity must be greater than 0")
-    elif quantity < min_qty:
-        errors.append(f"Quantity must be at least {min_qty}")
-    elif step_size and quantity % step_size != 0:
-        warnings.append(f"Quantity should be a multiple of {step_size}")
+    elif adjusted_quantity < min_qty:
+        errors.append(f"Quantity must be at least {min_qty} (after adjustment)")
     
-    # Validate price for LIMIT orders
-    effective_price = price if order_type == "LIMIT" else market_price
+    # Validate adjusted price for LIMIT orders
+    effective_price = adjusted_price if order_type == "LIMIT" else market_price
     if order_type == "LIMIT":
-        if not price or price <= 0:
+        if not adjusted_price or adjusted_price <= 0:
             errors.append("Price must be greater than 0 for LIMIT orders")
-        elif tick_size and price % tick_size != 0:
-            warnings.append(f"Price should be a multiple of {tick_size}")
     
-    # Validate min notional
-    if quantity and effective_price:
-        notional = quantity * effective_price
+    # Validate min notional with adjusted values
+    if adjusted_quantity and effective_price:
+        notional = adjusted_quantity * effective_price
         if notional < min_notional:
             errors.append(f"Order value (${notional:.2f}) must be at least ${min_notional}")
     
@@ -650,16 +704,26 @@ def validate_and_preview(symbol, side, order_type, quantity, price, market_price
     if warnings:
         feedback_children.append(
             dbc.Alert(
-                [html.Div(f"⚠️ {warning}") for warning in warnings],
+                [html.Div(warning) for warning in warnings],
                 color="warning",
             )
         )
+    if adjustments:
+        feedback_children.append(
+            dbc.Alert(
+                [
+                    html.Div([html.Strong("🔧 Auto-adjustments applied:")]),
+                    *[html.Div(adj, className="mt-1") for adj in adjustments]
+                ],
+                color="info",
+            )
+        )
     
-    # Build trade preview
+    # Build trade preview using ADJUSTED values
     preview_children = []
-    if quantity and effective_price and not errors:
-        notional = quantity * effective_price
-        estimated_fee = notional * 0.001  # 0.1% maker/taker fee estimate
+    if adjusted_quantity and effective_price and not errors:
+        notional = adjusted_quantity * effective_price
+        estimated_fee = notional * 0.001  # 0.1% estimate
         
         side_color = "success" if side == "BUY" else "danger"
         side_icon = "🟢" if side == "BUY" else "🔴"
@@ -669,6 +733,66 @@ def validate_and_preview(symbol, side, order_type, quantity, price, market_price
                 [
                     dbc.CardHeader([
                         html.I(className="bi bi-eye me-2"),
+                        "Order Preview"
+                    ], className="bg-secondary text-white"),
+                    dbc.CardBody(
+                        [
+                            dbc.Row([
+                                dbc.Col([
+                                    html.Strong("Symbol:"),
+                                    html.Div(symbol, className="text-primary fs-5")
+                                ], width=3),
+                                dbc.Col([
+                                    html.Strong("Side:"),
+                                    html.Div([side_icon, f" {side}"], className=f"text-{side_color} fs-5")
+                                ], width=3),
+                                dbc.Col([
+                                    html.Strong("Type:"),
+                                    html.Div(order_type, className="fs-5")
+                                ], width=3),
+                                dbc.Col([
+                                    html.Strong("Quantity:"),
+                                    html.Div(f"{adjusted_quantity:.8f}", className="fs-5"),
+                                    html.Small("(adjusted)" if qty_was_adjusted else "", className="text-muted")
+                                ], width=3),
+                            ], className="mb-3"),
+                            dbc.Row([
+                                dbc.Col([
+                                    html.Strong("Price:"),
+                                    html.Div(
+                                        [
+                                            f"${adjusted_price:.8f}" if order_type == "LIMIT" else f"~${market_price:.2f} (Market)",
+                                            html.Br() if price_was_adjusted and order_type == "LIMIT" else "",
+                                            html.Small("(adjusted)" if price_was_adjusted and order_type == "LIMIT" else "", className="text-muted")
+                                        ],
+                                        className="text-info fs-5"
+                                    )
+                                ], width=4),
+                                dbc.Col([
+                                    html.Strong("Est. Total:"),
+                                    html.Div(f"${notional:.2f}", className="text-warning fs-5")
+                                ], width=4),
+                                dbc.Col([
+                                    html.Strong("Est. Fee:"),
+                                    html.Div([
+                                        f"${estimated_fee:.4f}",
+                                        html.Br(),
+                                        html.Small("(assumes 0.1%)", className="text-muted")
+                                    ], className="text-muted fs-6")
+                                ], width=4),
+                            ]),
+                        ]
+                    ),
+                ],
+                color="dark",
+                outline=True,
+            )
+        ]
+    
+    # Enable/disable review button
+    button_disabled = len(errors) > 0 or not adjusted_quantity or not symbol
+    
+    return feedback_children, preview_children, button_disabled, price_hint, qty_hint
                         "Order Preview"
                     ], className="bg-secondary text-white"),
                     dbc.CardBody(
@@ -741,7 +865,7 @@ def validate_and_preview(symbol, side, order_type, quantity, price, market_price
 )
 def toggle_confirmation_modal(review_clicks, cancel_clicks, confirm_clicks, 
                                symbol, side, order_type, quantity, price, market_price, is_open):
-    """Toggle confirmation modal and show order summary"""
+    """Toggle confirmation modal and show order summary with ADJUSTED values"""
     from dash import ctx
     
     if not ctx.triggered_id:
@@ -753,36 +877,106 @@ def toggle_confirmation_modal(review_clicks, cancel_clicks, confirm_clicks,
     
     # Open modal on review
     if ctx.triggered_id == "trade-review-btn":
-        effective_price = price if order_type == "LIMIT" else market_price
-        notional = quantity * effective_price if quantity and effective_price else 0
+        # Get symbol info and apply adjustments (same logic as preview)
+        symbol_info = get_symbol_info(symbol)
+        step_size = symbol_info.get("step_size", 0.001)
+        tick_size = symbol_info.get("tick_size", 0.01)
+        
+        # Adjust values for execution
+        adjusted_quantity, qty_adjusted = format_quantity(quantity, step_size)
+        adjusted_price = price
+        price_adjusted = False
+        
+        if order_type == "LIMIT" and price:
+            adjusted_price, price_adjusted = format_price(price, tick_size)
+        
+        effective_price = adjusted_price if order_type == "LIMIT" else market_price
+        notional = adjusted_quantity * effective_price if adjusted_quantity and effective_price else 0
         estimated_fee = notional * 0.001
         
         side_color = "success" if side == "BUY" else "danger"
         side_icon = "🟢" if side == "BUY" else "🔴"
+        action_verb = "BUY" if side == "BUY" else "SELL"
         
-        summary = dbc.Table([
+        # SAFETY BANNER - Big, bold warning
+        safety_banner = dbc.Alert([
+            html.H4([
+                html.I(className="bi bi-exclamation-triangle-fill me-2"),
+                "CONFIRM ACTION"
+            ], className="mb-3"),
+            html.Div([
+                "You are about to ",
+                html.Strong(f"{action_verb} {adjusted_quantity:.8f} {symbol}", className=f"text-{side_color}"),
+                " for approximately ",
+                html.Strong(f"${notional:.2f}", className="text-warning"),
+            ], className="fs-5 mb-2"),
+            html.Hr(),
+            html.Div([
+                html.I(className="bi bi-shield-check me-2"),
+                "This will place a ",
+                html.Strong("real order on Binance TESTNET"),
+                " (no real money at risk)"
+            ], className="text-muted")
+        ], color="warning", className="mb-3")
+        
+        # Order summary table
+        summary_rows = [
             html.Tr([html.Td(html.Strong("Symbol")), html.Td(symbol, className="text-primary")]),
             html.Tr([html.Td(html.Strong("Side")), html.Td([side_icon, f" {side}"], className=f"text-{side_color}")]),
             html.Tr([html.Td(html.Strong("Order Type")), html.Td(order_type)]),
-            html.Tr([html.Td(html.Strong("Quantity")), html.Td(f"{quantity:.6f}")]),
-            html.Tr([html.Td(html.Strong("Price")), html.Td(
-                f"${price:.2f}" if order_type == "LIMIT" else f"~${market_price:.2f} (Market)", 
-                className="text-info"
-            )]),
-            html.Tr([html.Td(html.Strong("Estimated Total")), html.Td(f"${notional:.2f}", className="text-warning")]),
-            html.Tr([html.Td(html.Strong("Estimated Fee")), html.Td(f"${estimated_fee:.2f}", className="text-muted")]),
-        ], bordered=True, hover=True, dark=True)
+            html.Tr([
+                html.Td(html.Strong("Quantity")), 
+                html.Td([
+                    f"{adjusted_quantity:.8f}",
+                    html.Br() if qty_adjusted else "",
+                    html.Small(f" (adjusted from {quantity:.8f})", className="text-info") if qty_adjusted else ""
+                ])
+            ]),
+        ]
         
-        # Perform risk check
+        if order_type == "LIMIT":
+            summary_rows.append(
+                html.Tr([
+                    html.Td(html.Strong("Price")), 
+                    html.Td([
+                        f"${adjusted_price:.8f}",
+                        html.Br() if price_adjusted else "",
+                        html.Small(f" (adjusted from ${price:.8f})", className="text-info") if price_adjusted else ""
+                    ], className="text-info")
+                ])
+            )
+        else:
+            summary_rows.append(
+                html.Tr([
+                    html.Td(html.Strong("Price")), 
+                    html.Td(f"~${market_price:.2f} (Market - best available)", className="text-info")
+                ])
+            )
+        
+        summary_rows.extend([
+            html.Tr([html.Td(html.Strong("Estimated Total")), html.Td(f"${notional:.2f}", className="text-warning")]),
+            html.Tr([
+                html.Td(html.Strong("Estimated Fee")), 
+                html.Td([f"${estimated_fee:.4f} ", html.Small("(assumes 0.1%)", className="text-muted")])
+            ]),
+        ])
+        
+        summary = html.Div([
+            safety_banner,
+            dbc.Table(summary_rows, bordered=True, hover=True, dark=True)
+        ])
+        
+        # Perform risk check with ADJUSTED values
         try:
             components = get_trading_components()
             risk_agent = components["risk_agent"]
-            risk_check = risk_agent.validate_trade(symbol, side, quantity, effective_price or 0)
+            risk_check = risk_agent.validate_trade(symbol, side, adjusted_quantity, effective_price or 0)
             
             if risk_check.get("approved", False):
                 risk_status = dbc.Alert([
                     html.I(className="bi bi-shield-check me-2"),
                     html.Strong("✅ Risk Check: PASSED"),
+                    html.Div("Order meets all risk management criteria", className="mt-2 text-muted")
                 ], color="success")
             else:
                 reason = risk_check.get("reason", "Unknown reason")
@@ -814,7 +1008,7 @@ def toggle_confirmation_modal(review_clicks, cancel_clicks, confirm_clicks,
     prevent_initial_call=True,
 )
 def place_order_confirmed(n_clicks, symbol, side, order_type, quantity, price):
-    """Place order after confirmation"""
+    """Place order after confirmation - uses ADJUSTED values for execution"""
     if not n_clicks:
         return no_update, no_update, no_update
 
@@ -822,20 +1016,32 @@ def place_order_confirmed(n_clicks, symbol, side, order_type, quantity, price):
         components = get_trading_components()
         execution_agent = components["execution_agent"]
         risk_agent = components["risk_agent"]
+        
+        # Apply same adjustments as validation and modal
+        symbol_info = get_symbol_info(symbol)
+        step_size = symbol_info.get("step_size", 0.001)
+        tick_size = symbol_info.get("tick_size", 0.01)
+        
+        # Adjust values for execution
+        adjusted_quantity, _ = format_quantity(quantity, step_size)
+        adjusted_price = price
+        
+        if order_type == "LIMIT" and price:
+            adjusted_price, _ = format_price(price, tick_size)
 
-        # Final risk check
-        risk_check = risk_agent.validate_trade(symbol, side, quantity, price or 0)
+        # Final risk check with ADJUSTED values
+        risk_check = risk_agent.validate_trade(symbol, side, adjusted_quantity, adjusted_price or 0)
         if not risk_check.get("approved", False):
             reason = risk_check.get("reason", "Trade rejected by risk management")
             return dbc.Alert(f"⚠️ Risk Check Failed: {reason}", color="danger"), no_update, no_update
 
-        # Place the order
+        # Place the order with ADJUSTED values
         order_result = execution_agent.place_order(
             symbol=symbol,
             side=side,
             order_type=order_type,
-            quantity=quantity,
-            price=price,
+            quantity=adjusted_quantity,  # Use adjusted
+            price=adjusted_price,         # Use adjusted
         )
 
         if order_result.get("success"):
@@ -843,8 +1049,8 @@ def place_order_confirmed(n_clicks, symbol, side, order_type, quantity, price):
                 [
                     html.H5([html.I(className="bi bi-check-circle me-2"), "Order Placed Successfully!"]),
                     html.Div(f"Order ID: {order_result.get('order_id', 'N/A')}"),
-                    html.Div(f"Symbol: {symbol} | Side: {side} | Qty: {quantity}"),
-                    html.Div(f"Price: ${price or 'Market'}"),
+                    html.Div(f"Symbol: {symbol} | Side: {side} | Qty: {adjusted_quantity:.8f}"),
+                    html.Div(f"Price: ${adjusted_price or 'Market'}"),
                 ],
                 color="success",
             )
