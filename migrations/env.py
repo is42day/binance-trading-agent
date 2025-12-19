@@ -8,14 +8,23 @@ from sqlalchemy import pool
 from alembic import context
 
 # Add the app directory to sys.path so we can import binance_trade_agent
-sys.path.insert(0, '/app')
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# Import ORM Base and models IMMEDIATELY (before context.config)
-from binance_trade_agent.portfolio_manager import Base, PositionORM, TradeORM
+# Import ORM Base and models from correct location
+from binance_trade_agent.core.portfolio_manager import Base, PositionORM, TradeORM
+from binance_trade_agent.core import db
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+# Override sqlalchemy.url from environment if DATABASE_URL is set
+database_url = os.getenv("DATABASE_URL")
+if database_url:
+    config.set_main_option("sqlalchemy.url", database_url)
+elif not config.get_main_option("sqlalchemy.url"):
+    # Fallback to default from db module
+    config.set_main_option("sqlalchemy.url", db.get_database_url())
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

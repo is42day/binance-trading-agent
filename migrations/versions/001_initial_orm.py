@@ -32,6 +32,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('symbol')
     )
     
+    # Create index on positions symbol (redundant with PK but explicit)
+    op.create_index('ix_positions_symbol', 'positions', ['symbol'], unique=False)
+    
     # Create trades table
     op.create_table('trades',
         sa.Column('trade_id', sa.String(), nullable=False),
@@ -44,10 +47,25 @@ def upgrade() -> None:
         sa.Column('order_id', sa.String(), nullable=True),
         sa.Column('correlation_id', sa.String(), nullable=True),
         sa.Column('pnl', sa.Float(), nullable=True),
-        sa.PrimaryKeyConstraint('trade_id')
+        sa.PrimaryKeyConstraint('trade_id'),
+        sa.UniqueConstraint('order_id', name='uq_trades_order_id')  # Prevent duplicate orders
     )
+    
+    # Create indexes for common query patterns
+    op.create_index('ix_trades_symbol', 'trades', ['symbol'], unique=False)
+    op.create_index('ix_trades_timestamp', 'trades', ['timestamp'], unique=False)
+    op.create_index('ix_trades_symbol_timestamp', 'trades', ['symbol', 'timestamp'], unique=False)
+    op.create_index('ix_trades_correlation_id', 'trades', ['correlation_id'], unique=False)
 
 
 def downgrade() -> None:
+    # Drop indexes first
+    op.drop_index('ix_trades_correlation_id', table_name='trades')
+    op.drop_index('ix_trades_symbol_timestamp', table_name='trades')
+    op.drop_index('ix_trades_timestamp', table_name='trades')
+    op.drop_index('ix_trades_symbol', table_name='trades')
+    op.drop_index('ix_positions_symbol', table_name='positions')
+    
+    # Drop tables
     op.drop_table('trades')
     op.drop_table('positions')
