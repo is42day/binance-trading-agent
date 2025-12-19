@@ -76,7 +76,7 @@ pip install -r requirements.txt
 Create `.env` file with your Binance testnet credentials:
 ```env
 BINANCE_API_KEY=your_testnet_api_key
-BINANCE_SECRET_KEY=your_testnet_secret_key
+BINANCE_API_SECRET=your_testnet_secret_key
 BINANCE_TESTNET=true
 ```
 
@@ -235,7 +235,7 @@ docker build -t binance-trading-agent .
 # Run with environment variables
 docker run -d \
   -e BINANCE_API_KEY=your_key \
-  -e BINANCE_SECRET_KEY=your_secret \
+  -e BINANCE_API_SECRET=your_secret \
   -e BINANCE_TESTNET=true \
   binance-trading-agent
 ```

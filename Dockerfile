@@ -53,7 +53,8 @@ RUN rm -rf /root/.cache/streamlit /root/.streamlit && \
     find /app -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 
 # Expose ports
-EXPOSE 8080 9090 8501
+# FastAPI (8000), Dash (8050), MCP Server (8080), Metrics (9090)
+EXPOSE 8000 8050 8080 9090
 
 # Runtime env
 ENV PYTHONPATH=/app \
