@@ -5,6 +5,7 @@ Production-ready financial trading dashboard with real-time data
 
 import os
 import sys
+import logging
 
 import dash
 import dash_bootstrap_components as dbc
@@ -16,6 +17,7 @@ sys.path.insert(
     os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
 )
 
+from binance_trade_agent.common.logging_config import setup_logging, get_logger
 from binance_trade_agent.dashboard.components import navbar
 from binance_trade_agent.dashboard.pages import (
     advanced,
@@ -27,6 +29,15 @@ from binance_trade_agent.dashboard.pages import (
     signals_risk,
     system_health,
 )
+
+# Setup structured logging for dashboard
+setup_logging(
+    service_name="dashboard",
+    log_level=os.getenv("LOG_LEVEL", "INFO"),
+    use_json=os.getenv("LOG_FORMAT", "plain").lower() == "json",
+)
+
+logger = get_logger(__name__)
 
 # Initialize the Dash app
 app = dash.Dash(

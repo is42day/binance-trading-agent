@@ -13,7 +13,17 @@ from datetime import datetime, timedelta
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from binance_trade_agent.common.config import config
+from binance_trade_agent.common.logging_config import setup_logging, get_logger, set_correlation_id, generate_call_id
 from binance_trade_agent.core.orchestrator import TradingOrchestrator
+
+# Setup structured logging for trading loop
+setup_logging(
+    service_name="trading-agent",
+    log_level=os.getenv("LOG_LEVEL", "INFO"),
+    use_json=os.getenv("LOG_FORMAT", "plain").lower() == "json",
+)
+
+logger = get_logger(__name__)
 
 
 class AutonomousTradingLoop:

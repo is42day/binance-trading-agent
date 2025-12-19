@@ -16,10 +16,18 @@ from ..agents.market_data_agent import MarketDataAgent
 from ..agents.risk_management_agent import EnhancedRiskManagementAgent
 from ..clients.redis_cache import RedisCache
 from ..common.config import config
+from ..common.logging_config import setup_logging, get_logger, set_call_id, generate_call_id
 from ..core.portfolio_manager import PortfolioManager
 from ..core import db
 
-logger = logging.getLogger(__name__)
+# Setup structured logging for this service
+setup_logging(
+    service_name="api",
+    log_level=os.getenv("LOG_LEVEL", "INFO"),
+    use_json=os.getenv("LOG_FORMAT", "plain").lower() == "json",
+)
+
+logger = get_logger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
