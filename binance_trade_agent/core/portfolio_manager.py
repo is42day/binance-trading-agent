@@ -8,9 +8,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import Column, DateTime, Float, String, create_engine
+from sqlalchemy import Column, DateTime, Float, String
 from sqlalchemy.orm import Session as SQLAlchemySession
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base
+
+from binance_trade_agent.core import db
 
 # ============================================================================
 # Data Classes
@@ -111,13 +113,35 @@ class TradeORM(Base):
 class PortfolioManager:
     """Manages portfolio positions, trades, and P&L using SQLAlchemy ORM"""
 
-    def __init__(self, db_path: str = "/app/data/portfolio.db"):
-        """Initialize portfolio manager with SQLAlchemy session"""
-        self.db_path = db_path
-        self.engine = create_engine(f"sqlite:///{db_path}", echo=False)
-        Base.metadata.create_all(self.engine, checkfirst=True)
-        self.SessionLocal = sessionmaker(bind=self.engine)
+    def __init__(self, db_path: str = "/app/data/portfolio.db", use_shared_session: bool = True):
+        """
+        Initialize portfolio manager with SQLAlchemy session.
+        
+        Args:
+            db_path: Path to SQLite database (used only if DATABASE_URL not set)
+            use_shared_session: If True, uses shared session factory from db module.
+                               If False, creates own engine (legacy mode for tests).
+        """
         self.logger = logging.getLogger(self.__class__.__name__)
+        
+        if use_shared_session:
+            # Use centralized DB configuration (recommended)
+            # Set DB_PATH env var if db_path provided and DATABASE_URL not set
+            if not db.os.getenv("DATABASE_URL") and db_path != "/app/data/portfolio.db":
+                db.os.environ["DB_PATH"] = db_path
+            
+            self.engine = db.get_engine()
+            self.SessionLocal = db.get_session_factory()
+            self.db_path = None  # Not used with shared session
+        else:
+            # Legacy mode: create own SQLite engine (for backward compatibility)
+            from sqlalchemy import create_engine
+            from sqlalchemy.orm import sessionmaker
+            
+            self.db_path = db_path
+            self.engine = create_engine(f"sqlite:///{db_path}", echo=False)
+            Base.metadata.create_all(self.engine, checkfirst=True)
+            self.SessionLocal = sessionmaker(bind=self.engine)
 
     def get_session(self) -> SQLAlchemySession:
         """Get a new database session"""
