@@ -10,16 +10,24 @@ from typing import Any, Dict, List
 import requests
 
 # Get API URL from environment
-# Docker services: API_HOST=api, API_PORT=8000 (service-to-service)
-# Local dev: API_HOST=localhost, API_PORT=8000
-API_HOST = os.getenv("API_HOST", "localhost")
-API_PORT = os.getenv("API_PORT", "8000")
-API_BASE_URL = f"http://{API_HOST}:{API_PORT}/api/v1"
+# Priority order:
+# 1. API_BASE_URL (full URL override)
+# 2. API_HOST + API_PORT (Docker services: api:8000, Local: localhost:8000)
+# 3. Default: localhost:8000
+
+if os.getenv("API_BASE_URL"):
+    API_BASE_URL = os.getenv("API_BASE_URL")
+else:
+    API_HOST = os.getenv("API_HOST", "localhost")
+    API_PORT = os.getenv("API_PORT", "8000")
+    API_BASE_URL = f"http://{API_HOST}:{API_PORT}/api/v1"
 
 # Connection settings
 REQUEST_TIMEOUT = 5  # seconds
 MAX_RETRIES = 3
 RETRY_DELAY = 0.5  # seconds
+
+print(f"[API Client] Connecting to: {API_BASE_URL}")
 
 
 def _make_request_with_retry(url: str, max_retries: int = MAX_RETRIES) -> Dict[str, Any]:
@@ -41,7 +49,7 @@ def _make_request_with_retry(url: str, max_retries: int = MAX_RETRIES) -> Dict[s
             response.raise_for_status()
             return response.json()
         except requests.exceptions.ConnectionError as e:
-            last_error = f"Connection failed to {API_HOST}:{API_PORT} - is API service running?"
+            last_error = f"Connection failed to {API_BASE_URL} - is API service running?"
             if attempt < max_retries - 1:
                 time.sleep(RETRY_DELAY * (attempt + 1))  # Exponential backoff
                 continue
