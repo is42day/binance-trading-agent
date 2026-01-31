@@ -42,10 +42,10 @@ class CombinedEdgeStrategy(BaseStrategy):
     """
     
     def __init__(self, market_data_agent=None, config: dict = None):
-        super().__init__(market_data_agent)
-        self.name = "combined_edge"
-        
-        config = config or {}
+        self.market_data_agent = market_data_agent
+        self._name = "combined_edge"
+        self._config = config or {}
+        super().__init__()
         
         # Initialize sub-strategies
         self.edge_strategy = EdgeStrategy(market_data_agent)
@@ -55,12 +55,12 @@ class CombinedEdgeStrategy(BaseStrategy):
         self.bollinger_strategy = BollingerBandsStrategy()
         
         # Thresholds
-        self.edge_min_confidence = config.get("edge_min_confidence", 0.4)
-        self.entry_min_score = config.get("entry_min_score", 0.3)
-        self.ta_confirmation_required = config.get("ta_confirmation_required", 1)
+        self.edge_min_confidence = self._config.get("edge_min_confidence", 0.4)
+        self.entry_min_score = self._config.get("entry_min_score", 0.3)
+        self.ta_confirmation_required = self._config.get("ta_confirmation_required", 1)
         
         # Position sizing based on conviction
-        self.max_position_pct = config.get("max_position_pct", 0.10)  # 10% max per trade
+        self.max_position_pct = self._config.get("max_position_pct", 0.10)  # 10% max per trade
         self.conviction_multipliers = {
             "high": 1.0,    # Full size
             "medium": 0.5,  # Half size
@@ -93,11 +93,12 @@ class CombinedEdgeStrategy(BaseStrategy):
         
         # RSI
         try:
-            rsi_signal = self.rsi_strategy.generate_signal(symbol, ohlcv_data)
-            if rsi_signal.get("action") == "BUY":
+            rsi_result = self.rsi_strategy.analyze(ohlcv_data, symbol)
+            rsi_action = rsi_result.signal.value if hasattr(rsi_result, 'signal') else "HOLD"
+            if rsi_action == "BUY":
                 confirmations["bullish"] += 1
                 confirmations["details"]["rsi"] = "bullish"
-            elif rsi_signal.get("action") == "SELL":
+            elif rsi_action == "SELL":
                 confirmations["bearish"] += 1
                 confirmations["details"]["rsi"] = "bearish"
             else:
@@ -108,11 +109,12 @@ class CombinedEdgeStrategy(BaseStrategy):
         
         # MACD
         try:
-            macd_signal = self.macd_strategy.generate_signal(symbol, ohlcv_data)
-            if macd_signal.get("action") == "BUY":
+            macd_result = self.macd_strategy.analyze(ohlcv_data, symbol)
+            macd_action = macd_result.signal.value if hasattr(macd_result, 'signal') else "HOLD"
+            if macd_action == "BUY":
                 confirmations["bullish"] += 1
                 confirmations["details"]["macd"] = "bullish"
-            elif macd_signal.get("action") == "SELL":
+            elif macd_action == "SELL":
                 confirmations["bearish"] += 1
                 confirmations["details"]["macd"] = "bearish"
             else:
@@ -123,11 +125,12 @@ class CombinedEdgeStrategy(BaseStrategy):
         
         # Bollinger
         try:
-            bb_signal = self.bollinger_strategy.generate_signal(symbol, ohlcv_data)
-            if bb_signal.get("action") == "BUY":
+            bb_result = self.bollinger_strategy.analyze(ohlcv_data, symbol)
+            bb_action = bb_result.signal.value if hasattr(bb_result, 'signal') else "HOLD"
+            if bb_action == "BUY":
                 confirmations["bullish"] += 1
                 confirmations["details"]["bollinger"] = "bullish"
-            elif bb_signal.get("action") == "SELL":
+            elif bb_action == "SELL":
                 confirmations["bearish"] += 1
                 confirmations["details"]["bollinger"] = "bearish"
             else:
@@ -287,6 +290,43 @@ class CombinedEdgeStrategy(BaseStrategy):
             "timestamp": datetime.now().isoformat(),
             **metadata
         }
+    
+    def get_name(self) -> str:
+        """Return strategy name"""
+        return self._name
+    
+    def get_description(self) -> str:
+        """Return strategy description"""
+        return (
+            "Combined edge strategy that uses Fear & Greed Index, funding rates, "
+            "and smart entry timing, with traditional TA confirmation. "
+            "Conservative approach focused on high-conviction trades."
+        )
+    
+    def get_parameters(self) -> dict:
+        """Return strategy parameters"""
+        return {
+            "edge_min_confidence": {
+                "default": 0.4,
+                "description": "Minimum edge signal confidence to consider",
+            },
+            "entry_min_score": {
+                "default": 0.3,
+                "description": "Minimum entry timing score",
+            },
+            "ta_confirmation_required": {
+                "default": 1,
+                "description": "Number of TA confirmations required",
+            },
+            "max_position_pct": {
+                "default": 0.10,
+                "description": "Maximum position size as % of portfolio",
+            },
+        }
+    
+    def analyze(self, market_data: list, symbol: str = None) -> dict:
+        """Analyze market data - wrapper for generate_signal"""
+        return self.generate_signal(symbol or "BTCUSDT", market_data)
 
 
 # Convenience factory functions

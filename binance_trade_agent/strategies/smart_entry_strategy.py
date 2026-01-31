@@ -28,9 +28,10 @@ class SmartEntryStrategy(BaseStrategy):
     This strategy waits for high-probability entry points.
     """
     
-    def __init__(self, market_data_agent=None):
-        super().__init__(market_data_agent)
-        self.name = "smart_entry"
+    def __init__(self, market_data_agent=None, parameters: dict = None):
+        self.market_data_agent = market_data_agent
+        self._name = "smart_entry"
+        super().__init__(parameters)
         
         # Volatility parameters
         self.volatility_lookback = 20
@@ -387,3 +388,35 @@ class SmartEntryStrategy(BaseStrategy):
             "timestamp": datetime.now().isoformat(),
             **metadata
         }
+    
+    def get_name(self) -> str:
+        """Return strategy name"""
+        return self._name
+    
+    def get_description(self) -> str:
+        """Return strategy description"""
+        return (
+            "Smart entry strategy that optimizes entry timing using support/resistance "
+            "proximity, volatility compression, order flow analysis, and time-based patterns."
+        )
+    
+    def get_parameters(self) -> dict:
+        """Return strategy parameters"""
+        return {
+            "volatility_lookback": {
+                "default": 20,
+                "description": "Number of candles for volatility calculation",
+            },
+            "volatility_compression_threshold": {
+                "default": 0.6,
+                "description": "Threshold for detecting volatility compression",
+            },
+            "sr_proximity_pct": {
+                "default": 0.02,
+                "description": "Percentage proximity to S/R level",
+            },
+        }
+    
+    def analyze(self, market_data: list, symbol: str = None) -> dict:
+        """Analyze market data - wrapper for generate_signal"""
+        return self.generate_signal(symbol or "BTCUSDT", market_data)

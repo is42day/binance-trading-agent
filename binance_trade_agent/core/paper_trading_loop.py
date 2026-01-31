@@ -205,11 +205,11 @@ class PaperTradingLoop:
             timestamp = datetime.now().strftime("%H:%M:%S")
             if action != "HOLD":
                 logger.info(
-                    f"[{timestamp}] 📊 {symbol}: {action} signal "
+                    f"[{timestamp}] {symbol}: {action} signal "
                     f"(confidence: {confidence:.2f})"
                 )
                 if rejection_reason:
-                    logger.info(f"    ⚠️  Not executed: {rejection_reason}")
+                    logger.info(f"    [!] Not executed: {rejection_reason}")
             
             # Execute paper trade if signal is actionable
             if action == "BUY" and confidence >= 0.3:
@@ -225,10 +225,10 @@ class PaperTradingLoop:
                     )
                     if result["success"]:
                         logger.info(
-                            f"    ✅ Paper BUY executed: {quantity} {symbol} @ ${current_price:.2f}"
+                            f"    [+] Paper BUY executed: {quantity} {symbol} @ ${current_price:.2f}"
                         )
                     else:
-                        logger.warning(f"    ❌ Paper BUY failed: {result.get('error')}")
+                        logger.warning(f"    [-] Paper BUY failed: {result.get('error')}")
             
             elif action == "SELL" and symbol in self.paper_engine.portfolio.open_positions:
                 position = self.paper_engine.portfolio.open_positions[symbol]
@@ -242,9 +242,9 @@ class PaperTradingLoop:
                 )
                 if result["success"]:
                     pnl = result.get("pnl", 0)
-                    emoji = "🟢" if pnl > 0 else "🔴"
+                    marker = "[WIN]" if pnl > 0 else "[LOSS]"
                     logger.info(
-                        f"    {emoji} Paper SELL executed: P&L ${pnl:.2f} ({result.get('pnl_percent', 0):.2f}%)"
+                        f"    {marker} Paper SELL executed: P&L ${pnl:.2f} ({result.get('pnl_percent', 0):.2f}%)"
                     )
             
         except Exception as e:
@@ -256,7 +256,7 @@ class PaperTradingLoop:
         self.stop_flag = False
         
         logger.info("=" * 60)
-        logger.info("🧪 PAPER TRADING MODE - Using REAL mainnet data")
+        logger.info("PAPER TRADING MODE - Using REAL mainnet data")
         logger.info("=" * 60)
         logger.info(f"Strategy: {self.strategy_name}")
         logger.info(f"Symbols: {', '.join(self.symbols)}")
@@ -293,7 +293,7 @@ class PaperTradingLoop:
         stats = self.paper_engine.get_portfolio_summary()
         
         logger.info("\n" + "=" * 40)
-        logger.info("📊 PAPER TRADING SUMMARY")
+        logger.info("PAPER TRADING SUMMARY")
         logger.info("=" * 40)
         logger.info(f"Balance: ${stats['current_balance']:.2f}")
         logger.info(f"Total P&L: ${stats['total_pnl']:.2f} ({stats['total_pnl_percent']:.2f}%)")
@@ -304,9 +304,9 @@ class PaperTradingLoop:
         if stats['open_positions'] > 0:
             logger.info(f"\nOpen Positions:")
             for symbol, pos in stats.get('position_values', {}).items():
-                emoji = "🟢" if pos['unrealized_pnl'] > 0 else "🔴"
+                marker = "[+]" if pos['unrealized_pnl'] > 0 else "[-]"
                 logger.info(
-                    f"  {emoji} {symbol}: ${pos['value']:.2f} "
+                    f"  {marker} {symbol}: ${pos['value']:.2f} "
                     f"(P&L: ${pos['unrealized_pnl']:.2f})"
                 )
         logger.info("=" * 40 + "\n")

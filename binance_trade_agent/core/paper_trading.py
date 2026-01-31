@@ -317,19 +317,32 @@ class PaperTradingEngine:
         rejection_reason: str = None,
     ):
         """Log a signal (whether executed or not) for analysis"""
+        # Convert numpy types to Python native types for JSON serialization
+        def convert_numpy(obj):
+            if hasattr(obj, 'item'):  # numpy scalar
+                return obj.item()
+            elif isinstance(obj, dict):
+                return {k: convert_numpy(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_numpy(i) for i in obj]
+            return obj
+        
         signal_data = {
             "timestamp": datetime.now().isoformat(),
             "symbol": symbol,
             "action": action,
-            "confidence": confidence,
+            "confidence": float(confidence) if confidence else 0,
             "strategy": strategy,
             "executed": executed,
             "rejection_reason": rejection_reason,
-            "metadata": metadata,
+            "metadata": convert_numpy(metadata) if metadata else {},
         }
         
-        with open(self.signal_log_file, "a") as f:
-            f.write(json.dumps(signal_data) + "\n")
+        try:
+            with open(self.signal_log_file, "a") as f:
+                f.write(json.dumps(signal_data, default=str) + "\n")
+        except Exception as e:
+            logger.warning(f"Failed to log signal: {e}")
     
     def _log_trade(self, trade: PaperTrade, event: str):
         """Log trade to file"""
@@ -355,7 +368,7 @@ class PaperTradingEngine:
             f.write(json.dumps(trade_data) + "\n")
         
         logger.info(
-            f"📝 Paper trade {event}: {trade.symbol} {trade.side} @ ${trade.entry_price:.2f}"
+            f"[PAPER] Trade {event}: {trade.symbol} {trade.side} @ ${trade.entry_price:.2f}"
             + (f" -> ${trade.exit_price:.2f} (P&L: ${trade.pnl:.2f})" if trade.exit_price else "")
         )
     

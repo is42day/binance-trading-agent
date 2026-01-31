@@ -30,9 +30,10 @@ class EdgeStrategy(BaseStrategy):
     buy. When everyone is greedy and funding is sky-high, sell.
     """
     
-    def __init__(self, market_data_agent=None):
-        super().__init__(market_data_agent)
-        self.name = "edge_contrarian"
+    def __init__(self, market_data_agent=None, parameters: dict = None):
+        self.market_data_agent = market_data_agent
+        self._name = "edge_contrarian"
+        super().__init__(parameters)
         
         # Thresholds calibrated from historical data
         self.fear_greed_buy_threshold = 25    # Extreme fear = buy
@@ -372,3 +373,39 @@ class EdgeStrategy(BaseStrategy):
             "timestamp": datetime.now().isoformat(),
             **metadata
         }
+    
+    def get_name(self) -> str:
+        """Return strategy name"""
+        return self._name
+    
+    def get_description(self) -> str:
+        """Return strategy description"""
+        return (
+            "Contrarian edge strategy using Fear & Greed Index, funding rates, "
+            "and volume anomalies to identify market extremes for mean reversion trades."
+        )
+    
+    def get_parameters(self) -> dict:
+        """Return strategy parameters"""
+        return {
+            "fear_greed_buy_threshold": {
+                "default": 25,
+                "description": "Fear & Greed value below which to generate BUY signals",
+            },
+            "fear_greed_sell_threshold": {
+                "default": 75,
+                "description": "Fear & Greed value above which to generate SELL signals",
+            },
+            "funding_extreme_high": {
+                "default": 0.1,
+                "description": "Funding rate above which longs are crowded (bearish)",
+            },
+            "funding_extreme_low": {
+                "default": -0.05,
+                "description": "Funding rate below which shorts are crowded (bullish)",
+            },
+        }
+    
+    def analyze(self, market_data: list, symbol: str = None) -> dict:
+        """Analyze market data - wrapper for generate_signal"""
+        return self.generate_signal(symbol or "BTCUSDT", market_data)
