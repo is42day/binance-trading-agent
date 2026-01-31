@@ -59,14 +59,14 @@ class CombinedStrategy(BaseStrategy):
                 "description": "Weight for RSI signal (MACD weight = 1 - rsi_weight)",
             },
             "min_agreement_threshold": {
-                "default": 0.3,  # Lowered for testnet - easier to trigger signals
+                "default": 0.6,  # Production: require strong indicator agreement
                 "type": float,
                 "min": 0.0,
                 "max": 1.0,
                 "description": "Minimum agreement score to generate non-HOLD signal",
             },
             "require_direction_agreement": {
-                "default": False,  # Disabled for testnet - allows single indicator to trigger
+                "default": True,  # Production: both RSI and MACD must agree on direction
                 "type": bool,
                 "description": "Require both indicators to agree on BUY/SELL direction",
             },

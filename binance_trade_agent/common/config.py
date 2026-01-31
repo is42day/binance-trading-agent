@@ -59,9 +59,9 @@ class Config:
         self.trading_min_order_size_eth = float(os.getenv("TRADING_MIN_ORDER_SIZE_ETH", "0.00001"))
 
         # Signal Configuration
-        # Testnet-friendly: Wider RSI bands (40/60) to trigger more trades
-        self.signal_rsi_overbought = int(os.getenv("SIGNAL_RSI_OVERBOUGHT", "60"))
-        self.signal_rsi_oversold = int(os.getenv("SIGNAL_RSI_OVERSOLD", "40"))
+        # Production defaults: Standard RSI thresholds (70/30)
+        self.signal_rsi_overbought = int(os.getenv("SIGNAL_RSI_OVERBOUGHT", "70"))
+        self.signal_rsi_oversold = int(os.getenv("SIGNAL_RSI_OVERSOLD", "30"))
         self.signal_macd_signal_window = int(os.getenv("SIGNAL_MACD_SIGNAL_WINDOW", "9"))
 
         # Monitoring Configuration
