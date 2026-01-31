@@ -152,17 +152,37 @@ layout = dbc.Container(
                                                 dcc.Dropdown(
                                                     id="strategy-selector",
                                                     options=[
-                                                        {"label": "RSI", "value": "rsi"},
                                                         {
-                                                            "label": "MACD",
+                                                            "label": "🎯 Combined Edge (Recommended)",
+                                                            "value": "combined_edge",
+                                                        },
+                                                        {
+                                                            "label": "🛡️ Edge Conservative",
+                                                            "value": "edge_conservative",
+                                                        },
+                                                        {
+                                                            "label": "📊 Edge (Contrarian)",
+                                                            "value": "edge",
+                                                        },
+                                                        {
+                                                            "label": "⏰ Smart Entry",
+                                                            "value": "smart_entry",
+                                                        },
+                                                        {"label": "📈 RSI", "value": "rsi"},
+                                                        {
+                                                            "label": "📉 MACD",
                                                             "value": "macd",
                                                         },
                                                         {
-                                                            "label": "Combined",
+                                                            "label": "📐 Bollinger Bands",
+                                                            "value": "bollinger",
+                                                        },
+                                                        {
+                                                            "label": "🔀 Combined (TA)",
                                                             "value": "combined",
                                                         },
                                                     ],
-                                                    value="combined",
+                                                    value="combined_edge",
                                                     clearable=False,
                                                 ),
                                             ],

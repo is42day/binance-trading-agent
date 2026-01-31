@@ -11,9 +11,12 @@ from typing import Any, Dict, List, Optional, Type
 
 from .base_strategy import BaseStrategy, SignalType, StrategyResult
 from .bollinger_strategy import BollingerBandsStrategy
+from .combined_edge_strategy import CombinedEdgeStrategy, create_balanced_edge_strategy, create_conservative_edge_strategy
 from .combined_strategy import CombinedStrategy
+from .edge_strategy import EdgeStrategy
 from .macd_strategy import MACDStrategy
 from .rsi_strategy import RSIStrategy
+from .smart_entry_strategy import SmartEntryStrategy
 
 
 class StrategyManager:
@@ -32,6 +35,9 @@ class StrategyManager:
             "macd": MACDStrategy,
             "combined": CombinedStrategy,
             "bollinger": BollingerBandsStrategy,
+            "edge": EdgeStrategy,
+            "smart_entry": SmartEntryStrategy,
+            "combined_edge": CombinedEdgeStrategy,
         }
         self.performance_history: Dict[str, List[Dict[str, Any]]] = {}
         self.logger = logging.getLogger(__name__)
@@ -107,6 +113,35 @@ class StrategyManager:
             self.register_strategy("bollinger_conservative", bollinger_conservative)
         except Exception as e:
             self.logger.error(f"Failed to register bollinger_conservative: {str(e)}")
+        
+        # Edge strategies - Alternative data sources
+        try:
+            edge_strategy = EdgeStrategy()
+            self.register_strategy("edge", edge_strategy)
+            self.register_strategy("edge_contrarian", edge_strategy)
+        except Exception as e:
+            self.logger.error(f"Failed to register edge strategy: {str(e)}")
+        
+        try:
+            smart_entry = SmartEntryStrategy()
+            self.register_strategy("smart_entry", smart_entry)
+        except Exception as e:
+            self.logger.error(f"Failed to register smart_entry strategy: {str(e)}")
+        
+        # Combined Edge Strategies - RECOMMENDED for live trading
+        try:
+            combined_edge_balanced = create_balanced_edge_strategy()
+            self.register_strategy("combined_edge", combined_edge_balanced)
+            self.register_strategy("edge_balanced", combined_edge_balanced)
+        except Exception as e:
+            self.logger.error(f"Failed to register combined_edge strategy: {str(e)}")
+        
+        try:
+            combined_edge_conservative = create_conservative_edge_strategy()
+            self.register_strategy("edge_conservative", combined_edge_conservative)
+        except Exception as e:
+            self.logger.error(f"Failed to register edge_conservative strategy: {str(e)}")
+        
         self.logger.info(f"Initialized {len(self.strategies)} default strategies")
 
     def register_strategy(self, name: str, strategy: BaseStrategy) -> bool:
