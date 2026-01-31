@@ -120,6 +120,7 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./config.toml:/app/config.toml:ro
+      - ./binance_trade_agent:/app/binance_trade_agent  # Dev: mount source for hot reload
     networks:
       - trading-network
     depends_on:

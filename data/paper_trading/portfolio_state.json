@@ -1,0 +1,36 @@
+{
+  "saved_at": "2026-01-31T21:18:13.838109",
+  "portfolio": {
+    "initial_balance": 100.0,
+    "current_balance": 74.999922208,
+    "total_pnl": 0.0,
+    "total_pnl_percent": 0.0,
+    "total_trades": 0,
+    "winning_trades": 0,
+    "losing_trades": 0,
+    "win_rate": 0,
+    "avg_win": 0,
+    "avg_loss": 0,
+    "profit_factor": 0,
+    "max_drawdown": 0.0,
+    "max_drawdown_percent": 0.0,
+    "open_positions": 1,
+    "unrealized_pnl": -0.012493791999997228,
+    "positions_value": 24.987584000000002,
+    "total_value": 99.987506208,
+    "total_pnl_with_unrealized": -0.012493791999997228
+  },
+  "open_positions": {
+    "BTCUSDT": {
+      "trade_id": "PAPER_20260131_211813_BTCUSDT",
+      "entry_price": 78125.24309999999,
+      "current_price": 78086.2,
+      "quantity": 0.00032,
+      "entry_time": "2026-01-31T21:18:13.336236",
+      "strategy": "combined_edge",
+      "value": 24.987584000000002,
+      "pnl": -0.012493791999997228,
+      "pnl_percent": -0.04997501249374204
+    }
+  }
+}

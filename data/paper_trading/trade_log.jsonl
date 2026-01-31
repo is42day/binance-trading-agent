@@ -1,0 +1,1 @@
+{"event": "OPEN", "timestamp": "2026-01-31T21:18:13.336236", "trade": {"trade_id": "PAPER_20260131_211813_BTCUSDT", "symbol": "BTCUSDT", "side": "BUY", "entry_price": 78125.24309999999, "exit_price": null, "quantity": 0.00032, "pnl": null, "pnl_percent": null, "strategy": "combined_edge", "signal_confidence": 0.159875}, "portfolio_balance": 74.999922208}

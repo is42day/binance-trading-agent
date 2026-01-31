@@ -212,7 +212,7 @@ class PaperTradingLoop:
                     logger.info(f"    [!] Not executed: {rejection_reason}")
             
             # Execute paper trade if signal is actionable
-            if action == "BUY" and confidence >= 0.3:
+            if action == "BUY" and confidence >= 0.1:  # Lower threshold for paper trading
                 quantity = self._calculate_position_size(symbol, current_price)
                 if quantity > 0:
                     result = self.paper_engine.execute_paper_trade(

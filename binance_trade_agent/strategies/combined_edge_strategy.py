@@ -54,10 +54,11 @@ class CombinedEdgeStrategy(BaseStrategy):
         self.macd_strategy = MACDStrategy()
         self.bollinger_strategy = BollingerBandsStrategy()
         
-        # Thresholds
-        self.edge_min_confidence = self._config.get("edge_min_confidence", 0.4)
-        self.entry_min_score = self._config.get("entry_min_score", 0.3)
-        self.ta_confirmation_required = self._config.get("ta_confirmation_required", 1)
+        # Thresholds - relatively low to capture more opportunities
+        # but still require confluence of signals
+        self.edge_min_confidence = self._config.get("edge_min_confidence", 0.35)  # Edge confidence needed
+        self.entry_min_score = self._config.get("entry_min_score", -0.1)  # Allow slightly negative entry
+        self.ta_confirmation_required = self._config.get("ta_confirmation_required", 1)  # Need 1 TA confirm
         
         # Position sizing based on conviction
         self.max_position_pct = self._config.get("max_position_pct", 0.10)  # 10% max per trade
@@ -216,11 +217,11 @@ class CombinedEdgeStrategy(BaseStrategy):
         elif entry_score < self.entry_min_score:
             rejection_reason = f"Entry conditions unfavorable (score={entry_score:.2f})"
         
-        # Check for conflicting signals
-        elif (edge_action == "BUY" and entry_direction < -0.2):
-            rejection_reason = "Edge says BUY but entry timing bearish"
-        elif (edge_action == "SELL" and entry_direction > 0.2):
-            rejection_reason = "Edge says SELL but entry timing bullish"
+        # Check for conflicting signals - only reject if strongly opposite
+        elif (edge_action == "BUY" and entry_direction < -0.4):
+            rejection_reason = "Edge says BUY but entry timing strongly bearish"
+        elif (edge_action == "SELL" and entry_direction > 0.4):
+            rejection_reason = "Edge says SELL but entry timing strongly bullish"
         
         else:
             # Check TA confirmations
@@ -336,7 +337,7 @@ def create_conservative_edge_strategy(market_data_agent=None):
         market_data_agent=market_data_agent,
         config={
             "edge_min_confidence": 0.5,
-            "entry_min_score": 0.4,
+            "entry_min_score": -0.1,  # Allow trades even with slightly unfavorable entry
             "ta_confirmation_required": 2,
             "max_position_pct": 0.05,
         }
@@ -348,8 +349,8 @@ def create_balanced_edge_strategy(market_data_agent=None):
     return CombinedEdgeStrategy(
         market_data_agent=market_data_agent,
         config={
-            "edge_min_confidence": 0.4,
-            "entry_min_score": 0.3,
+            "edge_min_confidence": 0.35,  # Lowered to capture Fear/Greed signals
+            "entry_min_score": -0.15,  # Allow trades with slightly negative entry score
             "ta_confirmation_required": 1,
             "max_position_pct": 0.10,
         }

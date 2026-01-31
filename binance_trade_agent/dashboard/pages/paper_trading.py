@@ -352,10 +352,17 @@ def update_portfolio_stats(n_intervals):
     except:
         banner = dbc.Alert("Paper trading status unknown", color="secondary")
     
-    # Extract stats
-    balance = portfolio.get("current_balance", 0)
-    pnl = portfolio.get("total_pnl", 0)
-    pnl_pct = portfolio.get("total_pnl_percent", 0)
+    # Extract stats - use total_value (cash + positions) instead of just cash balance
+    balance = portfolio.get("total_value", portfolio.get("current_balance", 0))
+    cash_balance = portfolio.get("current_balance", 0)
+    positions_value = portfolio.get("positions_value", 0)
+    
+    # Use total P&L including unrealized
+    pnl = portfolio.get("total_pnl_with_unrealized", portfolio.get("total_pnl", 0))
+    unrealized_pnl = portfolio.get("unrealized_pnl", 0)
+    initial_balance = portfolio.get("initial_balance", 100)
+    pnl_pct = (pnl / initial_balance * 100) if initial_balance > 0 else 0
+    
     win_rate = portfolio.get("win_rate", 0)
     total_trades = portfolio.get("total_trades", 0)
     drawdown = portfolio.get("max_drawdown", 0)

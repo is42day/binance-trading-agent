@@ -242,21 +242,36 @@ class EdgeStrategy(BaseStrategy):
         if fear_greed is not None:
             if fear_greed <= self.fear_greed_buy_threshold:
                 # Extreme fear - contrarian BUY
-                strength = (self.fear_greed_buy_threshold - fear_greed) / self.fear_greed_buy_threshold
+                # Stronger signal when fear is more extreme (0-10 = max strength)
+                if fear_greed <= 10:
+                    strength = 1.0  # Extreme fear
+                elif fear_greed <= 15:
+                    strength = 0.85  # Very high fear
+                elif fear_greed <= 20:
+                    strength = 0.7  # High fear
+                else:
+                    strength = 0.5  # Moderate fear
                 signals["fear_greed"] = {
                     "signal": "bullish",
-                    "strength": min(strength, 1.0),
+                    "strength": strength,
                     "value": fear_greed,
-                    "interpretation": "Extreme Fear - Contrarian Buy"
+                    "interpretation": f"Fear Index {fear_greed} - Contrarian Buy"
                 }
             elif fear_greed >= self.fear_greed_sell_threshold:
                 # Extreme greed - contrarian SELL
-                strength = (fear_greed - self.fear_greed_sell_threshold) / (100 - self.fear_greed_sell_threshold)
+                if fear_greed >= 90:
+                    strength = 1.0  # Extreme greed
+                elif fear_greed >= 85:
+                    strength = 0.85  # Very high greed
+                elif fear_greed >= 80:
+                    strength = 0.7  # High greed
+                else:
+                    strength = 0.5  # Moderate greed
                 signals["fear_greed"] = {
                     "signal": "bearish",
-                    "strength": min(strength, 1.0),
+                    "strength": strength,
                     "value": fear_greed,
-                    "interpretation": "Extreme Greed - Contrarian Sell"
+                    "interpretation": f"Greed Index {fear_greed} - Contrarian Sell"
                 }
             else:
                 signals["fear_greed"]["value"] = fear_greed
@@ -334,15 +349,15 @@ class EdgeStrategy(BaseStrategy):
         # Determine final signal
         net_score = bullish_score - bearish_score
         
-        # Require minimum conviction
-        min_conviction = 0.25  # Need at least 25% weighted signal
+        # Require minimum conviction - lowered to allow single strong factor
+        min_conviction = 0.15  # Need at least 15% weighted signal
         
         if net_score >= min_conviction:
             action = "BUY"
-            confidence = min(net_score * 2, 1.0)  # Scale to 0-1
+            confidence = min(net_score * 1.5 + 0.3, 1.0)  # Scale with boost
         elif net_score <= -min_conviction:
             action = "SELL"
-            confidence = min(abs(net_score) * 2, 1.0)
+            confidence = min(abs(net_score) * 1.5 + 0.3, 1.0)
         else:
             action = "HOLD"
             confidence = 0.5

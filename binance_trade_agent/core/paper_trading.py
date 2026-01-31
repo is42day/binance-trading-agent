@@ -254,6 +254,7 @@ class PaperTradingEngine:
             self.portfolio.current_balance -= trade_value
             
             self._log_trade(trade, "OPEN")
+            self._save_state()  # Save after opening position
             
             return {
                 "success": True,
@@ -376,19 +377,57 @@ class PaperTradingEngine:
         """Save portfolio state to disk"""
         state_file = self.data_dir / "portfolio_state.json"
         
+        # Calculate unrealized P&L for open positions
+        unrealized_pnl = 0.0
+        positions_value = 0.0
+        open_positions_detail = {}
+        
+        for symbol, trade in self.portfolio.open_positions.items():
+            current_price = self._get_real_price(symbol)
+            if current_price > 0:
+                position_value = current_price * trade.quantity
+                positions_value += position_value
+                entry_value = trade.entry_price * trade.quantity
+                position_pnl = position_value - entry_value
+                unrealized_pnl += position_pnl
+                
+                open_positions_detail[symbol] = {
+                    "trade_id": trade.trade_id,
+                    "entry_price": trade.entry_price,
+                    "current_price": current_price,
+                    "quantity": trade.quantity,
+                    "entry_time": trade.entry_time.isoformat(),
+                    "strategy": trade.strategy,
+                    "value": position_value,
+                    "pnl": position_pnl,
+                    "pnl_percent": (position_pnl / entry_value) * 100 if entry_value > 0 else 0,
+                }
+            else:
+                # Can't get price, use entry price
+                open_positions_detail[symbol] = {
+                    "trade_id": trade.trade_id,
+                    "entry_price": trade.entry_price,
+                    "current_price": trade.entry_price,
+                    "quantity": trade.quantity,
+                    "entry_time": trade.entry_time.isoformat(),
+                    "strategy": trade.strategy,
+                    "value": trade.entry_price * trade.quantity,
+                    "pnl": 0,
+                    "pnl_percent": 0,
+                }
+                positions_value += trade.entry_price * trade.quantity
+        
+        # Get base stats and add calculated values
+        stats = self.portfolio.get_stats()
+        stats["unrealized_pnl"] = unrealized_pnl
+        stats["positions_value"] = positions_value
+        stats["total_value"] = self.portfolio.current_balance + positions_value
+        stats["total_pnl_with_unrealized"] = self.portfolio.total_pnl + unrealized_pnl
+        
         state = {
             "saved_at": datetime.now().isoformat(),
-            "portfolio": self.portfolio.get_stats(),
-            "open_positions": {
-                symbol: {
-                    "trade_id": t.trade_id,
-                    "entry_price": t.entry_price,
-                    "quantity": t.quantity,
-                    "entry_time": t.entry_time.isoformat(),
-                    "strategy": t.strategy,
-                }
-                for symbol, t in self.portfolio.open_positions.items()
-            },
+            "portfolio": stats,
+            "open_positions": open_positions_detail,
         }
         
         with open(state_file, "w") as f:
@@ -413,7 +452,22 @@ class PaperTradingEngine:
                 self.portfolio.max_drawdown = stats.get("max_drawdown", 0)
                 self.portfolio.peak_balance = stats.get("current_balance", self.portfolio.initial_balance)
                 
-                logger.info(f"Loaded paper trading state: balance=${self.portfolio.current_balance:.2f}")
+                # Restore open positions
+                open_positions = state.get("open_positions", {})
+                for symbol, pos_data in open_positions.items():
+                    trade = PaperTrade(
+                        trade_id=pos_data.get("trade_id", f"PAPER_RESTORED_{symbol}"),
+                        symbol=symbol,
+                        side="BUY",  # Assume all open positions are long for now
+                        entry_price=pos_data.get("entry_price", 0),
+                        quantity=pos_data.get("quantity", 0),
+                        entry_time=datetime.fromisoformat(pos_data.get("entry_time", datetime.now().isoformat())),
+                        strategy=pos_data.get("strategy", "unknown"),
+                    )
+                    self.portfolio.open_positions[symbol] = trade
+                    logger.info(f"Restored open position: {symbol} @ ${trade.entry_price:.2f}")
+                
+                logger.info(f"Loaded paper trading state: balance=${self.portfolio.current_balance:.2f}, positions={len(self.portfolio.open_positions)}")
             except Exception as e:
                 logger.warning(f"Failed to load paper trading state: {e}")
     
