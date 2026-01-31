@@ -223,18 +223,30 @@ layout = dbc.Container(
                                                                     "Limit Price (USDT)",
                                                                     className="text-secondary font-weight-bold",
                                                                 ),
-                                                                dbc.Input(
-                                                                    id="trade-price-input",
-                                                                    type="number",
-                                                                    placeholder="Enter limit price",
-                                                                    className="form-control",
-                                                                    step=0.01,
-                                                                    min=0,
+                                                                dbc.InputGroup(
+                                                                    [
+                                                                        dbc.InputGroupText("$"),
+                                                                        dbc.Input(
+                                                                            id="trade-price-input",
+                                                                            type="number",
+                                                                            placeholder="Enter limit price",
+                                                                            className="form-control",
+                                                                            step=0.01,
+                                                                            min=0,
+                                                                        ),
+                                                                        dbc.Button(
+                                                                            "📊 Use Market",
+                                                                            id="use-market-price-btn",
+                                                                            color="info",
+                                                                            size="sm",
+                                                                            outline=True,
+                                                                        ),
+                                                                    ]
                                                                 ),
                                                                 html.Small(
                                                                     id="price-hint",
                                                                     className="text-muted",
-                                                                    children="Must respect tick size; > 0"
+                                                                    children="Click 'Use Market' to auto-fill current price"
                                                                 )
                                                             ],
                                                             md=12,
@@ -260,27 +272,62 @@ layout = dbc.Container(
                                                 )
                                             ]
                                         ),
-                                        # Quantity
+                                        # Quantity Input Section
                                         dbc.Row(
                                             [
                                                 dbc.Col(
                                                     [
                                                         html.Label(
-                                                            "Quantity",
+                                                            "Amount to Trade",
                                                             className="text-secondary font-weight-bold",
                                                         ),
-                                                        dbc.Input(
-                                                            id="trade-quantity-input",
-                                                            type="number",
-                                                            placeholder="Enter quantity",
-                                                            className="form-control",
-                                                            step=0.001,
-                                                            min=0,
+                                                        dbc.Tabs(
+                                                            [
+                                                                dbc.Tab(
+                                                                    dbc.InputGroup(
+                                                                        [
+                                                                            dbc.Input(
+                                                                                id="trade-quantity-input",
+                                                                                type="number",
+                                                                                placeholder="Enter quantity",
+                                                                                className="form-control",
+                                                                                step=0.001,
+                                                                                min=0,
+                                                                            ),
+                                                                            dbc.InputGroupText(id="quantity-unit-label", children="BTC"),
+                                                                        ],
+                                                                        className="mt-2"
+                                                                    ),
+                                                                    label="By Quantity",
+                                                                    tab_id="qty-tab",
+                                                                ),
+                                                                dbc.Tab(
+                                                                    dbc.InputGroup(
+                                                                        [
+                                                                            dbc.InputGroupText("$"),
+                                                                            dbc.Input(
+                                                                                id="trade-usd-amount-input",
+                                                                                type="number",
+                                                                                placeholder="Enter USD amount",
+                                                                                className="form-control",
+                                                                                step=1,
+                                                                                min=0,
+                                                                            ),
+                                                                            dbc.InputGroupText("USDT"),
+                                                                        ],
+                                                                        className="mt-2"
+                                                                    ),
+                                                                    label="By USD Amount",
+                                                                    tab_id="usd-tab",
+                                                                ),
+                                                            ],
+                                                            id="amount-input-tabs",
+                                                            active_tab="usd-tab",
                                                         ),
                                                         html.Small(
                                                             id="quantity-hint",
-                                                            className="text-muted",
-                                                            children="Must respect lot size / min notional"
+                                                            className="text-muted mt-1",
+                                                            children="Enter USD amount or switch to quantity mode"
                                                         )
                                                     ],
                                                     md=12,
@@ -613,6 +660,105 @@ def toggle_price_visibility(order_type):
         return {"display": "none"}, {"display": "block"}, "MARKET: instant execution at best price"
     else:
         return {"display": "block"}, {"display": "none"}, "LIMIT: set your desired price"
+
+
+# Callback: Auto-fill price when clicking "Use Market" button
+@callback(
+    Output("trade-price-input", "value", allow_duplicate=True),
+    Input("use-market-price-btn", "n_clicks"),
+    State("current-market-price", "data"),
+    State("trade-symbol-selector", "value"),
+    prevent_initial_call=True,
+)
+def use_market_price(n_clicks, market_price, symbol):
+    """Fill price input with current market price, adjusted to tick size"""
+    if not n_clicks or not market_price:
+        return no_update
+    
+    symbol_info = get_symbol_info(symbol)
+    tick_size = symbol_info.get("tick_size", 0.01)
+    adjusted_price, _ = format_price(market_price, tick_size)
+    return adjusted_price
+
+
+# Callback: Update quantity unit label based on symbol
+@callback(
+    Output("quantity-unit-label", "children"),
+    Input("trade-symbol-selector", "value"),
+)
+def update_quantity_unit(symbol):
+    """Update the unit label based on selected symbol"""
+    if not symbol:
+        return "Units"
+    # Extract base currency (e.g., BTC from BTCUSDT)
+    base = symbol.replace("USDT", "").replace("BUSD", "").replace("BTC", "")
+    if not base:
+        base = symbol[:3] if len(symbol) > 3 else symbol
+    # Handle common symbols
+    if symbol.startswith("BTC"):
+        return "BTC"
+    elif symbol.startswith("ETH"):
+        return "ETH"
+    elif symbol.startswith("BNB"):
+        return "BNB"
+    elif symbol.startswith("SOL"):
+        return "SOL"
+    elif symbol.startswith("ADA"):
+        return "ADA"
+    return symbol.replace("USDT", "")
+
+
+# Callback: Convert USD amount to quantity
+@callback(
+    Output("trade-quantity-input", "value", allow_duplicate=True),
+    Input("trade-usd-amount-input", "value"),
+    State("current-market-price", "data"),
+    State("trade-symbol-selector", "value"),
+    State("amount-input-tabs", "active_tab"),
+    prevent_initial_call=True,
+)
+def convert_usd_to_quantity(usd_amount, market_price, symbol, active_tab):
+    """Convert USD amount to quantity based on current market price"""
+    if active_tab != "usd-tab" or not usd_amount or not market_price or market_price <= 0:
+        return no_update
+    
+    # Calculate quantity from USD amount
+    quantity = usd_amount / market_price
+    
+    # Adjust to step size
+    symbol_info = get_symbol_info(symbol)
+    step_size = symbol_info.get("step_size", 0.001)
+    adjusted_qty, _ = format_quantity(quantity, step_size)
+    
+    return adjusted_qty
+
+
+# Callback: Auto-fill price when symbol changes (only if empty)
+@callback(
+    Output("trade-price-input", "value", allow_duplicate=True),
+    Input("trade-symbol-selector", "value"),
+    State("trade-price-input", "value"),
+    prevent_initial_call=True,
+)
+def autofill_price_on_symbol_change(symbol, current_price_value):
+    """Auto-fill price with market price when symbol changes and price is empty"""
+    # Only auto-fill if price is empty (don't overwrite user input)
+    if current_price_value:
+        return no_update
+    
+    try:
+        from binance_trade_agent.dashboard.utils.data_fetch import get_market_data
+        market_data = get_market_data(symbol)
+        if "error" not in market_data:
+            market_price = market_data.get("price", 0)
+            if market_price > 0:
+                symbol_info = get_symbol_info(symbol)
+                tick_size = symbol_info.get("tick_size", 0.01)
+                adjusted_price, _ = format_price(market_price, tick_size)
+                return adjusted_price
+    except Exception:
+        pass
+    return no_update
 
 
 # Callback: Continuous validation and preview
