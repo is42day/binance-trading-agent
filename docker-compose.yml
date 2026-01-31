@@ -110,6 +110,10 @@ services:
       - REDIS_HOST=redis
       - API_HOST=api
       - API_PORT=8000
+      # Dashboard authentication (change for production!)
+      - DASHBOARD_USERNAME=${DASHBOARD_USERNAME:-admin}
+      - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD:-changeme}
+      - DASHBOARD_AUTH_ENABLED=${DASHBOARD_AUTH_ENABLED:-true}
     ports:
       - "8050:8050"
     volumes:

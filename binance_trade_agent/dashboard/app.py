@@ -30,6 +30,7 @@ from binance_trade_agent.dashboard.pages import (
     signals_risk,
     system_health,
 )
+from binance_trade_agent.dashboard.auth import require_auth
 
 # Setup structured logging for dashboard
 setup_logging(
@@ -49,6 +50,13 @@ app = dash.Dash(
     ],
     suppress_callback_exceptions=True,  # Allow callbacks to reference IDs that don't exist yet
 )
+
+# Enable HTTP Basic Authentication
+# Configure via environment variables:
+#   DASHBOARD_USERNAME (default: admin)
+#   DASHBOARD_PASSWORD (default: changeme)
+#   DASHBOARD_AUTH_ENABLED (default: true, set to false to disable)
+require_auth(app)
 
 # Configure app metadata
 app.title = "Binance Trading Agent"

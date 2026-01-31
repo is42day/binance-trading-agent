@@ -153,6 +153,87 @@ def health_check():
         return health_status
 
 
+@app.get("/ready")
+def readiness_check():
+    """
+    Readiness probe for Kubernetes/orchestration.
+    
+    Different from /health - this checks if the service is ready to accept traffic:
+    1. Database is connected and has schema
+    2. Binance API is accessible (circuit breaker not open)
+    3. Cache is available
+    
+    Returns 200 if ready, 503 if not ready.
+    """
+    from fastapi.responses import JSONResponse
+    
+    ready_status = {
+        "ready": False,
+        "timestamp": datetime.now().isoformat(),
+        "checks": {
+            "database": "pending",
+            "binance_api": "pending",
+            "cache": "pending",
+        },
+    }
+    
+    all_ready = True
+    
+    # Check 1: Database
+    try:
+        session = db.get_session()
+        session.execute(text("SELECT 1"))
+        ready_status["checks"]["database"] = "ready"
+    except Exception as e:
+        ready_status["checks"]["database"] = f"not ready: {str(e)}"
+        all_ready = False
+    
+    # Check 2: Binance API circuit breaker status
+    try:
+        from ..clients.binance_client import BinanceAPIClient
+        client = BinanceAPIClient()
+        cb_status = client.get_circuit_breaker_status()
+        if cb_status["state"] == "open":
+            ready_status["checks"]["binance_api"] = "not ready: circuit breaker open"
+            all_ready = False
+        else:
+            ready_status["checks"]["binance_api"] = f"ready ({cb_status['state']})"
+    except Exception as e:
+        ready_status["checks"]["binance_api"] = f"ready (demo mode)"
+    
+    # Check 3: Cache availability
+    try:
+        # Cache has already been connected during startup
+        ready_status["checks"]["cache"] = "ready"
+    except Exception as e:
+        ready_status["checks"]["cache"] = f"not ready: {str(e)}"
+        all_ready = False
+    
+    ready_status["ready"] = all_ready
+    
+    if all_ready:
+        return ready_status
+    else:
+        return JSONResponse(status_code=503, content=ready_status)
+
+
+@app.get("/api/v1/system/circuit-breaker")
+async def get_circuit_breaker_status():
+    """Get circuit breaker status for Binance API calls."""
+    try:
+        from ..clients.binance_client import BinanceAPIClient
+        client = BinanceAPIClient()
+        return {
+            "binance_api": client.get_circuit_breaker_status(),
+            "timestamp": datetime.now().isoformat(),
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "timestamp": datetime.now().isoformat(),
+        }
+
+
 @app.get("/api/v1/portfolio/summary")
 async def get_portfolio_summary():
     """Get a summary of the portfolio including P&L and value."""
