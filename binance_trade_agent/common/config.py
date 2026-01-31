@@ -26,6 +26,9 @@ class Config:
         if not self.binance_api_key or not self.binance_api_secret:
             self.demo_mode = True  # Force demo mode if no API keys
 
+        # Testnet Aggressive Mode - converts HOLD to random BUY/SELL for testing
+        self.testnet_aggressive_mode = os.getenv("TESTNET_AGGRESSIVE_MODE", "false").lower() == "true"
+
         # Redis Cache Configuration
         self.redis_host = os.getenv("REDIS_HOST", "redis")
         self.redis_port = int(os.getenv("REDIS_PORT", "6379"))
@@ -56,8 +59,9 @@ class Config:
         self.trading_min_order_size_eth = float(os.getenv("TRADING_MIN_ORDER_SIZE_ETH", "0.00001"))
 
         # Signal Configuration
-        self.signal_rsi_overbought = int(os.getenv("SIGNAL_RSI_OVERBOUGHT", "70"))
-        self.signal_rsi_oversold = int(os.getenv("SIGNAL_RSI_OVERSOLD", "30"))
+        # Testnet-friendly: Wider RSI bands (40/60) to trigger more trades
+        self.signal_rsi_overbought = int(os.getenv("SIGNAL_RSI_OVERBOUGHT", "60"))
+        self.signal_rsi_oversold = int(os.getenv("SIGNAL_RSI_OVERSOLD", "40"))
         self.signal_macd_signal_window = int(os.getenv("SIGNAL_MACD_SIGNAL_WINDOW", "9"))
 
         # Monitoring Configuration

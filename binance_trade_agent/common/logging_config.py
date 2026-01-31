@@ -157,6 +157,23 @@ def setup_logging(
     handler.setFormatter(formatter)
     root_logger.addHandler(handler)
 
+    # Also write to file for dashboard logs tab
+    log_dir = os.getenv("LOG_DIR", "/app/logs")
+    if os.path.isdir(log_dir):
+        log_file = os.path.join(log_dir, f"{service_name.replace('-', '_')}.log")
+        try:
+            from logging.handlers import RotatingFileHandler
+            file_handler = RotatingFileHandler(
+                log_file, 
+                maxBytes=10*1024*1024,  # 10MB
+                backupCount=3
+            )
+            file_handler.setLevel(numeric_level)
+            file_handler.setFormatter(PlainFormatter())
+            root_logger.addHandler(file_handler)
+        except Exception as e:
+            print(f"Warning: Could not create log file handler: {e}")
+
 
 def get_logger(name: str) -> logging.LoggerAdapter:
     """

@@ -24,7 +24,12 @@ _logs_candidates = [
     Path("./logs"),  # Fallback: relative to cwd
 ]
 LOG_DIR = next((p for p in _logs_candidates if p.exists()), _logs_candidates[0])
-LOG_FILE_PATHS = [LOG_DIR / "agent.log", LOG_DIR / "auto_trading.log"]
+LOG_FILE_PATHS = [
+    LOG_DIR / "agent.log", 
+    LOG_DIR / "auto_trading.log",
+    LOG_DIR / "trading_agent.log",  # New format from logging_config
+    LOG_DIR / "api.log",  # API service logs
+]
 
 logger.info(f"Using log directory: {LOG_DIR} (exists={LOG_DIR.exists()})")
 

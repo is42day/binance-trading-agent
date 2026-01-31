@@ -9,8 +9,8 @@ build:
 
 start: build
 	-docker rm api dashboard trading-agent -f 2>nul
-	docker run -d -p 8000:8000 --env-file $(ENV_FILE) -v "$(CURDIR)/data:/app/data" --name api $(DOCKER_IMAGE) python -m binance_trade_agent.api.api
-	docker run -d -p 8050:8050 --env-file $(ENV_FILE) --name dashboard $(DOCKER_IMAGE) python binance_trade_agent/dashboard/run.py
+	docker run -d -p 8000:8000 --env-file $(ENV_FILE) -v "$(CURDIR)/data:/app/data" -v "$(CURDIR)/logs:/app/logs" --name api $(DOCKER_IMAGE) python -m binance_trade_agent.api.api
+	docker run -d -p 8050:8050 --env-file $(ENV_FILE) -e API_HOST=host.docker.internal -v "$(CURDIR)/data:/app/data" -v "$(CURDIR)/logs:/app/logs" --name dashboard $(DOCKER_IMAGE) python binance_trade_agent/dashboard/run.py
 	docker run -d --env-file $(ENV_FILE) -v "$(CURDIR)/logs:/app/logs" -v "$(CURDIR)/data:/app/data" --name trading-agent $(DOCKER_IMAGE) python start_auto_trading.py --strategy combined --symbols BTCUSDT --interval 60
 	@echo "✅ System started!"
 	@echo "   Dashboard: http://localhost:8050"

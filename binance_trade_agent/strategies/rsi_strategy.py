@@ -52,14 +52,14 @@ class RSIStrategy(BaseStrategy):
                 "description": "RSI calculation period",
             },
             "overbought": {
-                "default": 70,
+                "default": 55,  # Lowered for testnet - more SELL signals
                 "type": int,
                 "min": 50,
                 "max": 95,
                 "description": "RSI overbought threshold",
             },
             "oversold": {
-                "default": 30,
+                "default": 45,  # Raised for testnet - more BUY signals
                 "type": int,
                 "min": 5,
                 "max": 50,

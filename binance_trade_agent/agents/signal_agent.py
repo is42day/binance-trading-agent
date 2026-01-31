@@ -94,11 +94,12 @@ class SignalAgent:
 
             if not ohlcv_data or len(ohlcv_data) < 20:
                 # Not enough data for reliable signals
-                return {
+                signal_result = {
                     "signal": "hold",
                     "confidence": 0.5,
                     "reason": "insufficient_data",
                 }
+                return self._apply_aggressive_mode(signal_result)
 
             # Use specified strategy or current default
             strategy_name = strategy_name or self.current_strategy_name
@@ -108,24 +109,45 @@ class SignalAgent:
 
             if result is None:
                 # Strategy analysis failed - return hold signal
-                return {
+                signal_result = {
                     "signal": "hold",
                     "confidence": 0.5,
                     "reason": "strategy_analysis_failed",
                 }
+                return self._apply_aggressive_mode(signal_result)
 
             # Convert to backward-compatible format
-            return self._convert_strategy_result(result)
+            signal_result = self._convert_strategy_result(result)
+            return self._apply_aggressive_mode(signal_result)
 
         except Exception as e:
             self.logger.error(f"Signal generation failed for {symbol}: {str(e)}")
             # On any error, fall back to hold signal
-            return {
+            signal_result = {
                 "signal": "hold",
                 "confidence": 0.5,
                 "reason": "error",
                 "error": str(e),
             }
+            return self._apply_aggressive_mode(signal_result)
+
+    def _apply_aggressive_mode(self, signal_result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Apply aggressive testnet mode - converts HOLD signals to random BUY/SELL.
+        This is useful for testing the trading pipeline on testnet.
+        """
+        if config.testnet_aggressive_mode and signal_result.get("signal", "").lower() == "hold":
+            import random
+            forced_signal = random.choice(["buy", "sell"])
+            self.logger.info(f"Aggressive mode: Converting HOLD to {forced_signal.upper()}")
+            return {
+                **signal_result,
+                "signal": forced_signal,
+                "confidence": 0.65,  # Lower confidence for forced signals
+                "aggressive_mode": True,
+                "original_signal": "hold",
+            }
+        return signal_result
 
     def _convert_strategy_result(self, result: StrategyResult) -> Dict[str, Any]:
         """Convert StrategyResult to backward-compatible dictionary format"""

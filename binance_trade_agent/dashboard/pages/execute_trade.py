@@ -793,57 +793,6 @@ def validate_and_preview(symbol, side, order_type, quantity, price, market_price
     button_disabled = len(errors) > 0 or not adjusted_quantity or not symbol
     
     return feedback_children, preview_children, button_disabled, price_hint, qty_hint
-                        "Order Preview"
-                    ], className="bg-secondary text-white"),
-                    dbc.CardBody(
-                        [
-                            dbc.Row([
-                                dbc.Col([
-                                    html.Strong("Symbol:"),
-                                    html.Div(symbol, className="text-primary fs-5")
-                                ], width=3),
-                                dbc.Col([
-                                    html.Strong("Side:"),
-                                    html.Div([side_icon, f" {side}"], className=f"text-{side_color} fs-5")
-                                ], width=3),
-                                dbc.Col([
-                                    html.Strong("Type:"),
-                                    html.Div(order_type, className="fs-5")
-                                ], width=3),
-                                dbc.Col([
-                                    html.Strong("Quantity:"),
-                                    html.Div(f"{quantity:.6f}", className="fs-5")
-                                ], width=3),
-                            ], className="mb-3"),
-                            dbc.Row([
-                                dbc.Col([
-                                    html.Strong("Price:"),
-                                    html.Div(
-                                        f"${price:.2f}" if order_type == "LIMIT" else f"~${market_price:.2f} (Market)",
-                                        className="text-info fs-5"
-                                    )
-                                ], width=4),
-                                dbc.Col([
-                                    html.Strong("Est. Total:"),
-                                    html.Div(f"${notional:.2f}", className="text-warning fs-5")
-                                ], width=4),
-                                dbc.Col([
-                                    html.Strong("Est. Fee:"),
-                                    html.Div(f"${estimated_fee:.2f}", className="text-muted fs-6")
-                                ], width=4),
-                            ]),
-                        ]
-                    ),
-                ],
-                color="dark",
-                outline=True,
-            )
-        ]
-    
-    # Enable/disable review button
-    button_disabled = len(errors) > 0 or not quantity or not symbol
-    
-    return feedback_children, preview_children, button_disabled, price_hint, qty_hint
 
 
 # Callback: Open confirmation modal
