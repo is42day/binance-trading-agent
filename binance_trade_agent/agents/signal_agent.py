@@ -5,10 +5,10 @@ Supports multiple strategies with easy swapping and testing capabilities.
 """
 import logging
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 from ..common.config import config
-from ..strategies import StrategyManager, StrategyResult
+from ..strategies import SignalType, StrategyManager, StrategyResult
 
 
 class SignalAgent:
@@ -117,8 +117,33 @@ class SignalAgent:
                 }
                 return self._apply_aggressive_mode(signal_result)
 
+            # Apply multi-timeframe confirmation if enabled
+            mtf_confirmed = True
+            mtf_trend = "NEUTRAL"
+            if config.get("use_multi_timeframe", True) and result.signal.value != "HOLD":
+                mtf_confirmed, mtf_trend = self._check_higher_timeframe(
+                    symbol, result.signal.value
+                )
+                if not mtf_confirmed:
+                    # Downgrade signal if higher timeframe doesn't confirm
+                    self.logger.info(
+                        f"Signal downgraded: {result.signal.value} not confirmed by 4h trend ({mtf_trend})"
+                    )
+                    result = StrategyResult(
+                        signal=SignalType.HOLD,
+                        confidence=result.confidence * 0.4,
+                        indicators=result.indicators,
+                        metadata={
+                            **result.metadata,
+                            "mtf_filtered": True,
+                            "mtf_trend": mtf_trend,
+                        },
+                    )
+
             # Convert to backward-compatible format
             signal_result = self._convert_strategy_result(result)
+            signal_result["mtf_confirmed"] = mtf_confirmed
+            signal_result["mtf_trend"] = mtf_trend
             return self._apply_aggressive_mode(signal_result)
 
         except Exception as e:
@@ -131,6 +156,81 @@ class SignalAgent:
                 "error": str(e),
             }
             return self._apply_aggressive_mode(signal_result)
+
+    def _check_higher_timeframe(
+        self, symbol: str, signal: str, htf_interval: str = "4h"
+    ) -> Tuple[bool, str]:
+        """
+        Check if higher timeframe trend confirms the signal.
+        
+        Uses 50/200 EMA crossover on 4h chart to determine trend.
+        BUY signals are only confirmed in uptrend.
+        SELL signals are only confirmed in downtrend.
+        
+        Args:
+            symbol: Trading symbol
+            signal: Current signal ("BUY" or "SELL")
+            htf_interval: Higher timeframe interval (default "4h")
+            
+        Returns:
+            Tuple of (is_confirmed, trend_direction)
+        """
+        try:
+            # Fetch higher timeframe data
+            htf_data = self.market_agent.fetch_ohlcv(symbol, interval=htf_interval, limit=250)
+            
+            if not htf_data or len(htf_data) < 200:
+                # Not enough data - allow the trade
+                self.logger.debug(f"Not enough {htf_interval} data for MTF confirmation")
+                return True, "NEUTRAL"
+            
+            # Calculate 50/200 EMA on higher timeframe
+            from binance_trade_agent.strategies.base_strategy import BaseStrategy
+            
+            # Use a temporary strategy instance to calculate EMAs
+            closes = [float(candle["close"]) for candle in htf_data]
+            
+            # Calculate 50 EMA
+            multiplier_50 = 2 / 51
+            ema_50 = sum(closes[:50]) / 50
+            for i in range(50, len(closes)):
+                ema_50 = (closes[i] * multiplier_50) + (ema_50 * (1 - multiplier_50))
+            
+            # Calculate 200 EMA
+            multiplier_200 = 2 / 201
+            ema_200 = sum(closes[:200]) / 200
+            for i in range(200, len(closes)):
+                ema_200 = (closes[i] * multiplier_200) + (ema_200 * (1 - multiplier_200))
+            
+            current_price = closes[-1]
+            threshold = current_price * 0.001  # 0.1% threshold
+            
+            # Determine trend
+            if ema_50 > ema_200 + threshold:
+                trend = "BULLISH"
+            elif ema_50 < ema_200 - threshold:
+                trend = "BEARISH"
+            else:
+                trend = "NEUTRAL"
+            
+            # Check if signal is confirmed
+            signal_upper = signal.upper()
+            if signal_upper == "BUY":
+                confirmed = trend in ["BULLISH", "NEUTRAL"]  # Allow buy in neutral too
+            elif signal_upper == "SELL":
+                confirmed = trend in ["BEARISH", "NEUTRAL"]  # Allow sell in neutral too
+            else:
+                confirmed = True
+            
+            self.logger.debug(
+                f"MTF Check: {htf_interval} trend={trend}, signal={signal_upper}, confirmed={confirmed}"
+            )
+            return confirmed, trend
+            
+        except Exception as e:
+            self.logger.warning(f"MTF confirmation failed: {str(e)}")
+            # On error, allow the trade
+            return True, "NEUTRAL"
 
     def _apply_aggressive_mode(self, signal_result: Dict[str, Any]) -> Dict[str, Any]:
         """

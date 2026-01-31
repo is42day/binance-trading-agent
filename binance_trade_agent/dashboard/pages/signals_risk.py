@@ -198,10 +198,17 @@ def update_signals(n_intervals):
             signal_type = "HOLD"
         confidence = signals.get("confidence", 0)
         indicators = signals.get("indicators", {})
+        
+        # Get MTF info from signal root
+        mtf_trend = signals.get("mtf_trend", "N/A")
+        mtf_confirmed = signals.get("mtf_confirmed", True)
 
         # Determine status color
         status_map = {"BUY": "success", "SELL": "danger", "HOLD": "warning", "NEUTRAL": "warning"}
         status = status_map.get(signal_type, "info")
+        
+        # MTF trend color
+        mtf_color = "success" if mtf_trend == "BULLISH" else "danger" if mtf_trend == "BEARISH" else "warning"
 
         signal_card = dbc.Card(
             [
@@ -227,7 +234,12 @@ def update_signals(n_intervals):
                                             f"Confidence: {confidence:.1%}",
                                             color=status,
                                             style={"fontSize": "0.875rem"},
-                                        )
+                                        ),
+                                        dbc.Badge(
+                                            f"4h: {mtf_trend}",
+                                            color=mtf_color,
+                                            style={"fontSize": "0.75rem", "marginLeft": "0.5rem"},
+                                        ),
                                     ],
                                     width="auto",
                                 ),
@@ -335,11 +347,8 @@ def _format_metadata(metadata: dict) -> list:
         ("rsi_confidence", "RSI Conf"),
         ("macd_confidence", "MACD Conf"),
         ("volume_confirmed", "Vol Confirmed"),
-        ("volume_ratio", "Vol Ratio"),
-        ("trend", "Trend"),
+        ("trend", "1h Trend"),
         ("trend_filtered", "Trend Filtered"),
-        ("using_atr_stops", "ATR Stops"),
-        ("using_trend_filter", "Trend Filter"),
     ]
     
     items = []

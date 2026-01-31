@@ -29,6 +29,10 @@ class Config:
         # Testnet Aggressive Mode - converts HOLD to random BUY/SELL for testing
         self.testnet_aggressive_mode = os.getenv("TESTNET_AGGRESSIVE_MODE", "false").lower() == "true"
 
+        # Multi-Timeframe Confirmation - confirm signals on 4h chart
+        self.use_multi_timeframe = os.getenv("USE_MULTI_TIMEFRAME", "true").lower() == "true"
+        self.mtf_interval = os.getenv("MTF_INTERVAL", "4h")  # Higher timeframe to check
+
         # Redis Cache Configuration
         self.redis_host = os.getenv("REDIS_HOST", "redis")
         self.redis_port = int(os.getenv("REDIS_PORT", "6379"))
@@ -136,6 +140,10 @@ class Config:
             "max_total_drawdown": self.risk_max_total_drawdown,
             "volatility_threshold": self.risk_volatility_threshold,
         }
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get configuration value by key name"""
+        return getattr(self, key, default)
 
 
 # Global configuration instance
