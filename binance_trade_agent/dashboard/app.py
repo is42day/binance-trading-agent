@@ -25,6 +25,7 @@ from binance_trade_agent.dashboard.pages import (
     execute_trade,
     logs,
     market_data,
+    paper_trading,
     performance,
     portfolio,
     signals_risk,
@@ -85,6 +86,11 @@ app.index_string = """
 # Define page routes
 PAGES = {
     "/": {"component": portfolio.layout, "name": "Portfolio", "icon": "📊"},
+    "/paper-trading": {
+        "component": paper_trading.layout,
+        "name": "Paper Trading",
+        "icon": "📝",
+    },
     "/market-data": {
         "component": market_data.layout,
         "name": "Market Data",

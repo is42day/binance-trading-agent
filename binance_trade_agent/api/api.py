@@ -400,6 +400,146 @@ async def get_performance_by_symbol():
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+# --- Paper Trading Endpoints ---
+
+@app.get("/api/v1/paper-trading/status")
+async def get_paper_trading_status():
+    """Get paper trading portfolio state and statistics."""
+    import json
+    from pathlib import Path
+    
+    paper_dir = Path("data/paper_trading")
+    state_file = paper_dir / "portfolio_state.json"
+    signal_file = paper_dir / "signal_log.jsonl"
+    
+    # Count signals first
+    signal_count = 0
+    last_signal_time = None
+    if signal_file.exists():
+        try:
+            with open(signal_file) as f:
+                lines = f.readlines()
+                signal_count = len(lines)
+                if lines:
+                    # Get timestamp from last signal
+                    last_signal = json.loads(lines[-1])
+                    last_signal_time = last_signal.get("timestamp")
+        except:
+            pass
+    
+    # Check portfolio state file
+    if state_file.exists():
+        try:
+            with open(state_file) as f:
+                state = json.load(f)
+            
+            saved_at = state.get("saved_at", "")
+            try:
+                last_update = datetime.fromisoformat(saved_at)
+                age_seconds = (datetime.now() - last_update).total_seconds()
+                active = age_seconds < 120
+            except:
+                active = False
+                age_seconds = 0
+            
+            return {
+                "active": active,
+                "last_update": saved_at,
+                "age_seconds": int(age_seconds),
+                "portfolio": state.get("portfolio", {}),
+                "signals_count": signal_count,
+            }
+        except Exception as e:
+            pass
+    
+    # No portfolio state, but check if we have recent signals
+    if signal_count > 0 and last_signal_time:
+        try:
+            last_update = datetime.fromisoformat(last_signal_time)
+            age_seconds = (datetime.now() - last_update).total_seconds()
+            active = age_seconds < 120
+            
+            return {
+                "active": active,
+                "last_update": last_signal_time,
+                "age_seconds": int(age_seconds),
+                "portfolio": {
+                    "current_balance": 100.0,
+                    "total_pnl": 0.0,
+                    "total_pnl_percent": 0.0,
+                    "win_rate": 0.0,
+                    "total_trades": 0,
+                    "max_drawdown": 0.0,
+                    "open_positions": 0,
+                    "profit_factor": 0.0,
+                },
+                "signals_count": signal_count,
+            }
+        except:
+            pass
+    
+    return {
+        "active": False,
+        "message": "Paper trading not running",
+        "portfolio": None,
+        "signals_count": signal_count,
+    }
+
+
+@app.get("/api/v1/paper-trading/signals")
+async def get_paper_trading_signals(limit: int = 50):
+    """Get recent paper trading signals."""
+    import json
+    from pathlib import Path
+    
+    signal_file = Path("data/paper_trading/signal_log.jsonl")
+    
+    if not signal_file.exists():
+        return {"signals": [], "total": 0}
+    
+    try:
+        signals = []
+        with open(signal_file) as f:
+            for line in f:
+                if line.strip():
+                    signals.append(json.loads(line))
+        
+        # Return most recent
+        return {
+            "signals": signals[-limit:][::-1],  # Reverse for newest first
+            "total": len(signals),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/v1/paper-trading/trades")
+async def get_paper_trading_trades(limit: int = 50):
+    """Get paper trading trade history."""
+    import json
+    from pathlib import Path
+    
+    trade_file = Path("data/paper_trading/trade_log.jsonl")
+    
+    if not trade_file.exists():
+        return {"trades": [], "total": 0}
+    
+    try:
+        trades = []
+        with open(trade_file) as f:
+            for line in f:
+                if line.strip():
+                    trades.append(json.loads(line))
+        
+        # Return most recent
+        return {
+            "trades": trades[-limit:][::-1],  # Reverse for newest first
+            "total": len(trades),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 if __name__ == "__main__":
     import uvicorn
 

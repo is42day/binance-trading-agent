@@ -257,22 +257,28 @@ class BinanceAPIClient:
             )
             self.client = None
         else:
-            # Create client with timeout
-            self.client = Client(
-                self.config.binance_api_key, 
-                self.config.binance_api_secret,
-                requests_params={"timeout": self.timeout}
-            )
-            
-            # Use testnet for safety unless explicitly disabled
-            if self.config.binance_testnet:
-                self.client.API_URL = "https://testnet.binance.vision/api"
-                print(f"🔧 Using Binance Testnet (timeout: {self.timeout}s)")
-            else:
-                print(
-                    f"🚨 PRODUCTION MODE: Using live Binance API - USE WITH CAUTION! "
-                    f"(timeout: {self.timeout}s)"
+            # Create client with timeout - disable initial ping to avoid startup failures
+            try:
+                self.client = Client(
+                    self.config.binance_api_key, 
+                    self.config.binance_api_secret,
+                    requests_params={"timeout": self.timeout},
+                    testnet=self.config.binance_testnet
                 )
+                
+                # Use testnet for safety unless explicitly disabled
+                if self.config.binance_testnet:
+                    self.client.API_URL = "https://testnet.binance.vision/api"
+                    print(f"🔧 Using Binance Testnet (timeout: {self.timeout}s)")
+                else:
+                    print(
+                        f"🚨 PRODUCTION MODE: Using live Binance API - USE WITH CAUTION! "
+                        f"(timeout: {self.timeout}s)"
+                    )
+            except Exception as e:
+                print(f"⚠️  WARNING: Failed to connect to Binance API: {e}. Running in DEMO MODE.")
+                self.client = None
+                self.config.demo_mode = True
 
     def get_circuit_breaker_status(self) -> dict:
         """Get circuit breaker status for monitoring"""
