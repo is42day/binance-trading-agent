@@ -13,6 +13,7 @@ from ..agents.risk_management_agent import RiskManagementAgent
 from ..agents.signal_agent import SignalAgent
 from ..agents.trade_execution_agent import TradeExecutionAgent
 from ..common.config import config
+from .performance_analytics import get_performance_analytics
 
 
 @dataclass
@@ -130,9 +131,10 @@ class TradingOrchestrator:
                     trade_decision.execution_price = execution_result.get("price", price)
                     trade_decision.execution_time = datetime.now()
                     
+                    exec_price = trade_decision.execution_price or price
+                    
                     # Register trailing stop for the executed trade
                     if self.risk_agent.config.get("trailing_stop_enabled", True):
-                        exec_price = trade_decision.execution_price or price
                         self.risk_agent.register_trailing_stop(
                             symbol=symbol,
                             entry_price=exec_price,
@@ -142,6 +144,19 @@ class TradingOrchestrator:
                             f"Trailing stop registered for {symbol} at {exec_price}",
                             extra=extra,
                         )
+                    
+                    # Record trade in performance analytics
+                    try:
+                        analytics = get_performance_analytics(config.portfolio_initial_value)
+                        analytics.record_trade_entry(
+                            symbol=symbol,
+                            side=signal_result["signal"],
+                            entry_price=exec_price,
+                            quantity=quantity,
+                            notes=f"Confidence: {signal_result['confidence']:.1%}",
+                        )
+                    except Exception as e:
+                        self.logger.warning(f"Failed to record trade in analytics: {e}")
             else:
                 self.logger.info(
                     f"Trade not executed - Risk approved: {risk_approved}, "

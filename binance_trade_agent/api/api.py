@@ -18,6 +18,7 @@ from ..clients.redis_cache import RedisCache
 from ..common.config import config
 from ..common.logging_config import setup_logging, get_logger, set_call_id, generate_call_id
 from ..core.portfolio_manager import PortfolioManager
+from ..core.performance_analytics import get_performance_analytics
 from ..core import db
 
 # Setup structured logging for this service
@@ -279,7 +280,41 @@ async def get_system_config():
             "demo_mode": config.demo_mode,
             "binance_testnet": config.binance_testnet,
             "risk_config": config.get_risk_config(),
+            "supported_symbols": config.supported_symbols,
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/v1/performance/summary")
+async def get_performance_summary():
+    """Get comprehensive performance analytics summary."""
+    try:
+        analytics = get_performance_analytics(config.portfolio_initial_value)
+        return analytics.get_performance_summary()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/v1/performance/trades")
+async def get_trade_history(limit: int = 50):
+    """Get recent trade history."""
+    try:
+        analytics = get_performance_analytics(config.portfolio_initial_value)
+        return {
+            "trades": analytics.get_trade_history(limit),
+            "total_trades": len(analytics.trades),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/v1/performance/by-symbol")
+async def get_performance_by_symbol():
+    """Get performance breakdown by trading symbol."""
+    try:
+        analytics = get_performance_analytics(config.portfolio_initial_value)
+        return analytics.get_symbol_performance()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 

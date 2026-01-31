@@ -398,6 +398,36 @@ def get_trailing_stops():
         return {"error": str(e), "active_stops": 0, "positions": {}}
 
 
+def get_performance_summary():
+    """Get performance analytics summary
+
+    Returns:
+        dict: Performance metrics including win rate, Sharpe ratio, drawdown
+    """
+    try:
+        from binance_trade_agent.core.performance_analytics import get_performance_analytics
+        
+        analytics = get_performance_analytics(config.portfolio_initial_value)
+        return analytics.get_performance_summary()
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def get_trade_history(limit: int = 50):
+    """Get recent trade history
+
+    Returns:
+        list: Recent trades with P&L info
+    """
+    try:
+        from binance_trade_agent.core.performance_analytics import get_performance_analytics
+        
+        analytics = get_performance_analytics(config.portfolio_initial_value)
+        return analytics.get_trade_history(limit)
+    except Exception as e:
+        return []
+
+
 def get_system_status():
     """Get comprehensive system health status
 

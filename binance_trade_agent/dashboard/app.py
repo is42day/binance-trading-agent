@@ -25,6 +25,7 @@ from binance_trade_agent.dashboard.pages import (
     execute_trade,
     logs,
     market_data,
+    performance,
     portfolio,
     signals_risk,
     system_health,
@@ -95,6 +96,11 @@ PAGES = {
         "component": execute_trade.layout,
         "name": "Execute Trade",
         "icon": "💼",
+    },
+    "/performance": {
+        "component": performance.layout,
+        "name": "Performance",
+        "icon": "📈",
     },
     "/system-health": {
         "component": system_health.layout,

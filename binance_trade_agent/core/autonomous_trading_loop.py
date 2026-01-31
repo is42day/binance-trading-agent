@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from binance_trade_agent.common.config import config
 from binance_trade_agent.common.logging_config import setup_logging, get_logger, set_correlation_id, generate_call_id
 from binance_trade_agent.core.orchestrator import TradingOrchestrator
+from binance_trade_agent.core.performance_analytics import get_performance_analytics
 
 # Setup structured logging for trading loop
 setup_logging(
@@ -138,6 +139,17 @@ class AutonomousTradingLoop:
                     )
                     pnl_pct = close_result.get("pnl_pct", 0) * 100
                     self.logger.info(f"      PnL: {pnl_pct:+.2f}%")
+                    
+                    # Record trade exit in performance analytics
+                    try:
+                        analytics = get_performance_analytics(config.portfolio_initial_value)
+                        analytics.record_trade_exit(
+                            symbol=symbol,
+                            exit_price=result["current_price"],
+                            notes="Trailing stop triggered",
+                        )
+                    except Exception as ae:
+                        self.logger.warning(f"Failed to record trade exit in analytics: {ae}")
                     
                 except Exception as e:
                     self.logger.error(f"      ❌ Failed to execute stop order: {e}")
