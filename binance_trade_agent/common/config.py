@@ -56,6 +56,8 @@ class Config:
             os.getenv("TRADING_DEFAULT_QUANTITY_BTC", "0.001")
         )
         self.trading_default_quantity_eth = float(os.getenv("TRADING_DEFAULT_QUANTITY_ETH", "0.01"))
+        self.trading_default_quantity_sol = float(os.getenv("TRADING_DEFAULT_QUANTITY_SOL", "0.1"))
+        self.trading_default_quantity_bnb = float(os.getenv("TRADING_DEFAULT_QUANTITY_BNB", "0.05"))
         self.trading_default_quantity_usdt = float(
             os.getenv("TRADING_DEFAULT_QUANTITY_USDT", "10.0")
         )
@@ -89,7 +91,21 @@ class Config:
                 "max_position": float(os.getenv("ETH_MAX_POSITION", "0.08")),
                 "volatility_multiplier": float(os.getenv("ETH_VOLATILITY_MULTIPLIER", "1.2")),
             },
+            "SOLUSDT": {
+                "max_position": float(os.getenv("SOL_MAX_POSITION", "0.06")),
+                "volatility_multiplier": float(os.getenv("SOL_VOLATILITY_MULTIPLIER", "1.5")),  # SOL is more volatile
+            },
+            "BNBUSDT": {
+                "max_position": float(os.getenv("BNB_MAX_POSITION", "0.07")),
+                "volatility_multiplier": float(os.getenv("BNB_VOLATILITY_MULTIPLIER", "1.1")),
+            },
         }
+
+        # Supported trading pairs
+        self.supported_symbols = os.getenv(
+            "SUPPORTED_SYMBOLS", 
+            "BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT"
+        ).split(",")
 
     def validate(self):
         """
@@ -119,6 +135,8 @@ class Config:
         defaults = {
             "BTC": self.trading_default_quantity_btc,
             "ETH": self.trading_default_quantity_eth,
+            "SOL": self.trading_default_quantity_sol,
+            "BNB": self.trading_default_quantity_bnb,
             "USDT": self.trading_default_quantity_usdt,
         }
         return defaults.get(symbol_base, 0.001)

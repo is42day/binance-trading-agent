@@ -43,13 +43,14 @@ class AutonomousTradingLoop:
         Initialize the autonomous trading loop
 
         Args:
-            symbols: List of symbols to trade (default: [BTCUSDT, ETHUSDT])
+            symbols: List of symbols to trade (default: from config.supported_symbols)
             trade_interval_seconds: Seconds between trades (minimum 60 for testnet)
             duration_minutes: Total duration to run (0 = infinite)
             strategy_name: Trading strategy to use
             strategy_parameters: Custom strategy parameters
         """
-        self.symbols = symbols or ["BTCUSDT", "ETHUSDT"]
+        # Use configured symbols if not specified
+        self.symbols = symbols or config.supported_symbols
         self.trade_interval = max(trade_interval_seconds, 60)  # Min 60 seconds for testnet
         self.duration_minutes = duration_minutes
         self.strategy_name = strategy_name or "combined_default"
@@ -265,8 +266,10 @@ async def main():
     """
     Main entry point
     """
-    # Get configuration from environment
-    symbols = os.getenv("TRADING_SYMBOLS", "BTCUSDT,ETHUSDT").split(",")
+    # Get configuration from environment or config
+    # If TRADING_SYMBOLS is set, use it, otherwise use config.supported_symbols
+    symbols_env = os.getenv("TRADING_SYMBOLS")
+    symbols = symbols_env.split(",") if symbols_env else config.supported_symbols
     interval = int(os.getenv("TRADING_INTERVAL_SECONDS", "120"))
     duration = int(os.getenv("TRADING_DURATION_MINUTES", "60"))
     strategy = os.getenv("STRATEGY_NAME", "combined_default")

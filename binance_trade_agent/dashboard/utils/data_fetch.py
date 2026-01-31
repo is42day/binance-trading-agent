@@ -45,7 +45,7 @@ def start_agent(symbols=None, interval=120, strategy="combined_default"):
     try:
         # Create autonomous trading loop
         trading_loop = AutonomousTradingLoop(
-            symbols=symbols or ["BTCUSDT", "ETHUSDT"],
+            symbols=symbols or config.supported_symbols,
             trade_interval_seconds=interval,
             duration_minutes=0,  # Run indefinitely
             strategy_name=strategy,
@@ -348,7 +348,7 @@ def get_risk_status():
                 "config": risk_config,
                 "symbol_limits": {
                     symbol: config.get_symbol_risk_config(symbol)
-                    for symbol in ["BTCUSDT", "ETHUSDT", "BNBUSDT"]
+                    for symbol in config.supported_symbols
                 },
                 "emergency_stop": getattr(risk_agent, "emergency_stop_active", False),
                 "last_updated": datetime.now().isoformat(),
