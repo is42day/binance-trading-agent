@@ -119,9 +119,10 @@ def get_trading_components():
     global _components
 
     if _components is None:
+        market_agent = MarketDataAgent()
         _components = {
-            "market_agent": MarketDataAgent(),
-            "signal_agent": SignalAgent(),
+            "market_agent": market_agent,
+            "signal_agent": SignalAgent(market_data_agent=market_agent),
             "risk_agent": EnhancedRiskManagementAgent(),
             "execution_agent": TradeExecutionAgent(),
             "portfolio": PortfolioManager("/app/data/web_portfolio.db"),

@@ -191,13 +191,16 @@ def update_signals(n_intervals):
         if isinstance(signals, dict) and "error" in signals:
             return dbc.Alert(f"Error: {signals['error']}", color="danger")
 
-        # Build signal cards
-        signal_type = signals.get("signal", "NEUTRAL")
+        # Build signal cards - normalize signal to uppercase
+        signal_type = signals.get("signal", "hold").upper()
+        # Map "HOLD" to display text
+        if signal_type == "HOLD":
+            signal_type = "HOLD"
         confidence = signals.get("confidence", 0)
         indicators = signals.get("indicators", {})
 
         # Determine status color
-        status_map = {"BUY": "success", "SELL": "danger", "NEUTRAL": "warning"}
+        status_map = {"BUY": "success", "SELL": "danger", "HOLD": "warning", "NEUTRAL": "warning"}
         status = status_map.get(signal_type, "info")
 
         signal_card = dbc.Card(
@@ -236,17 +239,18 @@ def update_signals(n_intervals):
                             "Indicators:",
                             style={"color": "#f4f2ee", "marginTop": "1rem"},
                         ),
+                        html.Div(
+                            _format_indicators(indicators),
+                            style={"marginBottom": "0"},
+                        ),
+                        # Show metadata if available
+                        html.Hr(style={"borderColor": "rgba(255, 145, 77, 0.2)"}),
+                        html.H6(
+                            "Details:",
+                            style={"color": "#f4f2ee", "marginTop": "0.5rem"},
+                        ),
                         html.Ul(
-                            [
-                                html.Li(
-                                    f"{k.upper()}: {v}",
-                                    style={
-                                        "color": "#b8b4b0",
-                                        "marginBottom": "0.25rem",
-                                    },
-                                )
-                                for k, v in list(indicators.items())[:5]
-                            ],
+                            _format_metadata(signals.get("metadata", {})),
                             style={"marginBottom": "0"},
                         ),
                     ]
@@ -263,6 +267,99 @@ def update_signals(n_intervals):
     except Exception as e:
         logger.error(f"Signals error: {str(e)}")
         return dbc.Alert(f"Error: {str(e)}", color="danger")
+
+
+def _format_indicators(indicators: dict) -> list:
+    """Format indicators for display, handling nested dicts"""
+    items = []
+    if not indicators:
+        return [html.Li("No indicators available", style={"color": "#b8b4b0"})]
+    
+    for k, v in indicators.items():
+        if isinstance(v, dict):
+            # Nested dict (e.g., rsi, macd sub-indicators)
+            if "value" in v:
+                # Simple indicator with value
+                val = v.get("value", "N/A")
+                if isinstance(val, (int, float)):
+                    val = f"{val:.2f}"
+                items.append(
+                    html.Li(
+                        f"{k.upper()}: {val}",
+                        style={"color": "#b8b4b0", "marginBottom": "0.25rem"},
+                    )
+                )
+            else:
+                # Complex nested dict - extract key values
+                sub_items = []
+                for sub_k, sub_v in list(v.items())[:3]:
+                    if isinstance(sub_v, (int, float)):
+                        sub_items.append(f"{sub_k}={sub_v:.2f}")
+                    elif sub_v is not None:
+                        sub_items.append(f"{sub_k}={sub_v}")
+                if sub_items:
+                    items.append(
+                        html.Li(
+                            f"{k.upper()}: {', '.join(sub_items)}",
+                            style={"color": "#b8b4b0", "marginBottom": "0.25rem"},
+                        )
+                    )
+        elif isinstance(v, (int, float)):
+            items.append(
+                html.Li(
+                    f"{k.upper()}: {v:.4f}" if isinstance(v, float) else f"{k.upper()}: {v}",
+                    style={"color": "#b8b4b0", "marginBottom": "0.25rem"},
+                )
+            )
+        elif v is not None:
+            items.append(
+                html.Li(
+                    f"{k.upper()}: {v}",
+                    style={"color": "#b8b4b0", "marginBottom": "0.25rem"},
+                )
+            )
+    
+    return items[:8] if items else [html.Li("No indicators", style={"color": "#b8b4b0"})]
+
+
+def _format_metadata(metadata: dict) -> list:
+    """Format metadata for display"""
+    if not metadata:
+        return [html.Li("No metadata", style={"color": "#b8b4b0"})]
+    
+    # Key fields to display
+    display_fields = [
+        ("current_price", "Price"),
+        ("rsi_signal", "RSI Signal"),
+        ("macd_signal", "MACD Signal"),
+        ("rsi_confidence", "RSI Conf"),
+        ("macd_confidence", "MACD Conf"),
+        ("volume_confirmed", "Vol Confirmed"),
+        ("volume_ratio", "Vol Ratio"),
+        ("using_atr_stops", "ATR Stops"),
+    ]
+    
+    items = []
+    for key, label in display_fields:
+        if key in metadata:
+            val = metadata[key]
+            if isinstance(val, float):
+                if "confidence" in key.lower():
+                    val = f"{val:.1%}"
+                elif "price" in key.lower():
+                    val = f"${val:,.2f}"
+                else:
+                    val = f"{val:.2f}"
+            elif isinstance(val, bool):
+                val = "✓" if val else "✗"
+            items.append(
+                html.Li(
+                    f"{label}: {val}",
+                    style={"color": "#b8b4b0", "marginBottom": "0.25rem"},
+                )
+            )
+    
+    return items[:8] if items else [html.Li("No details", style={"color": "#b8b4b0"})]
 
 
 # Callback for risk metrics
