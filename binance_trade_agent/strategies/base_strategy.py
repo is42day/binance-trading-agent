@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod  # noqa: E402
 from dataclasses import dataclass  # noqa: E402
 from datetime import datetime  # noqa: E402
 from enum import Enum  # noqa: E402
-from typing import Any, Dict, List, Optional  # noqa: E402
+from typing import Any, Dict, List, Optional, Tuple  # noqa: E402
 
 
 class SignalType(Enum):
@@ -158,6 +158,133 @@ class BaseStrategy(ABC):
     def supports_symbol(self, symbol: str) -> bool:
         """Check if strategy supports given symbol"""
         return True  # Default: support all symbols
+
+    def check_volume_confirmation(
+        self, 
+        market_data: List[Dict[str, Any]], 
+        volume_multiplier: float = 1.5,
+        lookback_period: int = 20
+    ) -> Tuple[bool, float]:
+        """
+        Check if current volume confirms the signal.
+        
+        Higher volume = more reliable signals
+        Returns (is_confirmed, volume_ratio)
+        
+        Args:
+            market_data: OHLCV candle data
+            volume_multiplier: Minimum ratio vs average (default 1.5x)
+            lookback_period: Periods for average calculation
+            
+        Returns:
+            Tuple of (confirmation_status, volume_ratio)
+        """
+        if not market_data or len(market_data) < lookback_period:
+            return True, 1.0  # Not enough data, don't block
+        
+        try:
+            # Extract volumes
+            volumes = []
+            for candle in market_data:
+                vol = candle.get("volume") or candle.get("vol") or candle.get("v")
+                if vol is not None:
+                    volumes.append(float(vol))
+            
+            if len(volumes) < lookback_period:
+                return True, 1.0  # Not enough volume data
+            
+            current_volume = volumes[-1]
+            avg_volume = sum(volumes[-lookback_period-1:-1]) / lookback_period
+            
+            if avg_volume == 0:
+                return True, 1.0
+            
+            volume_ratio = current_volume / avg_volume
+            is_confirmed = volume_ratio >= volume_multiplier
+            
+            return is_confirmed, volume_ratio
+            
+        except Exception:
+            return True, 1.0  # On error, don't block
+
+    def calculate_atr(
+        self,
+        market_data: List[Dict[str, Any]],
+        period: int = 14
+    ) -> float:
+        """
+        Calculate Average True Range (ATR) for volatility-based stops.
+        
+        ATR measures volatility by decomposing the entire range of an asset price
+        for a given period. Used for dynamic stop-loss placement.
+        
+        Args:
+            market_data: OHLCV candle data
+            period: ATR period (default 14)
+            
+        Returns:
+            ATR value
+        """
+        if len(market_data) < period + 1:
+            return 0.0
+        
+        try:
+            true_ranges = []
+            
+            for i in range(1, len(market_data)):
+                high = float(market_data[i].get("high", market_data[i]["close"]))
+                low = float(market_data[i].get("low", market_data[i]["close"]))
+                prev_close = float(market_data[i-1]["close"])
+                
+                # True Range = max(high-low, |high-prev_close|, |low-prev_close|)
+                tr = max(
+                    high - low,
+                    abs(high - prev_close),
+                    abs(low - prev_close)
+                )
+                true_ranges.append(tr)
+            
+            # ATR is the moving average of True Range
+            if len(true_ranges) < period:
+                return sum(true_ranges) / len(true_ranges) if true_ranges else 0.0
+            
+            return sum(true_ranges[-period:]) / period
+            
+        except Exception:
+            return 0.0
+
+    def calculate_atr_stops(
+        self,
+        current_price: float,
+        atr: float,
+        signal: "SignalType",
+        atr_multiplier: float = 2.0,
+        take_profit_multiplier: float = 3.0
+    ) -> Tuple[Optional[float], Optional[float]]:
+        """
+        Calculate ATR-based stop loss and take profit levels.
+        
+        Args:
+            current_price: Current asset price
+            atr: ATR value
+            signal: Trading signal (BUY/SELL)
+            atr_multiplier: Multiplier for stop loss distance (default 2x ATR)
+            take_profit_multiplier: Multiplier for take profit (default 3x ATR)
+            
+        Returns:
+            Tuple of (stop_loss, take_profit) or (None, None) for HOLD
+        """
+        if signal.value == "HOLD" or atr == 0:
+            return None, None
+        
+        if signal.value == "BUY":
+            stop_loss = current_price - (atr * atr_multiplier)
+            take_profit = current_price + (atr * take_profit_multiplier)
+        else:  # SELL
+            stop_loss = current_price + (atr * atr_multiplier)
+            take_profit = current_price - (atr * take_profit_multiplier)
+        
+        return stop_loss, take_profit
 
     def get_risk_metrics(self, market_data: List[Dict[str, Any]]) -> Dict[str, float]:
         """Calculate risk metrics for the strategy"""

@@ -6,6 +6,7 @@ easily testable and swappable.
 """
 
 from .base_strategy import BaseStrategy, SignalType, StrategyResult
+from .bollinger_strategy import BollingerBandsStrategy
 from .combined_strategy import CombinedStrategy
 from .macd_strategy import MACDStrategy
 from .rsi_strategy import RSIStrategy
@@ -18,5 +19,6 @@ __all__ = [
     "RSIStrategy",
     "MACDStrategy",
     "CombinedStrategy",
+    "BollingerBandsStrategy",
     "StrategyManager",
 ]

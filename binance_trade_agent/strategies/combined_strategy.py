@@ -77,6 +77,46 @@ class CombinedStrategy(BaseStrategy):
                 "max": 0.5,
                 "description": "Confidence boost when indicators agree",
             },
+            # Volume confirmation parameters
+            "require_volume_confirmation": {
+                "default": True,  # Production: require above-average volume
+                "type": bool,
+                "description": "Require above-average volume to confirm signals",
+            },
+            "volume_multiplier": {
+                "default": 1.5,
+                "type": float,
+                "min": 1.0,
+                "max": 3.0,
+                "description": "Required volume multiplier (current volume / avg volume)",
+            },
+            # ATR-based stops parameters
+            "use_atr_stops": {
+                "default": True,  # Production: use ATR for dynamic stops
+                "type": bool,
+                "description": "Use ATR-based stop losses and take profits",
+            },
+            "atr_period": {
+                "default": 14,
+                "type": int,
+                "min": 5,
+                "max": 30,
+                "description": "ATR calculation period",
+            },
+            "atr_stop_multiplier": {
+                "default": 2.0,
+                "type": float,
+                "min": 1.0,
+                "max": 4.0,
+                "description": "ATR multiplier for stop loss distance",
+            },
+            "atr_take_profit_multiplier": {
+                "default": 3.0,
+                "type": float,
+                "min": 1.5,
+                "max": 6.0,
+                "description": "ATR multiplier for take profit distance",
+            },
         }
 
         # Add RSI strategy parameters with prefix
@@ -123,18 +163,59 @@ class CombinedStrategy(BaseStrategy):
             # Combine signals
             combined_signal, combined_confidence = self._combine_signals(rsi_result, macd_result)
 
+            # Check volume confirmation if enabled
+            require_volume = self.get_parameter("require_volume_confirmation")
+            volume_multiplier = self.get_parameter("volume_multiplier")
+            volume_confirmed = True
+            volume_ratio = 1.0
+            
+            if require_volume and combined_signal != SignalType.HOLD:
+                volume_confirmed, volume_ratio = self.check_volume_confirmation(
+                    market_data, volume_multiplier
+                )
+                if not volume_confirmed:
+                    # Downgrade signal if volume doesn't confirm
+                    combined_signal = SignalType.HOLD
+                    combined_confidence *= 0.5
+
             # Combine indicators
             combined_indicators = {
                 "rsi": rsi_result.indicators,
                 "macd": macd_result.indicators,
                 "agreement_score": self._calculate_agreement_score(rsi_result, macd_result),
+                "volume_confirmed": volume_confirmed,
+                "volume_ratio": volume_ratio,
             }
 
-            # Calculate combined levels
+            # Calculate combined levels with ATR stops if enabled
             current_price = float(market_data[-1]["close"])
-            price_target, stop_loss, take_profit = self._calculate_combined_levels(
-                current_price, combined_signal, rsi_result, macd_result
-            )
+            
+            use_atr_stops = self.get_parameter("use_atr_stops")
+            if use_atr_stops and combined_signal != SignalType.HOLD:
+                # Use ATR-based dynamic stops
+                atr_period = self.get_parameter("atr_period")
+                atr_stop_mult = self.get_parameter("atr_stop_multiplier")
+                atr_tp_mult = self.get_parameter("atr_take_profit_multiplier")
+                
+                atr_value = self.calculate_atr(market_data, atr_period)
+                if atr_value is not None:
+                    stop_loss, take_profit = self.calculate_atr_stops(
+                        market_data, 
+                        is_long=(combined_signal == SignalType.BUY),
+                        atr_multiplier=atr_stop_mult,
+                        take_profit_multiplier=atr_tp_mult
+                    )
+                    price_target = take_profit  # Use take profit as price target
+                    combined_indicators["atr"] = atr_value
+                else:
+                    # Fallback to combined levels
+                    price_target, stop_loss, take_profit = self._calculate_combined_levels(
+                        current_price, combined_signal, rsi_result, macd_result
+                    )
+            else:
+                price_target, stop_loss, take_profit = self._calculate_combined_levels(
+                    current_price, combined_signal, rsi_result, macd_result
+                )
 
             return StrategyResult(
                 signal=combined_signal,
@@ -151,6 +232,9 @@ class CombinedStrategy(BaseStrategy):
                     "macd_signal": macd_result.signal.value,
                     "rsi_confidence": rsi_result.confidence,
                     "macd_confidence": macd_result.confidence,
+                    "volume_confirmed": volume_confirmed,
+                    "volume_ratio": round(volume_ratio, 2),
+                    "using_atr_stops": use_atr_stops,
                 },
             )
 

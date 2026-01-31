@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Type
 
 from .base_strategy import BaseStrategy, SignalType, StrategyResult
+from .bollinger_strategy import BollingerBandsStrategy
 from .combined_strategy import CombinedStrategy
 from .macd_strategy import MACDStrategy
 from .rsi_strategy import RSIStrategy
@@ -30,6 +31,7 @@ class StrategyManager:
             "rsi": RSIStrategy,
             "macd": MACDStrategy,
             "combined": CombinedStrategy,
+            "bollinger": BollingerBandsStrategy,
         }
         self.performance_history: Dict[str, List[Dict[str, Any]]] = {}
         self.logger = logging.getLogger(__name__)
@@ -89,6 +91,22 @@ class StrategyManager:
             self.register_strategy("macd", macd_default)  # Alias
         except Exception as e:
             self.logger.error(f"Failed to register macd: {str(e)}")
+        try:
+            bollinger_default = BollingerBandsStrategy()
+            self.register_strategy("bollinger_default", bollinger_default)
+            self.register_strategy("bollinger", bollinger_default)  # Alias
+        except Exception as e:
+            self.logger.error(f"Failed to register bollinger: {str(e)}")
+        try:
+            bollinger_conservative = BollingerBandsStrategy({
+                "num_std": 2.5,  # Wider bands = fewer signals
+                "rsi_overbought": 75,
+                "rsi_oversold": 25,
+                "require_rsi_confirmation": True,
+            })
+            self.register_strategy("bollinger_conservative", bollinger_conservative)
+        except Exception as e:
+            self.logger.error(f"Failed to register bollinger_conservative: {str(e)}")
         self.logger.info(f"Initialized {len(self.strategies)} default strategies")
 
     def register_strategy(self, name: str, strategy: BaseStrategy) -> bool:
