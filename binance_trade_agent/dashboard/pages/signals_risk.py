@@ -7,11 +7,12 @@ from dash import Input, Output, callback, dcc, html
 
 try:
     from binance_trade_agent.dashboard.components.navbar import create_metric_card
-    from binance_trade_agent.dashboard.utils.data_fetch import get_risk_status, get_signals
+    from binance_trade_agent.dashboard.utils.data_fetch import get_risk_status, get_signals, get_trailing_stops
 except Exception as e:
     print(f"Import error: {e}")
     get_signals = None
     get_risk_status = None
+    get_trailing_stops = None
     create_metric_card = None
 
 logger = logging.getLogger(__name__)
@@ -163,6 +164,41 @@ layout = dbc.Container(
                     lg=6,
                     md=12,
                 ),
+            ],
+            className="mb-4",
+        ),
+        # Trailing Stops Section
+        dbc.Row(
+            [
+                dbc.Col(
+                    [
+                        html.H4(
+                            "🎯 Active Trailing Stops",
+                            style={"color": "#ff914d", "marginTop": "2rem"},
+                        ),
+                    ]
+                )
+            ],
+            className="mb-3",
+        ),
+        dbc.Row(
+            [
+                dbc.Col(
+                    [
+                        html.Div(
+                            id="trailing-stops-content",
+                            children=[
+                                dbc.Alert(
+                                    "No active trailing stops",
+                                    color="secondary",
+                                    className="text-center",
+                                )
+                            ],
+                            style={},
+                        )
+                    ],
+                    width=12,
+                )
             ],
             className="mb-4",
         ),
@@ -615,4 +651,163 @@ def update_emergency_controls(n_intervals):
 
     except Exception as e:
         logger.error(f"Emergency controls error: {str(e)}")
+        return dbc.Alert(f"Error: {str(e)}", color="danger")
+
+
+# Callback for trailing stops
+@callback(
+    Output("trailing-stops-content", "children"),
+    Input("signals-risk-timer", "n_intervals"),
+    prevent_initial_call=False,
+)
+def update_trailing_stops(n_intervals):
+    """Update trailing stops display"""
+    try:
+        if get_trailing_stops is None:
+            return dbc.Alert("Trailing stops unavailable", color="warning")
+
+        trailing_data = get_trailing_stops()
+
+        if isinstance(trailing_data, dict) and "error" in trailing_data:
+            return dbc.Alert(f"Error: {trailing_data['error']}", color="danger")
+
+        positions = trailing_data.get("positions", {})
+        active_count = trailing_data.get("active_stops", 0)
+
+        if not positions or active_count == 0:
+            return dbc.Alert(
+                [
+                    html.Span("🎯 "),
+                    html.Strong("No active trailing stops. "),
+                    html.Span("Trailing stops are automatically registered when trades execute."),
+                ],
+                color="secondary",
+                className="text-center",
+            )
+
+        # Build cards for each trailing stop
+        cards = []
+        for symbol, pos in positions.items():
+            entry_price = pos.get("entry_price", 0)
+            current_price = pos.get("current_price", 0)
+            current_stop = pos.get("current_stop", 0)
+            side = pos.get("side", "buy").upper()
+            pnl_pct = pos.get("pnl_pct", 0)
+            highest = pos.get("highest_price", 0)
+            lowest = pos.get("lowest_price", 0)
+
+            # Determine P&L color
+            pnl_color = "success" if pnl_pct >= 0 else "danger"
+            side_color = "#4CAF50" if side == "BUY" else "#f44336"
+
+            card = dbc.Col(
+                [
+                    dbc.Card(
+                        [
+                            dbc.CardBody(
+                                [
+                                    html.Div(
+                                        [
+                                            html.H5(
+                                                symbol,
+                                                style={
+                                                    "color": "#f4f2ee",
+                                                    "marginBottom": "0.5rem",
+                                                    "display": "inline-block",
+                                                },
+                                            ),
+                                            dbc.Badge(
+                                                side,
+                                                color="success" if side == "BUY" else "danger",
+                                                className="ms-2",
+                                            ),
+                                        ]
+                                    ),
+                                    html.Hr(style={"borderColor": "rgba(255, 145, 77, 0.3)"}),
+                                    # Price info
+                                    dbc.Row(
+                                        [
+                                            dbc.Col(
+                                                [
+                                                    html.Small("Entry", style={"color": "#b8b4b0"}),
+                                                    html.Div(
+                                                        f"${entry_price:,.2f}",
+                                                        style={"color": "#f4f2ee", "fontWeight": "bold"},
+                                                    ),
+                                                ],
+                                                width=6,
+                                            ),
+                                            dbc.Col(
+                                                [
+                                                    html.Small("Current", style={"color": "#b8b4b0"}),
+                                                    html.Div(
+                                                        f"${current_price:,.2f}" if current_price else "N/A",
+                                                        style={"color": "#ff914d", "fontWeight": "bold"},
+                                                    ),
+                                                ],
+                                                width=6,
+                                            ),
+                                        ],
+                                        className="mb-2",
+                                    ),
+                                    # Stop and P&L
+                                    dbc.Row(
+                                        [
+                                            dbc.Col(
+                                                [
+                                                    html.Small("Trail Stop", style={"color": "#b8b4b0"}),
+                                                    html.Div(
+                                                        f"${current_stop:,.2f}",
+                                                        style={"color": "#FFC107", "fontWeight": "bold"},
+                                                    ),
+                                                ],
+                                                width=6,
+                                            ),
+                                            dbc.Col(
+                                                [
+                                                    html.Small("P&L", style={"color": "#b8b4b0"}),
+                                                    html.Div(
+                                                        f"{pnl_pct:+.2f}%",
+                                                        style={
+                                                            "color": "#4CAF50" if pnl_pct >= 0 else "#f44336",
+                                                            "fontWeight": "bold",
+                                                        },
+                                                    ),
+                                                ],
+                                                width=6,
+                                            ),
+                                        ],
+                                        className="mb-2",
+                                    ),
+                                    # High/Low
+                                    html.Div(
+                                        [
+                                            html.Small(
+                                                f"High: ${highest:,.2f} | Low: ${lowest:,.2f}",
+                                                style={"color": "#888"},
+                                            ),
+                                        ],
+                                        className="text-center",
+                                    ),
+                                ]
+                            )
+                        ],
+                        style={
+                            "backgroundColor": "#23242a",
+                            "borderColor": "rgba(255, 145, 77, 0.3)",
+                            "borderWidth": "1px",
+                        },
+                    )
+                ],
+                lg=4,
+                md=6,
+                xs=12,
+                className="mb-3",
+            )
+            cards.append(card)
+
+        return dbc.Row(cards)
+
+    except Exception as e:
+        logger.error(f"Trailing stops error: {str(e)}")
         return dbc.Alert(f"Error: {str(e)}", color="danger")

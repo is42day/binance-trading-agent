@@ -127,8 +127,21 @@ class TradingOrchestrator:
                 if execution_result:
                     trade_decision.executed = True
                     trade_decision.order_id = execution_result.get("order_id")
-                    trade_decision.execution_price = execution_result.get("price")
+                    trade_decision.execution_price = execution_result.get("price", price)
                     trade_decision.execution_time = datetime.now()
+                    
+                    # Register trailing stop for the executed trade
+                    if self.risk_agent.config.get("trailing_stop_enabled", True):
+                        exec_price = trade_decision.execution_price or price
+                        self.risk_agent.register_trailing_stop(
+                            symbol=symbol,
+                            entry_price=exec_price,
+                            side=signal_result["signal"],
+                        )
+                        self.logger.info(
+                            f"Trailing stop registered for {symbol} at {exec_price}",
+                            extra=extra,
+                        )
             else:
                 self.logger.info(
                     f"Trade not executed - Risk approved: {risk_approved}, "

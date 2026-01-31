@@ -76,6 +76,79 @@ class AutonomousTradingLoop:
         self.start_time = None
         self.stop_flag = False
 
+    async def _update_trailing_stops(self):
+        """
+        Update trailing stops for all active positions.
+        If a stop is triggered, close the position.
+        """
+        risk_agent = self.orchestrator.risk_agent
+        trailing_info = risk_agent.get_trailing_stop_info()
+        
+        if not trailing_info.get("positions"):
+            return
+        
+        self.logger.info(f"\n🎯 Checking {trailing_info['active_stops']} trailing stop(s)...")
+        
+        # Get current prices for all tracked symbols
+        prices = {}
+        for symbol in trailing_info["positions"].keys():
+            try:
+                price = self.orchestrator.market_agent.get_latest_price(symbol)
+                prices[symbol] = price
+            except Exception as e:
+                self.logger.error(f"   Failed to get price for {symbol}: {e}")
+        
+        # Update all trailing stops with current prices
+        results = risk_agent.update_all_trailing_stops(prices)
+        
+        # Handle triggered stops
+        for symbol, result in results.items():
+            if result.get("stop_triggered"):
+                self.logger.warning(f"   ⚠️ {symbol} trailing stop TRIGGERED!")
+                self.logger.info(
+                    f"      Entry: ${result['entry_price']:,.2f}, "
+                    f"Stop: ${result['current_stop']:,.2f}, "
+                    f"Current: ${result['current_price']:,.2f}"
+                )
+                
+                # Execute the stop order
+                try:
+                    side = result["side"]
+                    # Opposite order to close position
+                    close_side = "sell" if side == "buy" else "buy"
+                    
+                    # Get quantity (for now, use default - in production, would track position size)
+                    quantity = config.get_default_quantity(symbol)
+                    
+                    if close_side == "sell":
+                        order = self.orchestrator.execution_agent.place_sell_order(symbol, quantity)
+                    else:
+                        order = self.orchestrator.execution_agent.place_buy_order(symbol, quantity)
+                    
+                    self.logger.info(
+                        f"      ✅ Stop order executed: {close_side.upper()} {quantity} {symbol}"
+                    )
+                    self.trades_executed += 1
+                    
+                    # Close the trailing stop tracking
+                    close_result = risk_agent.close_trailing_stop(
+                        symbol, 
+                        close_price=result["current_price"]
+                    )
+                    pnl_pct = close_result.get("pnl_pct", 0) * 100
+                    self.logger.info(f"      PnL: {pnl_pct:+.2f}%")
+                    
+                except Exception as e:
+                    self.logger.error(f"      ❌ Failed to execute stop order: {e}")
+            else:
+                # Log trailing stop status
+                profit_pct = result.get("profit_pct", 0) * 100
+                self.logger.info(
+                    f"   {symbol}: Price ${result['current_price']:,.2f}, "
+                    f"Stop ${result['current_stop']:,.2f}, "
+                    f"P&L: {profit_pct:+.2f}%"
+                )
+
     async def run(self):
         """
         Run the autonomous trading loop
@@ -152,6 +225,9 @@ class AutonomousTradingLoop:
 
                 except Exception as e:
                     self.logger.error(f"  ❌ Error processing {symbol}: {str(e)}", exc_info=True)
+
+            # Check and update trailing stops for all active positions
+            await self._update_trailing_stops()
 
             # Log cycle summary
             elapsed = datetime.now() - self.start_time

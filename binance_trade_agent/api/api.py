@@ -221,6 +221,29 @@ async def get_risk_status():
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@app.get("/api/v1/risk/trailing-stops")
+async def get_trailing_stops():
+    """Get all active trailing stops."""
+    try:
+        return risk_agent.get_trailing_stop_info()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/v1/risk/trailing-stops/{symbol}")
+async def get_trailing_stop_for_symbol(symbol: str):
+    """Get trailing stop info for a specific symbol."""
+    try:
+        result = risk_agent.get_trailing_stop_info(symbol.upper())
+        if "error" in result:
+            raise HTTPException(status_code=404, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @app.get("/api/v1/market/price/{symbol}")
 async def get_market_price(symbol: str):
     """Get the latest market price for a given symbol, with caching."""

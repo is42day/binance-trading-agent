@@ -360,6 +360,44 @@ def get_risk_status():
         return {"error": str(e)}
 
 
+def get_trailing_stops():
+    """Get all active trailing stops
+
+    Returns:
+        dict: Active trailing stops with position info
+    """
+    try:
+        components = get_trading_components()
+        risk_agent = components["risk_agent"]
+        market_agent = components["market_agent"]
+
+        trailing_info = risk_agent.get_trailing_stop_info()
+        
+        # Enhance with current prices and P&L
+        if trailing_info.get("positions"):
+            for symbol, position in trailing_info["positions"].items():
+                try:
+                    current_price = market_agent.get_latest_price(symbol)
+                    position["current_price"] = current_price
+                    
+                    # Calculate unrealized P&L
+                    entry = position.get("entry_price", 0)
+                    side = position.get("side", "buy")
+                    if entry > 0:
+                        if side == "buy":
+                            position["pnl_pct"] = (current_price - entry) / entry * 100
+                        else:
+                            position["pnl_pct"] = (entry - current_price) / entry * 100
+                except Exception:
+                    position["current_price"] = None
+                    position["pnl_pct"] = None
+        
+        trailing_info["last_updated"] = datetime.now().isoformat()
+        return trailing_info
+    except Exception as e:
+        return {"error": str(e), "active_stops": 0, "positions": {}}
+
+
 def get_system_status():
     """Get comprehensive system health status
 
