@@ -305,6 +305,176 @@ class BaseStrategy(ABC):
 
         return {"volatility": volatility, "risk_level": risk_level}
 
+    def calculate_ema(
+        self,
+        market_data: List[Dict[str, Any]],
+        period: int = 20
+    ) -> Optional[float]:
+        """
+        Calculate Exponential Moving Average.
+        
+        Args:
+            market_data: OHLCV candle data
+            period: EMA period
+            
+        Returns:
+            EMA value or None if insufficient data
+        """
+        if len(market_data) < period:
+            return None
+        
+        try:
+            closes = [float(candle["close"]) for candle in market_data]
+            
+            # Calculate EMA using the standard formula
+            multiplier = 2 / (period + 1)
+            
+            # Start with SMA for first EMA value
+            ema = sum(closes[:period]) / period
+            
+            # Calculate EMA for remaining values
+            for i in range(period, len(closes)):
+                ema = (closes[i] * multiplier) + (ema * (1 - multiplier))
+            
+            return ema
+            
+        except Exception:
+            return None
+
+    def calculate_ema_series(
+        self,
+        market_data: List[Dict[str, Any]],
+        period: int = 20
+    ) -> List[float]:
+        """
+        Calculate EMA series for all data points.
+        
+        Args:
+            market_data: OHLCV candle data
+            period: EMA period
+            
+        Returns:
+            List of EMA values
+        """
+        if len(market_data) < period:
+            return []
+        
+        try:
+            closes = [float(candle["close"]) for candle in market_data]
+            multiplier = 2 / (period + 1)
+            
+            # Start with SMA
+            ema_values = []
+            ema = sum(closes[:period]) / period
+            ema_values.extend([ema] * period)  # Fill initial values with first EMA
+            
+            # Calculate EMA for remaining values
+            for i in range(period, len(closes)):
+                ema = (closes[i] * multiplier) + (ema * (1 - multiplier))
+                ema_values.append(ema)
+            
+            return ema_values
+            
+        except Exception:
+            return []
+
+    def get_trend_filter(
+        self,
+        market_data: List[Dict[str, Any]],
+        fast_period: int = 50,
+        slow_period: int = 200
+    ) -> Dict[str, Any]:
+        """
+        Calculate trend filter using EMA crossover (50/200 EMA).
+        
+        A classic trend-following filter:
+        - BULLISH: 50 EMA > 200 EMA (uptrend)
+        - BEARISH: 50 EMA < 200 EMA (downtrend)
+        - NEUTRAL: Not enough data or EMAs are very close
+        
+        Args:
+            market_data: OHLCV candle data
+            fast_period: Fast EMA period (default 50)
+            slow_period: Slow EMA period (default 200)
+            
+        Returns:
+            Dict with trend info:
+            - trend: "BULLISH", "BEARISH", or "NEUTRAL"
+            - ema_fast: Current fast EMA value
+            - ema_slow: Current slow EMA value
+            - trend_strength: How far apart the EMAs are (as % of price)
+            - allows_buy: True if trend allows buying
+            - allows_sell: True if trend allows selling
+        """
+        if len(market_data) < slow_period:
+            return {
+                "trend": "NEUTRAL",
+                "ema_fast": None,
+                "ema_slow": None,
+                "trend_strength": 0.0,
+                "allows_buy": True,  # Allow both when no trend data
+                "allows_sell": True,
+                "reason": "Insufficient data for trend analysis"
+            }
+        
+        try:
+            ema_fast = self.calculate_ema(market_data, fast_period)
+            ema_slow = self.calculate_ema(market_data, slow_period)
+            
+            if ema_fast is None or ema_slow is None:
+                return {
+                    "trend": "NEUTRAL",
+                    "ema_fast": None,
+                    "ema_slow": None,
+                    "trend_strength": 0.0,
+                    "allows_buy": True,
+                    "allows_sell": True,
+                    "reason": "EMA calculation failed"
+                }
+            
+            current_price = float(market_data[-1]["close"])
+            
+            # Calculate trend strength as percentage difference
+            trend_strength = abs(ema_fast - ema_slow) / current_price * 100
+            
+            # Determine trend direction
+            # Using a small threshold (0.1%) to avoid noise
+            threshold = current_price * 0.001  # 0.1% of price
+            
+            if ema_fast > ema_slow + threshold:
+                trend = "BULLISH"
+                allows_buy = True
+                allows_sell = False  # Don't short in uptrend
+            elif ema_fast < ema_slow - threshold:
+                trend = "BEARISH"
+                allows_buy = False  # Don't buy in downtrend
+                allows_sell = True
+            else:
+                trend = "NEUTRAL"
+                allows_buy = True
+                allows_sell = True
+            
+            return {
+                "trend": trend,
+                "ema_fast": round(ema_fast, 2),
+                "ema_slow": round(ema_slow, 2),
+                "trend_strength": round(trend_strength, 3),
+                "allows_buy": allows_buy,
+                "allows_sell": allows_sell,
+                "reason": f"50 EMA {'above' if ema_fast > ema_slow else 'below'} 200 EMA"
+            }
+            
+        except Exception as e:
+            return {
+                "trend": "NEUTRAL",
+                "ema_fast": None,
+                "ema_slow": None,
+                "trend_strength": 0.0,
+                "allows_buy": True,
+                "allows_sell": True,
+                "reason": f"Error: {str(e)}"
+            }
+
     def __str__(self) -> str:
         return f"{self.name}: {self.description}"
 

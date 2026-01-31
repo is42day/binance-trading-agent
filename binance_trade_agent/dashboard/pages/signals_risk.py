@@ -336,7 +336,10 @@ def _format_metadata(metadata: dict) -> list:
         ("macd_confidence", "MACD Conf"),
         ("volume_confirmed", "Vol Confirmed"),
         ("volume_ratio", "Vol Ratio"),
+        ("trend", "Trend"),
+        ("trend_filtered", "Trend Filtered"),
         ("using_atr_stops", "ATR Stops"),
+        ("using_trend_filter", "Trend Filter"),
     ]
     
     items = []

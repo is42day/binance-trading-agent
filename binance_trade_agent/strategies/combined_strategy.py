@@ -117,6 +117,26 @@ class CombinedStrategy(BaseStrategy):
                 "max": 6.0,
                 "description": "ATR multiplier for take profit distance",
             },
+            # Trend filter parameters (EMA crossover)
+            "use_trend_filter": {
+                "default": True,  # Production: only trade in trend direction
+                "type": bool,
+                "description": "Use 50/200 EMA trend filter to avoid counter-trend trades",
+            },
+            "trend_ema_fast": {
+                "default": 50,
+                "type": int,
+                "min": 10,
+                "max": 100,
+                "description": "Fast EMA period for trend filter",
+            },
+            "trend_ema_slow": {
+                "default": 200,
+                "type": int,
+                "min": 50,
+                "max": 300,
+                "description": "Slow EMA period for trend filter",
+            },
         }
 
         # Add RSI strategy parameters with prefix
@@ -132,10 +152,13 @@ class CombinedStrategy(BaseStrategy):
         return params
 
     def requires_minimum_data(self) -> int:
-        return max(
+        # Need at least 200 periods for trend filter (200 EMA)
+        base_requirement = max(
             self.rsi_strategy.requires_minimum_data(),
             self.macd_strategy.requires_minimum_data(),
         )
+        trend_requirement = self.get_parameter("trend_ema_slow") if self.get_parameter("use_trend_filter") else 0
+        return max(base_requirement, trend_requirement)
 
     def analyze(self, market_data: List[Dict[str, Any]], symbol: str = None) -> StrategyResult:
         """
@@ -178,6 +201,28 @@ class CombinedStrategy(BaseStrategy):
                     combined_signal = SignalType.HOLD
                     combined_confidence *= 0.5
 
+            # Apply trend filter if enabled (50/200 EMA crossover)
+            use_trend_filter = self.get_parameter("use_trend_filter")
+            trend_info = {"trend": "NEUTRAL", "allows_buy": True, "allows_sell": True}
+            trend_filtered = False
+            
+            if use_trend_filter and combined_signal != SignalType.HOLD:
+                ema_fast = self.get_parameter("trend_ema_fast")
+                ema_slow = self.get_parameter("trend_ema_slow")
+                trend_info = self.get_trend_filter(market_data, ema_fast, ema_slow)
+                
+                # Check if signal is allowed by trend
+                if combined_signal == SignalType.BUY and not trend_info["allows_buy"]:
+                    # Don't buy in a downtrend
+                    combined_signal = SignalType.HOLD
+                    combined_confidence *= 0.4
+                    trend_filtered = True
+                elif combined_signal == SignalType.SELL and not trend_info["allows_sell"]:
+                    # Don't sell/short in an uptrend
+                    combined_signal = SignalType.HOLD
+                    combined_confidence *= 0.4
+                    trend_filtered = True
+
             # Combine indicators
             combined_indicators = {
                 "rsi": rsi_result.indicators,
@@ -185,6 +230,10 @@ class CombinedStrategy(BaseStrategy):
                 "agreement_score": self._calculate_agreement_score(rsi_result, macd_result),
                 "volume_confirmed": volume_confirmed,
                 "volume_ratio": volume_ratio,
+                "trend": trend_info.get("trend", "NEUTRAL"),
+                "ema_fast": trend_info.get("ema_fast"),
+                "ema_slow": trend_info.get("ema_slow"),
+                "trend_strength": trend_info.get("trend_strength", 0),
             }
 
             # Calculate combined levels with ATR stops if enabled
@@ -235,6 +284,9 @@ class CombinedStrategy(BaseStrategy):
                     "volume_confirmed": volume_confirmed,
                     "volume_ratio": round(volume_ratio, 2),
                     "using_atr_stops": use_atr_stops,
+                    "trend": trend_info.get("trend", "NEUTRAL"),
+                    "trend_filtered": trend_filtered if use_trend_filter else False,
+                    "using_trend_filter": use_trend_filter,
                 },
             )
 
