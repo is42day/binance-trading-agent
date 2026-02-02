@@ -567,24 +567,24 @@ class EnhancedRiskManagementAgent:
     ) -> Dict[str, Any]:
         """
         Register a new position for trailing stop tracking.
-        
+
         Args:
             symbol: Trading pair (e.g., 'BTCUSDT')
             entry_price: Entry price of the position
             side: 'buy' for long, 'sell' for short
             initial_stop: Optional initial stop-loss price (defaults to config default)
-            
+
         Returns:
             Dictionary with trailing stop info
         """
         trailing_pct = self.config.get("trailing_stop_pct", 0.02)  # Default 2%
-        
+
         if initial_stop is None:
             if side.lower() == "buy":
                 initial_stop = entry_price * (1 - self.config["default_stop_loss_pct"])
             else:
                 initial_stop = entry_price * (1 + self.config["default_stop_loss_pct"])
-        
+
         self.trailing_stops[symbol] = {
             "entry_price": entry_price,
             "side": side.lower(),
@@ -594,35 +594,35 @@ class EnhancedRiskManagementAgent:
             "trailing_pct": trailing_pct,
             "registered_at": datetime.now().isoformat(),
         }
-        
+
         self.logger.info(
             f"Trailing stop registered for {symbol}: entry={entry_price}, "
             f"side={side}, initial_stop={initial_stop:.2f}"
         )
-        
+
         return self.trailing_stops[symbol]
 
     def update_trailing_stop(self, symbol: str, current_price: float) -> Dict[str, Any]:
         """
         Update the trailing stop based on current price.
-        
+
         For LONG positions: Stop trails up as price rises (locks in profits)
         For SHORT positions: Stop trails down as price falls (locks in profits)
-        
+
         Args:
             symbol: Trading pair
             current_price: Current market price
-            
+
         Returns:
             Updated trailing stop info with 'stop_triggered' flag
         """
         if symbol not in self.trailing_stops:
             return {"error": f"No trailing stop registered for {symbol}"}
-        
+
         ts = self.trailing_stops[symbol]
         trailing_pct = ts.get("trailing_pct", self.config.get("trailing_stop_pct", 0.02))
         stop_triggered = False
-        
+
         if ts["side"] == "buy":
             # LONG position - track highest price, trail stop up
             if current_price > ts["highest_price"]:
@@ -637,7 +637,7 @@ class EnhancedRiskManagementAgent:
                         f"Trailing stop updated for {symbol}: "
                         f"{old_stop:.2f} -> {new_stop:.2f} (price: {current_price:.2f})"
                     )
-            
+
             # Check if stop triggered
             if current_price <= ts["current_stop"]:
                 stop_triggered = True
@@ -645,7 +645,7 @@ class EnhancedRiskManagementAgent:
                     f"Trailing stop TRIGGERED for {symbol} LONG: "
                     f"price={current_price:.2f} <= stop={ts['current_stop']:.2f}"
                 )
-        
+
         else:
             # SHORT position - track lowest price, trail stop down
             if current_price < ts["lowest_price"]:
@@ -660,7 +660,7 @@ class EnhancedRiskManagementAgent:
                         f"Trailing stop updated for {symbol}: "
                         f"{old_stop:.2f} -> {new_stop:.2f} (price: {current_price:.2f})"
                     )
-            
+
             # Check if stop triggered
             if current_price >= ts["current_stop"]:
                 stop_triggered = True
@@ -668,17 +668,17 @@ class EnhancedRiskManagementAgent:
                     f"Trailing stop TRIGGERED for {symbol} SHORT: "
                     f"price={current_price:.2f} >= stop={ts['current_stop']:.2f}"
                 )
-        
+
         # Update lowest price tracking for longs too
         ts["lowest_price"] = min(ts["lowest_price"], current_price)
         ts["highest_price"] = max(ts["highest_price"], current_price)
-        
+
         # Calculate profit from entry
         if ts["side"] == "buy":
             profit_pct = (current_price - ts["entry_price"]) / ts["entry_price"]
         else:
             profit_pct = (ts["entry_price"] - current_price) / ts["entry_price"]
-        
+
         return {
             **ts,
             "current_price": current_price,
@@ -689,19 +689,19 @@ class EnhancedRiskManagementAgent:
     def check_trailing_stop_triggered(self, symbol: str, current_price: float) -> bool:
         """
         Quick check if trailing stop is triggered without updating.
-        
+
         Args:
             symbol: Trading pair
             current_price: Current market price
-            
+
         Returns:
             True if stop is triggered, False otherwise
         """
         if symbol not in self.trailing_stops:
             return False
-        
+
         ts = self.trailing_stops[symbol]
-        
+
         if ts["side"] == "buy":
             return current_price <= ts["current_stop"]
         else:
@@ -710,48 +710,48 @@ class EnhancedRiskManagementAgent:
     def close_trailing_stop(self, symbol: str, close_price: Optional[float] = None) -> Dict[str, Any]:
         """
         Close and remove trailing stop tracking for a position.
-        
+
         Args:
             symbol: Trading pair
             close_price: Optional close price for P&L calculation
-            
+
         Returns:
             Final trailing stop info with P&L if close_price provided
         """
         if symbol not in self.trailing_stops:
             return {"error": f"No trailing stop found for {symbol}"}
-        
+
         ts = self.trailing_stops.pop(symbol)
-        
+
         result = {
             **ts,
             "closed_at": datetime.now().isoformat(),
         }
-        
+
         if close_price:
             if ts["side"] == "buy":
                 pnl_pct = (close_price - ts["entry_price"]) / ts["entry_price"]
             else:
                 pnl_pct = (ts["entry_price"] - close_price) / ts["entry_price"]
-            
+
             result["close_price"] = close_price
             result["pnl_pct"] = pnl_pct
-            
+
             self.logger.info(
                 f"Trailing stop closed for {symbol}: "
                 f"entry={ts['entry_price']:.2f}, close={close_price:.2f}, "
                 f"PnL={pnl_pct*100:.2f}%"
             )
-        
+
         return result
 
     def get_trailing_stop_info(self, symbol: Optional[str] = None) -> Dict[str, Any]:
         """
         Get trailing stop information for a symbol or all symbols.
-        
+
         Args:
             symbol: Optional specific symbol, or None for all
-            
+
         Returns:
             Trailing stop info dictionary
         """
@@ -759,7 +759,7 @@ class EnhancedRiskManagementAgent:
             if symbol in self.trailing_stops:
                 return self.trailing_stops[symbol]
             return {"error": f"No trailing stop found for {symbol}"}
-        
+
         return {
             "active_stops": len(self.trailing_stops),
             "positions": self.trailing_stops,
@@ -768,26 +768,26 @@ class EnhancedRiskManagementAgent:
     def update_all_trailing_stops(self, prices: Dict[str, float]) -> Dict[str, Dict[str, Any]]:
         """
         Update all trailing stops with current prices.
-        
+
         Args:
             prices: Dictionary of {symbol: current_price}
-            
+
         Returns:
             Dictionary of updated trailing stop info for each symbol
         """
         results = {}
         triggered = []
-        
-        for symbol, ts_info in list(self.trailing_stops.items()):
+
+        for symbol, _ts_info in list(self.trailing_stops.items()):
             if symbol in prices:
                 result = self.update_trailing_stop(symbol, prices[symbol])
                 results[symbol] = result
                 if result.get("stop_triggered"):
                     triggered.append(symbol)
-        
+
         if triggered:
             self.logger.warning(f"Trailing stops triggered for: {triggered}")
-        
+
         return results
 
     def load_config(self, config_file: str):

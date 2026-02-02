@@ -1,10 +1,9 @@
 import asyncio
-import logging
 import os
 import signal
 import sys
 
-from .common.logging_config import setup_logging, get_logger
+from .common.logging_config import get_logger, setup_logging
 
 
 def main():
@@ -14,7 +13,7 @@ def main():
         log_level=os.getenv("LOG_LEVEL", "INFO"),
         use_json=os.getenv("LOG_FORMAT", "plain").lower() == "json",
     )
-    
+
     logger = get_logger(__name__)
 
     from .common.config import config
@@ -28,7 +27,7 @@ def main():
     duration = int(os.getenv("TRADING_DURATION_MINUTES", "0"))  # 0 = run forever
     strategy = os.getenv("STRATEGY_NAME", "combined")
 
-    logger.info(f"Starting Autonomous Trading Loop...")
+    logger.info("Starting Autonomous Trading Loop...")
     logger.info(f"  Symbols: {symbols}")
     logger.info(f"  Interval: {interval}s")
     logger.info(f"  Duration: {'infinite' if duration == 0 else f'{duration} min'}")

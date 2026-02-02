@@ -10,13 +10,11 @@ import logging
 import signal
 import sys
 from datetime import datetime
-from typing import List, Optional
+from typing import List
 
 from binance_trade_agent.agents.market_data_agent import MarketDataAgent
-from binance_trade_agent.clients.binance_client import BinanceAPIClient
-from binance_trade_agent.core.paper_trading import PaperTradingEngine, get_paper_trading_engine
+from binance_trade_agent.core.paper_trading import get_paper_trading_engine
 from binance_trade_agent.strategies import (
-    CombinedEdgeStrategy,
     EdgeStrategy,
     SmartEntryStrategy,
     StrategyManager,
@@ -32,11 +30,11 @@ class MainnetDataClient:
     Client that ALWAYS fetches from Binance mainnet.
     Used for paper trading to get real market data.
     """
-    
+
     def __init__(self):
         self.base_url = "https://api.binance.com/api/v3"
         self._session = None
-    
+
     def get_latest_price(self, symbol: str) -> float:
         """Get real price from mainnet"""
         import requests
@@ -46,7 +44,7 @@ class MainnetDataClient:
             timeout=5,
         )
         return float(response.json()["price"])
-    
+
     def get_klines(self, symbol: str, interval: str = "1h", limit: int = 100) -> list:
         """Get real OHLCV data from mainnet"""
         import requests
@@ -56,7 +54,7 @@ class MainnetDataClient:
             timeout=10,
         )
         return response.json()
-    
+
     def get_order_book(self, symbol: str, limit: int = 10) -> dict:
         """Get real order book from mainnet"""
         import requests
@@ -71,14 +69,14 @@ class MainnetDataClient:
 class PaperTradingLoop:
     """
     Run paper trading with real market data.
-    
+
     This loop:
     1. Fetches REAL data from Binance mainnet
     2. Runs strategy signals
     3. Executes paper trades (simulated)
     4. Tracks performance
     """
-    
+
     def __init__(
         self,
         symbols: List[str] = None,
@@ -91,29 +89,29 @@ class PaperTradingLoop:
         self.strategy_name = strategy_name
         self.trade_interval = trade_interval_seconds
         self.position_size_pct = position_size_pct
-        
+
         # Use mainnet data client
         self.data_client = MainnetDataClient()
-        
+
         # Create market agent with mainnet client
         self.market_agent = MarketDataAgent(binance_client=self.data_client)
-        
+
         # Initialize strategy
         self.strategy = self._create_strategy(strategy_name)
-        
+
         # Paper trading engine
         self.paper_engine = get_paper_trading_engine(initial_balance=initial_balance)
-        
+
         # Control flags
         self.stop_flag = False
         self.is_running = False
-        
+
         logger.info(
             f"Paper trading loop initialized: "
             f"symbols={symbols}, strategy={strategy_name}, "
             f"balance=${initial_balance:.2f}"
         )
-    
+
     def _create_strategy(self, name: str):
         """Create strategy instance"""
         if name == "combined_edge":
@@ -128,7 +126,7 @@ class PaperTradingLoop:
             # Fallback to strategy manager
             manager = StrategyManager()
             return manager.strategies.get(name, create_balanced_edge_strategy(self.market_agent))
-    
+
     def _fetch_ohlcv(self, symbol: str, interval: str = "1h", limit: int = 100) -> list:
         """Fetch OHLCV data from mainnet"""
         try:
@@ -147,22 +145,22 @@ class PaperTradingLoop:
         except Exception as e:
             logger.error(f"Failed to fetch OHLCV for {symbol}: {e}")
             return []
-    
+
     def _calculate_position_size(self, symbol: str, price: float) -> float:
         """Calculate position size based on portfolio and settings"""
         stats = self.paper_engine.get_portfolio_summary()
         available_balance = stats["current_balance"]
-        
+
         # Don't trade if we already have a position
         if symbol in self.paper_engine.portfolio.open_positions:
             return 0.0
-        
+
         # Calculate position value
         position_value = available_balance * self.position_size_pct
-        
+
         # Convert to quantity
         quantity = position_value / price
-        
+
         # Round to appropriate precision
         if "BTC" in symbol:
             quantity = round(quantity, 6)
@@ -170,9 +168,9 @@ class PaperTradingLoop:
             quantity = round(quantity, 5)
         else:
             quantity = round(quantity, 4)
-        
+
         return quantity
-    
+
     async def _process_symbol(self, symbol: str):
         """Process a single symbol for trading signals"""
         try:
@@ -180,16 +178,16 @@ class PaperTradingLoop:
             ohlcv_data = self._fetch_ohlcv(symbol)
             if not ohlcv_data:
                 return
-            
+
             current_price = ohlcv_data[-1]["close"]
-            
+
             # Generate signal
             signal = self.strategy.generate_signal(symbol, ohlcv_data)
-            
+
             action = signal.get("action", "HOLD")
             confidence = signal.get("confidence", 0)
             rejection_reason = signal.get("rejection_reason")
-            
+
             # Log signal
             self.paper_engine.log_signal(
                 symbol=symbol,
@@ -200,7 +198,7 @@ class PaperTradingLoop:
                 executed=False,  # Will update if executed
                 rejection_reason=rejection_reason,
             )
-            
+
             # Print signal info
             timestamp = datetime.now().strftime("%H:%M:%S")
             if action != "HOLD":
@@ -210,7 +208,7 @@ class PaperTradingLoop:
                 )
                 if rejection_reason:
                     logger.info(f"    [!] Not executed: {rejection_reason}")
-            
+
             # Execute paper trade if signal is actionable
             if action == "BUY" and confidence >= 0.3:
                 quantity = self._calculate_position_size(symbol, current_price)
@@ -229,7 +227,7 @@ class PaperTradingLoop:
                         )
                     else:
                         logger.warning(f"    [-] Paper BUY failed: {result.get('error')}")
-            
+
             elif action == "SELL" and symbol in self.paper_engine.portfolio.open_positions:
                 position = self.paper_engine.portfolio.open_positions[symbol]
                 result = self.paper_engine.execute_paper_trade(
@@ -246,52 +244,52 @@ class PaperTradingLoop:
                     logger.info(
                         f"    {marker} Paper SELL executed: P&L ${pnl:.2f} ({result.get('pnl_percent', 0):.2f}%)"
                     )
-            
+
         except Exception as e:
             logger.error(f"Error processing {symbol}: {e}")
-    
+
     async def run(self):
         """Run the paper trading loop"""
         self.is_running = True
         self.stop_flag = False
-        
+
         logger.info("=" * 60)
         logger.info("PAPER TRADING MODE - Using REAL mainnet data")
         logger.info("=" * 60)
         logger.info(f"Strategy: {self.strategy_name}")
         logger.info(f"Symbols: {', '.join(self.symbols)}")
         logger.info(f"Interval: {self.trade_interval}s")
-        
+
         stats = self.paper_engine.get_portfolio_summary()
         logger.info(f"Starting balance: ${stats['current_balance']:.2f}")
         logger.info("=" * 60)
-        
+
         iteration = 0
         while not self.stop_flag:
             iteration += 1
-            
+
             logger.info(f"\n--- Iteration {iteration} @ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---")
-            
+
             # Process each symbol
             for symbol in self.symbols:
                 await self._process_symbol(symbol)
                 await asyncio.sleep(1)  # Small delay between symbols
-            
+
             # Print portfolio summary every 5 iterations
             if iteration % 5 == 0:
                 self._print_summary()
-            
+
             # Wait for next iteration
             await asyncio.sleep(self.trade_interval)
-        
+
         self.is_running = False
         logger.info("Paper trading loop stopped")
         self._print_summary()
-    
+
     def _print_summary(self):
         """Print portfolio summary"""
         stats = self.paper_engine.get_portfolio_summary()
-        
+
         logger.info("\n" + "=" * 40)
         logger.info("PAPER TRADING SUMMARY")
         logger.info("=" * 40)
@@ -300,9 +298,9 @@ class PaperTradingLoop:
         logger.info(f"Trades: {stats['total_trades']} (W:{stats['winning_trades']} L:{stats['losing_trades']})")
         logger.info(f"Win Rate: {stats['win_rate']:.1f}%")
         logger.info(f"Max Drawdown: ${stats['max_drawdown']:.2f} ({stats['max_drawdown_percent']:.1f}%)")
-        
+
         if stats['open_positions'] > 0:
-            logger.info(f"\nOpen Positions:")
+            logger.info("\nOpen Positions:")
             for symbol, pos in stats.get('position_values', {}).items():
                 marker = "[+]" if pos['unrealized_pnl'] > 0 else "[-]"
                 logger.info(
@@ -310,7 +308,7 @@ class PaperTradingLoop:
                     f"(P&L: ${pos['unrealized_pnl']:.2f})"
                 )
         logger.info("=" * 40 + "\n")
-    
+
     def stop(self):
         """Stop the paper trading loop"""
         self.stop_flag = True
@@ -324,7 +322,7 @@ def run_paper_trading(
 ):
     """
     Run paper trading from command line.
-    
+
     Usage:
         python -m binance_trade_agent.core.paper_trading_loop
     """
@@ -337,38 +335,38 @@ def run_paper_trading(
             logging.FileHandler("data/paper_trading/paper_trading.log"),
         ]
     )
-    
+
     symbols = symbols or ["BTCUSDT"]
-    
+
     loop = PaperTradingLoop(
         symbols=symbols,
         strategy_name=strategy,
         initial_balance=balance,
         trade_interval_seconds=interval,
     )
-    
+
     # Handle Ctrl+C gracefully
     def signal_handler(sig, frame):
         logger.info("\nStopping paper trading...")
         loop.stop()
-    
+
     signal.signal(signal.SIGINT, signal_handler)
-    
+
     # Run the loop
     asyncio.run(loop.run())
 
 
 if __name__ == "__main__":
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Run paper trading with real data")
     parser.add_argument("--symbols", nargs="+", default=["BTCUSDT"], help="Symbols to trade")
     parser.add_argument("--strategy", default="combined_edge", help="Strategy name")
     parser.add_argument("--balance", type=float, default=100.0, help="Initial balance in USDT")
     parser.add_argument("--interval", type=int, default=120, help="Trading interval in seconds")
-    
+
     args = parser.parse_args()
-    
+
     run_paper_trading(
         symbols=args.symbols,
         strategy=args.strategy,
