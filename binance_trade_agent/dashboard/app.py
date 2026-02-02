@@ -134,7 +134,7 @@ app.layout = dbc.Container(
         navbar.create_navbar(PAGES),
         # Main content area
         dbc.Container(
-            [html.Div(id="page-content", style={"minHeight": "80vh", "padding": "2rem 0"})],
+            [html.Div(id="page-content", className="page-content")],
             fluid=True,
             style={"backgroundColor": "#1a1d23", "color": "#f4f2ee"},
         ),

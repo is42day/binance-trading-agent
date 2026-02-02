@@ -128,49 +128,28 @@ def create_metric_card(
         ),
         html.Div(
             value,
-            style={
-                "fontSize": "1.75rem",
-                "fontWeight": "700",
-                "color": "#f4f2ee",
-                "lineHeight": "1.2",
-                "marginTop": "0.25rem",
-            },
+            className="metric-value",
         ),
     ]
 
     # Add delta if provided
     if delta:
-        delta_color = (
-            "#27ae60"
+        delta_class = (
+            "positive"
             if "+" in delta or delta.startswith(">")
-            else "#e74c3c" if "-" in delta or delta.startswith("<") else "#f4f2ee"
+            else "negative" if "-" in delta or delta.startswith("<") else "neutral"
         )
         card_content.append(
             html.Div(
                 delta,
-                style={
-                    "fontSize": "0.875rem",
-                    "color": delta_color,
-                    "fontWeight": "500",
-                    "marginTop": "0.5rem",
-                },
+                className=f"metric-delta {delta_class}",
             )
         )
 
     card = dbc.Card(
         dbc.CardBody(card_content),
-        style={
-            "border": "1px solid rgba(255, 145, 77, 0.2)",
-            "borderLeft": f"3px solid {border_color}",
-            "backgroundColor": "#23242a",
-            "minHeight": "120px",
-            "display": "flex",
-            "flexDirection": "column",
-            "justifyContent": "center",
-            "boxShadow": "0 2px 8px rgba(0, 0, 0, 0.2)",
-            "transition": "all 0.2s ease",
-            "cursor": "pointer",
-        },
+        className=f"metric-card {status}",
+        style={"borderLeft": f"4px solid {border_color}"},
     )
 
     # Wrap with tooltip if help_text provided
