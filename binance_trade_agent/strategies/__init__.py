@@ -7,7 +7,11 @@ easily testable and swappable.
 
 from .base_strategy import BaseStrategy, SignalType, StrategyResult
 from .bollinger_strategy import BollingerBandsStrategy
-from .combined_edge_strategy import CombinedEdgeStrategy, create_balanced_edge_strategy, create_conservative_edge_strategy
+from .combined_edge_strategy import (
+    CombinedEdgeStrategy,
+    create_balanced_edge_strategy,
+    create_conservative_edge_strategy,
+)
 from .combined_strategy import CombinedStrategy
 from .edge_strategy import EdgeStrategy
 from .macd_strategy import MACDStrategy

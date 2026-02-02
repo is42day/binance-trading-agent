@@ -4,7 +4,6 @@ Extracted from web_ui.py and adapted for Dash callbacks
 """
 
 import asyncio
-import threading
 from datetime import datetime
 
 from binance_trade_agent.agents.market_data_agent import MarketDataAgent
@@ -372,14 +371,14 @@ def get_trailing_stops():
         market_agent = components["market_agent"]
 
         trailing_info = risk_agent.get_trailing_stop_info()
-        
+
         # Enhance with current prices and P&L
         if trailing_info.get("positions"):
             for symbol, position in trailing_info["positions"].items():
                 try:
                     current_price = market_agent.get_latest_price(symbol)
                     position["current_price"] = current_price
-                    
+
                     # Calculate unrealized P&L
                     entry = position.get("entry_price", 0)
                     side = position.get("side", "buy")
@@ -391,7 +390,7 @@ def get_trailing_stops():
                 except Exception:
                     position["current_price"] = None
                     position["pnl_pct"] = None
-        
+
         trailing_info["last_updated"] = datetime.now().isoformat()
         return trailing_info
     except Exception as e:
@@ -406,14 +405,14 @@ def get_performance_summary():
     """
     try:
         from binance_trade_agent.core.performance_analytics import get_performance_analytics
-        
+
         analytics = get_performance_analytics(config.portfolio_initial_value)
         return analytics.get_performance_summary()
     except Exception as e:
         return {"error": str(e)}
 
 
-def get_trade_history(limit: int = 50):
+def get_performance_trade_history(limit: int = 50):
     """Get recent trade history
 
     Returns:
@@ -421,7 +420,7 @@ def get_trade_history(limit: int = 50):
     """
     try:
         from binance_trade_agent.core.performance_analytics import get_performance_analytics
-        
+
         analytics = get_performance_analytics(config.portfolio_initial_value)
         return analytics.get_trade_history(limit)
     except Exception as e:

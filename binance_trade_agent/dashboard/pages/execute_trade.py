@@ -2,8 +2,7 @@
 Execute Trade Page - Enhanced with validation, preview, and safety features
 """
 
-import traceback
-from decimal import Decimal, ROUND_DOWN
+from decimal import ROUND_DOWN, Decimal
 
 import dash_bootstrap_components as dbc
 from dash import Input, Output, State, callback, dcc, html, no_update
@@ -26,7 +25,7 @@ def get_symbol_info(symbol):
     """
     if symbol in SYMBOL_INFO_CACHE:
         return SYMBOL_INFO_CACHE[symbol]
-    
+
     # Mock data - in production, fetch from Binance exchangeInfo endpoint
     # TODO: Implement dynamic fetching from Binance API with TTL cache (1h)
     known_symbols = {
@@ -36,19 +35,19 @@ def get_symbol_info(symbol):
         "SOLUSDT": {"tick_size": 0.01, "step_size": 0.01, "min_notional": 10.0, "min_qty": 0.01, "available": True},
         "ADAUSDT": {"tick_size": 0.0001, "step_size": 1.0, "min_notional": 10.0, "min_qty": 1.0, "available": True},
     }
-    
+
     if symbol in known_symbols:
         SYMBOL_INFO_CACHE[symbol] = known_symbols[symbol]
     else:
         # Symbol not in our mock data - return conservative defaults with warning flag
         SYMBOL_INFO_CACHE[symbol] = {
-            "tick_size": 0.01, 
-            "step_size": 0.001, 
-            "min_notional": 10.0, 
+            "tick_size": 0.01,
+            "step_size": 0.001,
+            "min_notional": 10.0,
             "min_qty": 0.001,
             "available": False  # Flag: constraints are not verified
         }
-    
+
     return SYMBOL_INFO_CACHE[symbol]
 
 
@@ -59,11 +58,11 @@ def format_quantity(qty, step_size):
     """
     if not qty or not step_size:
         return qty, False
-    
+
     original_qty = qty
     precision = len(str(step_size).split('.')[-1]) if '.' in str(step_size) else 0
     adjusted_qty = float(Decimal(str(qty)).quantize(Decimal(str(step_size)), rounding=ROUND_DOWN))
-    
+
     was_adjusted = abs(original_qty - adjusted_qty) > 1e-10
     return adjusted_qty, was_adjusted
 
@@ -75,11 +74,11 @@ def format_price(price, tick_size):
     """
     if not price or not tick_size:
         return price, False
-    
+
     original_price = price
     precision = len(str(tick_size).split('.')[-1]) if '.' in str(tick_size) else 0
     adjusted_price = float(Decimal(str(price)).quantize(Decimal(str(tick_size)), rounding=ROUND_DOWN))
-    
+
     was_adjusted = abs(original_price - adjusted_price) > 1e-10
     return adjusted_price, was_adjusted
 
@@ -674,7 +673,7 @@ def use_market_price(n_clicks, market_price, symbol):
     """Fill price input with current market price, adjusted to tick size"""
     if not n_clicks or not market_price:
         return no_update
-    
+
     symbol_info = get_symbol_info(symbol)
     tick_size = symbol_info.get("tick_size", 0.01)
     adjusted_price, _ = format_price(market_price, tick_size)
@@ -721,15 +720,15 @@ def convert_usd_to_quantity(usd_amount, market_price, symbol, active_tab):
     """Convert USD amount to quantity based on current market price"""
     if active_tab != "usd-tab" or not usd_amount or not market_price or market_price <= 0:
         return no_update
-    
+
     # Calculate quantity from USD amount
     quantity = usd_amount / market_price
-    
+
     # Adjust to step size
     symbol_info = get_symbol_info(symbol)
     step_size = symbol_info.get("step_size", 0.001)
     adjusted_qty, _ = format_quantity(quantity, step_size)
-    
+
     return adjusted_qty
 
 
@@ -745,7 +744,7 @@ def autofill_price_on_symbol_change(symbol, current_price_value):
     # Only auto-fill if price is empty (don't overwrite user input)
     if current_price_value:
         return no_update
-    
+
     try:
         from binance_trade_agent.dashboard.utils.data_fetch import get_market_data
         market_data = get_market_data(symbol)
@@ -780,7 +779,7 @@ def validate_and_preview(symbol, side, order_type, quantity, price, market_price
     errors = []
     warnings = []
     adjustments = []
-    
+
     # Get symbol info for validation
     symbol_info = get_symbol_info(symbol)
     tick_size = symbol_info.get("tick_size", 0.01)
@@ -788,18 +787,18 @@ def validate_and_preview(symbol, side, order_type, quantity, price, market_price
     min_notional = symbol_info.get("min_notional", 10.0)
     min_qty = symbol_info.get("min_qty", 0.001)
     constraints_available = symbol_info.get("available", False)
-    
+
     # WARNING: Exchange constraints not verified
     if not constraints_available:
         warnings.append(
             "⚠️ Exchange constraints not available for this symbol. "
             "Values will be validated at execution time by Binance."
         )
-    
+
     # Update hints
     price_hint = f"Tick size: {tick_size} | Current: ${market_price:.2f}"
     qty_hint = f"Step size: {step_size} | Min qty: {min_qty} | Min notional: ${min_notional}"
-    
+
     # Auto-adjust quantity for step size (round down for safety)
     adjusted_quantity = quantity
     qty_was_adjusted = False
@@ -809,7 +808,7 @@ def validate_and_preview(symbol, side, order_type, quantity, price, market_price
             adjustments.append(
                 f"Quantity adjusted to {adjusted_quantity:.8f} (step size: {step_size}) - rounded down for safety"
             )
-    
+
     # Auto-adjust price for tick size (round down for safety)
     adjusted_price = price
     price_was_adjusted = False
@@ -819,25 +818,25 @@ def validate_and_preview(symbol, side, order_type, quantity, price, market_price
             adjustments.append(
                 f"Price adjusted to {adjusted_price:.8f} (tick size: {tick_size}) - rounded down for safety"
             )
-    
+
     # Validate adjusted quantity
     if not adjusted_quantity or adjusted_quantity <= 0:
         errors.append("Quantity must be greater than 0")
     elif adjusted_quantity < min_qty:
         errors.append(f"Quantity must be at least {min_qty} (after adjustment)")
-    
+
     # Validate adjusted price for LIMIT orders
     effective_price = adjusted_price if order_type == "LIMIT" else market_price
     if order_type == "LIMIT":
         if not adjusted_price or adjusted_price <= 0:
             errors.append("Price must be greater than 0 for LIMIT orders")
-    
+
     # Validate min notional with adjusted values
     if adjusted_quantity and effective_price:
         notional = adjusted_quantity * effective_price
         if notional < min_notional:
             errors.append(f"Order value (${notional:.2f}) must be at least ${min_notional}")
-    
+
     # Build validation feedback
     feedback_children = []
     if errors:
@@ -864,16 +863,16 @@ def validate_and_preview(symbol, side, order_type, quantity, price, market_price
                 color="info",
             )
         )
-    
+
     # Build trade preview using ADJUSTED values
     preview_children = []
     if adjusted_quantity and effective_price and not errors:
         notional = adjusted_quantity * effective_price
         estimated_fee = notional * 0.001  # 0.1% estimate
-        
+
         side_color = "success" if side == "BUY" else "danger"
         side_icon = "🟢" if side == "BUY" else "🔴"
-        
+
         preview_children = [
             dbc.Card(
                 [
@@ -934,10 +933,10 @@ def validate_and_preview(symbol, side, order_type, quantity, price, market_price
                 outline=True,
             )
         ]
-    
+
     # Enable/disable review button
     button_disabled = len(errors) > 0 or not adjusted_quantity or not symbol
-    
+
     return feedback_children, preview_children, button_disabled, price_hint, qty_hint
 
 
@@ -958,41 +957,41 @@ def validate_and_preview(symbol, side, order_type, quantity, price, market_price
     State("confirmation-modal", "is_open"),
     prevent_initial_call=True,
 )
-def toggle_confirmation_modal(review_clicks, cancel_clicks, confirm_clicks, 
+def toggle_confirmation_modal(review_clicks, cancel_clicks, confirm_clicks,
                                symbol, side, order_type, quantity, price, market_price, is_open):
     """Toggle confirmation modal and show order summary with ADJUSTED values"""
     from dash import ctx
-    
+
     if not ctx.triggered_id:
         return no_update, no_update, no_update
-    
+
     # Close modal on cancel or confirm
     if ctx.triggered_id in ["modal-cancel-btn", "modal-confirm-btn"]:
         return False, no_update, no_update
-    
+
     # Open modal on review
     if ctx.triggered_id == "trade-review-btn":
         # Get symbol info and apply adjustments (same logic as preview)
         symbol_info = get_symbol_info(symbol)
         step_size = symbol_info.get("step_size", 0.001)
         tick_size = symbol_info.get("tick_size", 0.01)
-        
+
         # Adjust values for execution
         adjusted_quantity, qty_adjusted = format_quantity(quantity, step_size)
         adjusted_price = price
         price_adjusted = False
-        
+
         if order_type == "LIMIT" and price:
             adjusted_price, price_adjusted = format_price(price, tick_size)
-        
+
         effective_price = adjusted_price if order_type == "LIMIT" else market_price
         notional = adjusted_quantity * effective_price if adjusted_quantity and effective_price else 0
         estimated_fee = notional * 0.001
-        
+
         side_color = "success" if side == "BUY" else "danger"
         side_icon = "🟢" if side == "BUY" else "🔴"
         action_verb = "BUY" if side == "BUY" else "SELL"
-        
+
         # SAFETY BANNER - Big, bold warning
         safety_banner = dbc.Alert([
             html.H4([
@@ -1013,14 +1012,14 @@ def toggle_confirmation_modal(review_clicks, cancel_clicks, confirm_clicks,
                 " (no real money at risk)"
             ], className="text-muted")
         ], color="warning", className="mb-3")
-        
+
         # Order summary table
         summary_rows = [
             html.Tr([html.Td(html.Strong("Symbol")), html.Td(symbol, className="text-primary")]),
             html.Tr([html.Td(html.Strong("Side")), html.Td([side_icon, f" {side}"], className=f"text-{side_color}")]),
             html.Tr([html.Td(html.Strong("Order Type")), html.Td(order_type)]),
             html.Tr([
-                html.Td(html.Strong("Quantity")), 
+                html.Td(html.Strong("Quantity")),
                 html.Td([
                     f"{adjusted_quantity:.8f}",
                     html.Br() if qty_adjusted else "",
@@ -1028,11 +1027,11 @@ def toggle_confirmation_modal(review_clicks, cancel_clicks, confirm_clicks,
                 ])
             ]),
         ]
-        
+
         if order_type == "LIMIT":
             summary_rows.append(
                 html.Tr([
-                    html.Td(html.Strong("Price")), 
+                    html.Td(html.Strong("Price")),
                     html.Td([
                         f"${adjusted_price:.8f}",
                         html.Br() if price_adjusted else "",
@@ -1043,30 +1042,30 @@ def toggle_confirmation_modal(review_clicks, cancel_clicks, confirm_clicks,
         else:
             summary_rows.append(
                 html.Tr([
-                    html.Td(html.Strong("Price")), 
+                    html.Td(html.Strong("Price")),
                     html.Td(f"~${market_price:.2f} (Market - best available)", className="text-info")
                 ])
             )
-        
+
         summary_rows.extend([
             html.Tr([html.Td(html.Strong("Estimated Total")), html.Td(f"${notional:.2f}", className="text-warning")]),
             html.Tr([
-                html.Td(html.Strong("Estimated Fee")), 
+                html.Td(html.Strong("Estimated Fee")),
                 html.Td([f"${estimated_fee:.4f} ", html.Small("(assumes 0.1%)", className="text-muted")])
             ]),
         ])
-        
+
         summary = html.Div([
             safety_banner,
             dbc.Table(summary_rows, bordered=True, hover=True, dark=True)
         ])
-        
+
         # Perform risk check with ADJUSTED values
         try:
             components = get_trading_components()
             risk_agent = components["risk_agent"]
             risk_check = risk_agent.validate_trade(symbol, side, adjusted_quantity, effective_price or 0)
-            
+
             if risk_check.get("approved", False):
                 risk_status = dbc.Alert([
                     html.I(className="bi bi-shield-check me-2"),
@@ -1083,9 +1082,9 @@ def toggle_confirmation_modal(review_clicks, cancel_clicks, confirm_clicks,
                 ], color="danger")
         except Exception as e:
             risk_status = dbc.Alert(f"Error checking risk: {str(e)}", color="warning")
-        
+
         return True, summary, risk_status
-    
+
     return no_update, no_update, no_update
 
 
@@ -1111,16 +1110,16 @@ def place_order_confirmed(n_clicks, symbol, side, order_type, quantity, price):
         components = get_trading_components()
         execution_agent = components["execution_agent"]
         risk_agent = components["risk_agent"]
-        
+
         # Apply same adjustments as validation and modal
         symbol_info = get_symbol_info(symbol)
         step_size = symbol_info.get("step_size", 0.001)
         tick_size = symbol_info.get("tick_size", 0.01)
-        
+
         # Adjust values for execution
         adjusted_quantity, _ = format_quantity(quantity, step_size)
         adjusted_price = price
-        
+
         if order_type == "LIMIT" and price:
             adjusted_price, _ = format_price(price, tick_size)
 

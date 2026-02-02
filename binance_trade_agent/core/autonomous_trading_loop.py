@@ -13,7 +13,10 @@ from datetime import datetime, timedelta
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from binance_trade_agent.common.config import config
-from binance_trade_agent.common.logging_config import setup_logging, get_logger, set_correlation_id, generate_call_id
+from binance_trade_agent.common.logging_config import (
+    get_logger,
+    setup_logging,
+)
 from binance_trade_agent.core.orchestrator import TradingOrchestrator
 from binance_trade_agent.core.performance_analytics import get_performance_analytics
 
@@ -85,12 +88,12 @@ class AutonomousTradingLoop:
         """
         risk_agent = self.orchestrator.risk_agent
         trailing_info = risk_agent.get_trailing_stop_info()
-        
+
         if not trailing_info.get("positions"):
             return
-        
+
         self.logger.info(f"\n🎯 Checking {trailing_info['active_stops']} trailing stop(s)...")
-        
+
         # Get current prices for all tracked symbols
         prices = {}
         for symbol in trailing_info["positions"].keys():
@@ -99,10 +102,10 @@ class AutonomousTradingLoop:
                 prices[symbol] = price
             except Exception as e:
                 self.logger.error(f"   Failed to get price for {symbol}: {e}")
-        
+
         # Update all trailing stops with current prices
         results = risk_agent.update_all_trailing_stops(prices)
-        
+
         # Handle triggered stops
         for symbol, result in results.items():
             if result.get("stop_triggered"):
@@ -112,34 +115,34 @@ class AutonomousTradingLoop:
                     f"Stop: ${result['current_stop']:,.2f}, "
                     f"Current: ${result['current_price']:,.2f}"
                 )
-                
+
                 # Execute the stop order
                 try:
                     side = result["side"]
                     # Opposite order to close position
                     close_side = "sell" if side == "buy" else "buy"
-                    
+
                     # Get quantity (for now, use default - in production, would track position size)
                     quantity = config.get_default_quantity(symbol)
-                    
+
                     if close_side == "sell":
                         order = self.orchestrator.execution_agent.place_sell_order(symbol, quantity)
                     else:
                         order = self.orchestrator.execution_agent.place_buy_order(symbol, quantity)
-                    
+
                     self.logger.info(
                         f"      ✅ Stop order executed: {close_side.upper()} {quantity} {symbol}"
                     )
                     self.trades_executed += 1
-                    
+
                     # Close the trailing stop tracking
                     close_result = risk_agent.close_trailing_stop(
-                        symbol, 
+                        symbol,
                         close_price=result["current_price"]
                     )
                     pnl_pct = close_result.get("pnl_pct", 0) * 100
                     self.logger.info(f"      PnL: {pnl_pct:+.2f}%")
-                    
+
                     # Record trade exit in performance analytics
                     try:
                         analytics = get_performance_analytics(config.portfolio_initial_value)
@@ -150,7 +153,7 @@ class AutonomousTradingLoop:
                         )
                     except Exception as ae:
                         self.logger.warning(f"Failed to record trade exit in analytics: {ae}")
-                    
+
                 except Exception as e:
                     self.logger.error(f"      ❌ Failed to execute stop order: {e}")
             else:

@@ -7,11 +7,14 @@ from dash import Input, Output, callback, dcc, html
 
 try:
     from binance_trade_agent.dashboard.components.navbar import create_metric_card
-    from binance_trade_agent.dashboard.utils.data_fetch import get_performance_summary, get_trade_history
+    from binance_trade_agent.dashboard.utils.data_fetch import (
+        get_performance_summary,
+        get_performance_trade_history,
+    )
 except Exception as e:
     print(f"Import error: {e}")
     get_performance_summary = None
-    get_trade_history = None
+    get_performance_trade_history = None
     create_metric_card = None
 
 logger = logging.getLogger(__name__)
@@ -527,7 +530,7 @@ def update_session_info(n_intervals):
                         dbc.Col(
                             [
                                 html.Div("Session Start", style={"color": "#b8b4b0", "fontSize": "0.875rem"}),
-                                html.Div(session_start[:19] if len(session_start) > 19 else session_start, 
+                                html.Div(session_start[:19] if len(session_start) > 19 else session_start,
                                          style={"color": "#f4f2ee", "fontSize": "1rem"}),
                             ],
                             width=12,
@@ -600,10 +603,10 @@ def update_session_info(n_intervals):
 def update_trade_history(n_intervals):
     """Update trade history table"""
     try:
-        if get_trade_history is None:
+        if get_performance_trade_history is None:
             return dbc.Alert("Trade history unavailable", color="warning")
 
-        trades = get_trade_history(20)  # Last 20 trades
+        trades = get_performance_trade_history(20)  # Last 20 trades
 
         if not trades:
             return dbc.Alert(

@@ -1,7 +1,7 @@
 /**
  * Unified Design System for Binance Trading Agent
  * Applies consistent styling across all 7 application tabs
- * 
+ *
  * Design Principles:
  * - 8px baseline grid (all spacing multiples of 8)
  * - Professional component library
@@ -22,7 +22,7 @@
     --grid-spacing-md: 24px;
     --grid-spacing-lg: 32px;
     --grid-spacing-xl: 48px;
-    
+
     /* Typography */
     --font-family-primary: 'Segoe UI', 'Roboto', 'Helvetica', sans-serif;
     --font-size-xs: 12px;
@@ -35,7 +35,7 @@
     --font-weight-medium: 500;
     --font-weight-semibold: 600;
     --font-weight-bold: 700;
-    
+
     /* Colors */
     --color-success: #00D084;
     --color-success-dark: #00A866;
@@ -44,33 +44,33 @@
     --color-warning: #F39C12;
     --color-info: #3498DB;
     --color-info-dark: #2980B9;
-    
+
     /* Backgrounds */
     --color-bg-primary: #23242A;
     --color-bg-secondary: #2F3035;
     --color-bg-tertiary: #3A3F47;
-    
+
     /* Text */
     --color-text-primary: #F4F2EE;
     --color-text-secondary: #BFBBB2;
     --color-text-tertiary: #8B8680;
-    
+
     /* Borders */
     --color-border-light: rgba(255, 255, 255, 0.1);
     --color-border-medium: rgba(255, 255, 255, 0.2);
-    
+
     /* Shadows */
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
     --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.15);
     --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.2);
     --shadow-hover: 0 8px 16px rgba(0, 0, 0, 0.25);
-    
+
     /* Border Radius */
     --radius-sm: 4px;
     --radius-md: 8px;
     --radius-lg: 12px;
     --radius-xl: 16px;
-    
+
     /* Transitions */
     --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
     --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -751,7 +751,7 @@
     .grid--3-col { grid-template-columns: repeat(2, 1fr); }
     .grid--4-col { grid-template-columns: repeat(2, 1fr); }
     .grid--6-col { grid-template-columns: repeat(2, 1fr); }
-    
+
     .hide-tablet { display: none; }
 }
 
@@ -761,11 +761,11 @@
     .grid--3-col { grid-template-columns: repeat(1, 1fr); }
     .grid--4-col { grid-template-columns: repeat(1, 1fr); }
     .grid--6-col { grid-template-columns: repeat(1, 1fr); }
-    
+
     .metric-card {
         min-width: 100%;
     }
-    
+
     .hide-mobile { display: none; }
 }
 
@@ -775,17 +775,17 @@
     .grid--3-col { grid-template-columns: repeat(1, 1fr); }
     .grid--4-col { grid-template-columns: repeat(1, 1fr); }
     .grid--6-col { grid-template-columns: repeat(1, 1fr); }
-    
+
     .metric-card {
         min-width: 100%;
     }
-    
+
     .flex--row {
         flex-direction: column;
     }
-    
+
     .hide-mobile { display: none; }
-    
+
     .p-sm { padding: var(--grid-spacing-xs); }
     .p-md { padding: var(--grid-spacing-sm); }
 }

@@ -25,35 +25,35 @@ logger = logging.getLogger(__name__)
 class EdgeStrategy(BaseStrategy):
     """
     Contrarian edge strategy using alternative data sources.
-    
+
     Key insight: Markets overreact at extremes. When everyone is fearful,
     buy. When everyone is greedy and funding is sky-high, sell.
     """
-    
+
     def __init__(self, market_data_agent=None, parameters: dict = None):
         self.market_data_agent = market_data_agent
         self._name = "edge_contrarian"
         super().__init__(parameters)
-        
+
         # Thresholds calibrated from historical data
         self.fear_greed_buy_threshold = 25    # Extreme fear = buy
         self.fear_greed_sell_threshold = 75   # Extreme greed = sell
-        
+
         # Funding rate thresholds (annualized)
         self.funding_extreme_high = 0.1       # 0.1% per 8h = very high
         self.funding_extreme_low = -0.05      # Negative funding = shorts paying
-        
+
         # Volume anomaly detection
         self.volume_spike_multiplier = 2.5    # Volume > 2.5x average
-        
+
         # Cache for API calls (avoid rate limits)
         self._fear_greed_cache = {"value": None, "timestamp": None}
         self._funding_cache = {}
-        
+
     def _get_fear_greed_index(self) -> Optional[int]:
         """
         Fetch Fear & Greed Index from Alternative.me
-        
+
         Returns value 0-100:
         - 0-25: Extreme Fear (BUY signal)
         - 25-45: Fear
@@ -66,7 +66,7 @@ class EdgeStrategy(BaseStrategy):
             age = datetime.now() - self._fear_greed_cache["timestamp"]
             if age < timedelta(minutes=30):
                 return self._fear_greed_cache["value"]
-        
+
         try:
             response = requests.get(
                 "https://api.alternative.me/fng/",
@@ -74,23 +74,23 @@ class EdgeStrategy(BaseStrategy):
             )
             data = response.json()
             value = int(data["data"][0]["value"])
-            
+
             self._fear_greed_cache = {
                 "value": value,
                 "timestamp": datetime.now()
             }
-            
+
             logger.info(f"Fear & Greed Index: {value}")
             return value
-            
+
         except Exception as e:
             logger.warning(f"Failed to fetch Fear & Greed: {e}")
             return None
-    
+
     def _get_funding_rate(self, symbol: str) -> Optional[float]:
         """
         Get current funding rate for perpetual futures.
-        
+
         Binance funding rate is paid every 8 hours.
         Positive = longs pay shorts (bullish sentiment, often tops)
         Negative = shorts pay longs (bearish sentiment, often bottoms)
@@ -102,100 +102,100 @@ class EdgeStrategy(BaseStrategy):
             age = datetime.now() - cache_entry["timestamp"]
             if age < timedelta(minutes=5):
                 return cache_entry["value"]
-        
+
         try:
             # Convert spot symbol to futures symbol
             futures_symbol = symbol  # BTCUSDT works for both
-            
+
             response = requests.get(
-                f"https://fapi.binance.com/fapi/v1/fundingRate",
+                "https://fapi.binance.com/fapi/v1/fundingRate",
                 params={"symbol": futures_symbol, "limit": 1},
                 timeout=5
             )
             data = response.json()
-            
+
             if data and len(data) > 0:
                 funding_rate = float(data[0]["fundingRate"])
-                
+
                 self._funding_cache[cache_key] = {
                     "value": funding_rate,
                     "timestamp": datetime.now()
                 }
-                
+
                 logger.info(f"Funding rate {symbol}: {funding_rate:.4%}")
                 return funding_rate
-                
+
         except Exception as e:
             logger.warning(f"Failed to fetch funding rate: {e}")
-        
+
         return None
-    
+
     def _detect_volume_anomaly(self, ohlcv_data: list) -> dict:
         """
         Detect unusual volume patterns.
-        
+
         High volume + small price move = accumulation/distribution
         This often precedes big moves.
         """
         if len(ohlcv_data) < 20:
             return {"detected": False}
-        
+
         recent = ohlcv_data[-1]
         historical = ohlcv_data[-21:-1]  # Last 20 candles excluding current
-        
+
         avg_volume = sum(c["volume"] for c in historical) / len(historical)
         current_volume = recent["volume"]
-        
+
         # Calculate price move
         price_change_pct = abs(
             (recent["close"] - recent["open"]) / recent["open"] * 100
         )
-        
+
         volume_ratio = current_volume / avg_volume if avg_volume > 0 else 1
-        
+
         # High volume + small price move = accumulation/distribution
         if volume_ratio > self.volume_spike_multiplier and price_change_pct < 1.0:
             # Determine direction by close position in candle
             candle_body = recent["close"] - recent["open"]
             candle_range = recent["high"] - recent["low"]
-            
+
             if candle_range > 0:
                 close_position = (recent["close"] - recent["low"]) / candle_range
             else:
                 close_position = 0.5
-            
+
             return {
                 "detected": True,
                 "volume_ratio": volume_ratio,
                 "type": "accumulation" if close_position > 0.6 else "distribution",
                 "signal": "bullish" if close_position > 0.6 else "bearish"
             }
-        
+
         return {"detected": False, "volume_ratio": volume_ratio}
-    
+
     def _calculate_liquidation_levels(self, current_price: float, ohlcv_data: list) -> dict:
         """
         Estimate where liquidation clusters might be.
-        
-        Theory: Price tends to hunt liquidity. If there's been a strong 
+
+        Theory: Price tends to hunt liquidity. If there's been a strong
         move, stops/liquidations cluster at recent highs/lows.
         """
         if len(ohlcv_data) < 50:
             return {"levels": []}
-        
+
         recent_data = ohlcv_data[-50:]
-        
+
         # Find recent swing highs and lows
         highs = [c["high"] for c in recent_data]
         lows = [c["low"] for c in recent_data]
-        
+
         recent_high = max(highs[-20:])
         recent_low = min(lows[-20:])
-        
+
         # Estimate liquidation zones (common leverage points)
         # 10x leverage liquidates at ~10% move against position
         # 20x liquidates at ~5% move
-        
+
         levels = {
             "long_liquidations_10x": current_price * 0.90,  # 10% below
             "long_liquidations_20x": current_price * 0.95,  # 5% below
@@ -204,31 +204,31 @@ class EdgeStrategy(BaseStrategy):
             "recent_high": recent_high,
             "recent_low": recent_low,
         }
-        
+
         # Check if price is near liquidation zones (potential magnets)
         distance_to_short_liq = (levels["short_liquidations_20x"] - current_price) / current_price
         distance_to_long_liq = (current_price - levels["long_liquidations_20x"]) / current_price
-        
+
         return {
             "levels": levels,
             "near_short_liquidations": distance_to_short_liq < 0.02,
             "near_long_liquidations": distance_to_long_liq < 0.02,
         }
-    
+
     def generate_signal(self, symbol: str, ohlcv_data: list = None) -> dict:
         """
         Generate trading signal based on contrarian edge factors.
-        
+
         Signal strength is based on confluence of multiple edge factors.
         """
         if ohlcv_data is None:
             ohlcv_data = self._fetch_ohlcv(symbol)
-        
+
         if not ohlcv_data or len(ohlcv_data) < 50:
             return self._create_signal("HOLD", 0.0, {"error": "Insufficient data"})
-        
+
         current_price = ohlcv_data[-1]["close"]
-        
+
         # Collect all edge signals
         signals = {
             "fear_greed": {"signal": "neutral", "strength": 0},
@@ -236,7 +236,7 @@ class EdgeStrategy(BaseStrategy):
             "volume": {"signal": "neutral", "strength": 0},
             "liquidation": {"signal": "neutral", "strength": 0},
         }
-        
+
         # 1. Fear & Greed Index (weight: 35%)
         fear_greed = self._get_fear_greed_index()
         if fear_greed is not None:
@@ -260,7 +260,7 @@ class EdgeStrategy(BaseStrategy):
                 }
             else:
                 signals["fear_greed"]["value"] = fear_greed
-        
+
         # 2. Funding Rate (weight: 30%)
         funding = self._get_funding_rate(symbol)
         if funding is not None:
@@ -284,7 +284,7 @@ class EdgeStrategy(BaseStrategy):
                 }
             else:
                 signals["funding"]["value"] = funding
-        
+
         # 3. Volume Anomaly (weight: 20%)
         volume_analysis = self._detect_volume_anomaly(ohlcv_data)
         if volume_analysis["detected"]:
@@ -295,7 +295,7 @@ class EdgeStrategy(BaseStrategy):
                 "volume_ratio": volume_analysis["volume_ratio"],
                 "interpretation": f"{volume_analysis['type'].title()} detected (volume {volume_analysis['volume_ratio']:.1f}x avg)"
             }
-        
+
         # 4. Liquidation Levels (weight: 15%)
         liq_analysis = self._calculate_liquidation_levels(current_price, ohlcv_data)
         if liq_analysis.get("near_short_liquidations"):
@@ -310,7 +310,7 @@ class EdgeStrategy(BaseStrategy):
                 "strength": 0.6,
                 "interpretation": "Near long liquidation zone - potential cascade"
             }
-        
+
         # Calculate weighted signal
         weights = {
             "fear_greed": 0.35,
@@ -318,25 +318,25 @@ class EdgeStrategy(BaseStrategy):
             "volume": 0.20,
             "liquidation": 0.15,
         }
-        
+
         bullish_score = 0
         bearish_score = 0
-        
+
         for factor, data in signals.items():
             weight = weights[factor]
             strength = data.get("strength", 0)
-            
+
             if data["signal"] == "bullish":
                 bullish_score += weight * strength
             elif data["signal"] == "bearish":
                 bearish_score += weight * strength
-        
+
         # Determine final signal
         net_score = bullish_score - bearish_score
-        
+
         # Require minimum conviction
         min_conviction = 0.25  # Need at least 25% weighted signal
-        
+
         if net_score >= min_conviction:
             action = "BUY"
             confidence = min(net_score * 2, 1.0)  # Scale to 0-1
@@ -346,7 +346,7 @@ class EdgeStrategy(BaseStrategy):
         else:
             action = "HOLD"
             confidence = 0.5
-        
+
         return self._create_signal(
             action=action,
             confidence=confidence,
@@ -359,12 +359,12 @@ class EdgeStrategy(BaseStrategy):
                 "net_score": round(net_score, 3),
                 "factors": signals,
                 "edge_factors_active": sum(
-                    1 for s in signals.values() 
+                    1 for s in signals.values()
                     if s.get("strength", 0) > 0
                 ),
             }
         )
-    
+
     def _create_signal(self, action: str, confidence: float, metadata: dict) -> dict:
         """Create standardized signal response"""
         return {
@@ -373,18 +373,18 @@ class EdgeStrategy(BaseStrategy):
             "timestamp": datetime.now().isoformat(),
             **metadata
         }
-    
+
     def get_name(self) -> str:
         """Return strategy name"""
         return self._name
-    
+
     def get_description(self) -> str:
         """Return strategy description"""
         return (
             "Contrarian edge strategy using Fear & Greed Index, funding rates, "
             "and volume anomalies to identify market extremes for mean reversion trades."
         )
-    
+
     def get_parameters(self) -> dict:
         """Return strategy parameters"""
         return {
@@ -405,7 +405,7 @@ class EdgeStrategy(BaseStrategy):
                 "description": "Funding rate below which shorts are crowded (bullish)",
             },
         }
-    
+
     def analyze(self, market_data: list, symbol: str = None) -> dict:
         """Analyze market data - wrapper for generate_signal"""
         return self.generate_signal(symbol or "BTCUSDT", market_data)
