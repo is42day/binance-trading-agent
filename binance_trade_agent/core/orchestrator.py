@@ -130,9 +130,9 @@ class TradingOrchestrator:
                     trade_decision.order_id = execution_result.get("order_id")
                     trade_decision.execution_price = execution_result.get("price", price)
                     trade_decision.execution_time = datetime.now()
-                    
+
                     exec_price = trade_decision.execution_price or price
-                    
+
                     # Register trailing stop for the executed trade
                     if self.risk_agent.config.get("trailing_stop_enabled", True):
                         self.risk_agent.register_trailing_stop(
@@ -144,7 +144,7 @@ class TradingOrchestrator:
                             f"Trailing stop registered for {symbol} at {exec_price}",
                             extra=extra,
                         )
-                    
+
                     # Record trade in performance analytics
                     try:
                         analytics = get_performance_analytics(config.portfolio_initial_value)

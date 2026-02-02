@@ -9,9 +9,10 @@ Card Types:
 - Status Pills: Connected/Degraded/Disconnected states
 """
 
-from dash import html
+from typing import List, Optional, Union
+
 import dash_bootstrap_components as dbc
-from typing import Optional, List, Union
+from dash import html
 
 
 def create_kpi_card(

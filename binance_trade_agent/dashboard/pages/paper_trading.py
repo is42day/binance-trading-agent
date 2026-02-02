@@ -308,7 +308,7 @@ layout = dbc.Container(
 def update_portfolio_stats(n_intervals):
     """Update portfolio statistics"""
     status = fetch_paper_status()
-    
+
     if status is None or not status.get("portfolio"):
         banner = dbc.Alert(
             [
@@ -329,13 +329,13 @@ def update_portfolio_stats(n_intervals):
             "0.00",
             "0",
         )
-    
+
     portfolio = status.get("portfolio", {})
     active = status.get("active", False)
     last_update = status.get("last_update", "")
     age_seconds = status.get("age_seconds", 0)
     signals_count = status.get("signals_count", 0)
-    
+
     # Determine status
     try:
         update_time = datetime.fromisoformat(last_update)
@@ -349,9 +349,9 @@ def update_portfolio_stats(n_intervals):
                 f"Paper trading idle - Last update: {update_time.strftime('%H:%M:%S')} ({age_seconds}s ago)",
                 color="info",
             )
-    except:
+    except Exception:
         banner = dbc.Alert("Paper trading status unknown", color="secondary")
-    
+
     # Extract stats
     balance = portfolio.get("current_balance", 0)
     pnl = portfolio.get("total_pnl", 0)
@@ -361,11 +361,11 @@ def update_portfolio_stats(n_intervals):
     drawdown = portfolio.get("max_drawdown", 0)
     open_positions = portfolio.get("open_positions", 0)
     profit_factor = portfolio.get("profit_factor", 0)
-    
+
     # Style for P&L
     pnl_color = "#27ae60" if pnl >= 0 else "#e74c3c"
     pnl_style = {"color": pnl_color}
-    
+
     return (
         banner,
         f"${balance:,.2f}",
@@ -388,21 +388,21 @@ def update_trade_history(n_intervals):
     """Update trade history table"""
     data = fetch_paper_trades(limit=20)
     trades = data.get("trades", [])
-    
+
     if not trades:
         return html.P("No trades yet", className="text-muted text-center")
-    
+
     rows = []
     for trade in trades[:20]:  # Show last 20
         trade_data = trade.get("trade", {})
         event = trade.get("event", "")
-        
+
         symbol = trade_data.get("symbol", "")
         side = trade_data.get("side", "")
         entry = trade_data.get("entry_price", 0)
         exit_price = trade_data.get("exit_price")
         pnl = trade_data.get("pnl")
-        
+
         if event == "OPEN":
             row = html.Tr(
                 [
@@ -434,7 +434,7 @@ def update_trade_history(n_intervals):
                 ]
             )
         rows.append(row)
-    
+
     table = html.Table(
         [
             html.Thead(
@@ -453,7 +453,7 @@ def update_trade_history(n_intervals):
         ],
         className="table table-sm table-dark",
     )
-    
+
     return table
 
 
@@ -465,17 +465,17 @@ def update_signal_history(n_intervals):
     """Update signal history"""
     data = fetch_paper_signals(limit=30)
     signals = data.get("signals", [])
-    
+
     if not signals:
         return html.P("No signals yet", className="text-muted text-center")
-    
+
     rows = []
     for sig in signals:
         action = sig.get("action", "HOLD")
         confidence = sig.get("confidence", 0)
         executed = sig.get("executed", False)
         rejection = sig.get("rejection_reason")
-        
+
         # Color based on action
         if action == "BUY":
             action_color = "#27ae60"
@@ -483,7 +483,7 @@ def update_signal_history(n_intervals):
             action_color = "#e74c3c"
         else:
             action_color = "#6c757d"
-        
+
         # Execution status
         if executed:
             status = html.Span("EXEC", className="badge bg-success")
@@ -491,7 +491,7 @@ def update_signal_history(n_intervals):
             status = html.Span("SKIP", className="badge bg-warning text-dark")
         else:
             status = html.Span("HOLD", className="badge bg-secondary")
-        
+
         row = html.Tr(
             [
                 html.Td(sig.get("timestamp", "")[:19], className="small"),
@@ -502,7 +502,7 @@ def update_signal_history(n_intervals):
             ]
         )
         rows.append(row)
-    
+
     table = html.Table(
         [
             html.Thead(
@@ -520,7 +520,7 @@ def update_signal_history(n_intervals):
         ],
         className="table table-sm table-dark",
     )
-    
+
     return table
 
 
@@ -532,15 +532,15 @@ def update_signal_details(n_intervals):
     """Show details of the latest signal"""
     data = fetch_paper_signals(limit=1)
     signals = data.get("signals", [])
-    
+
     if not signals:
         return html.P("No signals yet", className="text-muted text-center")
-    
+
     sig = signals[0]  # Already newest first from API
     metadata = sig.get("metadata", {})
-    
+
     details = []
-    
+
     # Basic info
     details.append(
         dbc.Row(
@@ -563,7 +563,7 @@ def update_signal_details(n_intervals):
             className="mb-2",
         )
     )
-    
+
     # Rejection reason
     if sig.get("rejection_reason"):
         details.append(
@@ -573,12 +573,12 @@ def update_signal_details(n_intervals):
                 className="py-1 px-2 mb-2",
             )
         )
-    
+
     # Edge factors
     edge_data = metadata.get("edge", {})
     if edge_data:
         factors = edge_data.get("factors", {})
-        
+
         factor_items = []
         for factor_name, factor_data in factors.items():
             if isinstance(factor_data, dict):
@@ -586,9 +586,9 @@ def update_signal_details(n_intervals):
                 strength = factor_data.get("strength", 0)
                 interp = factor_data.get("interpretation", "")
                 value = factor_data.get("value", "")
-                
+
                 color = "#27ae60" if signal == "bullish" else "#e74c3c" if signal == "bearish" else "#6c757d"
-                
+
                 factor_items.append(
                     html.Div(
                         [
@@ -607,7 +607,7 @@ def update_signal_details(n_intervals):
                         className="mb-2",
                     )
                 )
-        
+
         if factor_items:
             details.append(
                 html.Div(
@@ -617,7 +617,7 @@ def update_signal_details(n_intervals):
                     ]
                 )
             )
-    
+
     # Entry data
     entry_data = metadata.get("entry", {})
     if entry_data:
@@ -651,7 +651,7 @@ def update_signal_details(n_intervals):
                 className="mt-2",
             )
         )
-    
+
     # TA Confirmations
     ta_data = metadata.get("ta_confirmations", {})
     if ta_data:
@@ -683,5 +683,5 @@ def update_signal_details(n_intervals):
                 className="mt-2",
             )
         )
-    
+
     return html.Div(details)

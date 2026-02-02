@@ -103,7 +103,7 @@ class Config:
 
         # Supported trading pairs
         self.supported_symbols = os.getenv(
-            "SUPPORTED_SYMBOLS", 
+            "SUPPORTED_SYMBOLS",
             "BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT"
         ).split(",")
 

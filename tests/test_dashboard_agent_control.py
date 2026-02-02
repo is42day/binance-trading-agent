@@ -3,7 +3,6 @@ Tests for Dashboard Agent Control Functionality
 Tests the automation page agent start/stop/restart functionality
 """
 
-import asyncio
 from unittest.mock import MagicMock, patch
 
 import pytest

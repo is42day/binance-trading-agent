@@ -13,13 +13,13 @@ A production-ready automated trading system for Binance with advanced risk manag
 
 ### Advanced Features
 - **Portfolio Management**: SQLite-backed position tracking with P&L calculations
-- **Enhanced Risk Controls**: 
+- **Enhanced Risk Controls**:
   - Stop-loss/take-profit automation
   - Position sizing limits
   - Maximum drawdown protection
   - Trading frequency controls
   - Symbol-specific rules
-- **Structured Logging & Monitoring**: 
+- **Structured Logging & Monitoring**:
   - Correlation ID tracking
   - Performance metrics collection
   - System health monitoring
@@ -254,7 +254,7 @@ docker run -d \
 # Default configuration in risk_management_agent.py
 config = {
     'max_position_per_symbol': 0.05,    # 5% per symbol
-    'max_total_exposure': 0.8,          # 80% total exposure  
+    'max_total_exposure': 0.8,          # 80% total exposure
     'max_single_trade_size': 0.02,      # 2% per trade
     'default_stop_loss_pct': 0.02,      # 2% stop-loss
     'default_take_profit_pct': 0.06,    # 6% take-profit

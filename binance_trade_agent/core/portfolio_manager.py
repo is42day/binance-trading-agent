@@ -25,10 +25,10 @@ from binance_trade_agent.core import db
 def retry_on_db_error(max_retries: int = 3, backoff_seconds: float = 0.5):
     """
     Decorator to retry database operations on transient errors.
-    
+
     Useful for handling connection resets, serialization failures, etc.
     Only retries OperationalError (connection issues), not data integrity errors.
-    
+
     Args:
         max_retries: Maximum number of retry attempts
         backoff_seconds: Initial backoff time (doubles each retry)
@@ -38,7 +38,7 @@ def retry_on_db_error(max_retries: int = 3, backoff_seconds: float = 0.5):
         def wrapper(*args, **kwargs):
             retries = 0
             current_backoff = backoff_seconds
-            
+
             while retries < max_retries:
                 try:
                     return func(*args, **kwargs)
@@ -46,7 +46,7 @@ def retry_on_db_error(max_retries: int = 3, backoff_seconds: float = 0.5):
                     retries += 1
                     if retries >= max_retries:
                         raise  # Give up after max retries
-                    
+
                     # Log and retry with backoff
                     logger = logging.getLogger(__name__)
                     logger.warning(
@@ -55,7 +55,7 @@ def retry_on_db_error(max_retries: int = 3, backoff_seconds: float = 0.5):
                     )
                     time.sleep(current_backoff)
                     current_backoff *= 2  # Exponential backoff
-                    
+
             return func(*args, **kwargs)  # Final attempt
         return wrapper
     return decorator
@@ -165,7 +165,7 @@ class HeartbeatORM(Base):
                 details = json.loads(self.details)
             except (json.JSONDecodeError, TypeError):
                 details = {"raw": self.details}
-        
+
         return {
             "service_name": self.service_name,
             "last_update": self.last_update.isoformat() if self.last_update else None,
@@ -185,20 +185,20 @@ class PortfolioManager:
     def __init__(self, db_path: str = "/app/data/portfolio.db", use_shared_session: bool = True):
         """
         Initialize portfolio manager with SQLAlchemy session.
-        
+
         Args:
             db_path: Path to SQLite database (used only if DATABASE_URL not set)
             use_shared_session: If True, uses shared session factory from db module.
                                If False, creates own engine (legacy mode for tests).
         """
         self.logger = logging.getLogger(self.__class__.__name__)
-        
+
         if use_shared_session:
             # Use centralized DB configuration (recommended)
             # Set DB_PATH env var if db_path provided and DATABASE_URL not set
             if not db.os.getenv("DATABASE_URL") and db_path != "/app/data/portfolio.db":
                 db.os.environ["DB_PATH"] = db_path
-            
+
             self.engine = db.get_engine()
             self.SessionLocal = db.get_session_factory()
             self.db_path = None  # Not used with shared session
@@ -206,7 +206,7 @@ class PortfolioManager:
             # Legacy mode: create own SQLite engine (for backward compatibility)
             from sqlalchemy import create_engine
             from sqlalchemy.orm import sessionmaker
-            
+
             self.db_path = db_path
             self.engine = create_engine(f"sqlite:///{db_path}", echo=False)
             Base.metadata.create_all(self.engine, checkfirst=True)
@@ -231,7 +231,7 @@ class PortfolioManager:
     ) -> TradeORM:
         """
         Add a new trade to the portfolio and update position atomically.
-        
+
         Uses a single transaction to ensure consistency between trade insertion
         and position updates. This prevents partial updates in concurrent scenarios.
         """
@@ -252,14 +252,14 @@ class PortfolioManager:
                     pnl=pnl,
                 )
                 session.add(trade)
-                
+
                 # Update position in same transaction (atomic operation)
                 self._update_position_from_trade(session, trade)
-                
+
             # Transaction automatically committed if no exception
             self.logger.info(f"Added trade: {side} {quantity} {symbol} @ ${price:.2f}")
             return trade
-            
+
         except Exception as e:
             # Transaction automatically rolled back on exception
             self.logger.error(f"Error adding trade: {str(e)}")
@@ -537,7 +537,7 @@ class PortfolioManager:
     def update_heartbeat(self, service_name: str, status: str = "healthy", details: Optional[Dict[str, Any]] = None):
         """
         Update or create a heartbeat record for a service.
-        
+
         Args:
             service_name: Name of the service (e.g., "trading-agent", "api", "dashboard")
             status: Status string (e.g., "healthy", "degraded", "unhealthy")
@@ -547,12 +547,12 @@ class PortfolioManager:
         try:
             with session.begin():
                 details_json = json.dumps(details) if details else None
-                
+
                 # Try to update existing heartbeat
                 heartbeat = session.query(HeartbeatORM).filter(
                     HeartbeatORM.service_name == service_name
                 ).first()
-                
+
                 if heartbeat:
                     heartbeat.last_update = datetime.now()
                     heartbeat.status = status
@@ -566,18 +566,18 @@ class PortfolioManager:
                         details=details_json,
                     )
                     session.add(heartbeat)
-                
-                logger.debug(f"Updated heartbeat for {service_name}: {status}")
+
+                self.logger.debug(f"Updated heartbeat for {service_name}: {status}")
         finally:
             session.close()
 
     def get_heartbeat(self, service_name: str) -> Optional[Dict[str, Any]]:
         """
         Get the latest heartbeat record for a service.
-        
+
         Args:
             service_name: Name of the service
-            
+
         Returns:
             Dictionary with heartbeat data, or None if not found
         """
@@ -586,7 +586,7 @@ class PortfolioManager:
             heartbeat = session.query(HeartbeatORM).filter(
                 HeartbeatORM.service_name == service_name
             ).first()
-            
+
             return heartbeat.to_dict() if heartbeat else None
         finally:
             session.close()
@@ -594,7 +594,7 @@ class PortfolioManager:
     def get_all_heartbeats(self) -> List[Dict[str, Any]]:
         """
         Get all heartbeat records from all services.
-        
+
         Returns:
             List of heartbeat dictionaries
         """

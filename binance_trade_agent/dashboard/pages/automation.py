@@ -533,10 +533,11 @@ def handle_agent_control(
 ):
     """Handle agent control button clicks."""
     from dash import callback_context
+
     from binance_trade_agent.dashboard.utils.data_fetch import (
+        restart_agent,
         start_agent,
         stop_agent,
-        restart_agent,
     )
 
     if not callback_context.triggered:

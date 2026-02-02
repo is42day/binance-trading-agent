@@ -33,16 +33,16 @@ print(f"[API Client] Connecting to: {API_BASE_URL}")
 def _make_request_with_retry(url: str, max_retries: int = MAX_RETRIES) -> Dict[str, Any]:
     """
     Make HTTP request with retry logic for transient failures.
-    
+
     Args:
         url: Full URL to request
         max_retries: Maximum number of retry attempts
-        
+
     Returns:
         JSON response as dict, or dict with 'error' key on failure
     """
     last_error = None
-    
+
     for attempt in range(max_retries):
         try:
             response = requests.get(url, timeout=REQUEST_TIMEOUT)
@@ -63,7 +63,7 @@ def _make_request_with_retry(url: str, max_retries: int = MAX_RETRIES) -> Dict[s
             if attempt < max_retries - 1:
                 time.sleep(RETRY_DELAY * (attempt + 1))
                 continue
-    
+
     print(f"API Error after {max_retries} retries: {last_error}")
     return {"error": last_error}
 

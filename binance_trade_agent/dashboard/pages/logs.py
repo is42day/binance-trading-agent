@@ -25,7 +25,7 @@ _logs_candidates = [
 ]
 LOG_DIR = next((p for p in _logs_candidates if p.exists()), _logs_candidates[0])
 LOG_FILE_PATHS = [
-    LOG_DIR / "agent.log", 
+    LOG_DIR / "agent.log",
     LOG_DIR / "auto_trading.log",
     LOG_DIR / "trading_agent.log",  # New format from logging_config
     LOG_DIR / "api.log",  # API service logs
@@ -47,7 +47,7 @@ def read_log_files(limit: int = 200) -> list:
             try:
                 with open(path, "r", encoding="utf-8", errors="ignore") as f:
                     lines = f.readlines()[-limit:]
-                
+
                 for line in lines:
                     if not line.strip():
                         continue
@@ -57,12 +57,12 @@ def read_log_files(limit: int = 200) -> list:
                     parts = line.strip().split(" - ")
                     if len(parts) < 2:
                         continue
-                    
+
                     timestamp = parts[0]
-                    
+
                     # Detect format by checking if parts[1] is a log level
                     LOG_LEVEL_KEYWORDS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
-                    
+
                     if parts[1].upper() in LOG_LEVEL_KEYWORDS:
                         # Format 1: timestamp - LEVEL - message
                         level = parts[1]
@@ -78,7 +78,7 @@ def read_log_files(limit: int = 200) -> list:
                             # Fallback if format is unexpected
                             level = "INFO"
                             message = " - ".join(parts[1:])
-                    
+
                     results.append({
                         "timestamp": timestamp,
                         "level": level.strip().upper(),
@@ -91,7 +91,7 @@ def read_log_files(limit: int = 200) -> list:
                 continue
     except Exception as e:
         logger.error(f"Error in read_log_files: {e}")
-    
+
     return results
 
 
@@ -100,11 +100,11 @@ def read_monitoring_events(limit: int = 100) -> list:
     results = []
     try:
         from binance_trade_agent.monitoring import monitoring
-        
+
         if not monitoring:
             logger.debug("Monitoring system not available")
             return results
-        
+
         # Try to get logs from monitoring loggers
         if hasattr(monitoring, 'loggers') and monitoring.loggers:
             for logger_name, monitor_logger in monitoring.loggers.items():
@@ -126,7 +126,7 @@ def read_monitoring_events(limit: int = 100) -> list:
         logger.debug("Monitoring module not available")
     except Exception as e:
         logger.warning(f"Error in read_monitoring_events: {e}")
-    
+
     return results
 
 
@@ -141,10 +141,10 @@ def _log_in_date_range(timestamp: str, start_date: str, end_date: str) -> bool:
                 break
             except ValueError:
                 continue
-        
+
         if not log_date:
             return True  # If we can't parse, include it
-        
+
         if start_date:
             try:
                 start = datetime.fromisoformat(start_date).date()
@@ -152,7 +152,7 @@ def _log_in_date_range(timestamp: str, start_date: str, end_date: str) -> bool:
                     return False
             except Exception:
                 pass
-        
+
         if end_date:
             try:
                 end = datetime.fromisoformat(end_date).date()
@@ -160,7 +160,7 @@ def _log_in_date_range(timestamp: str, start_date: str, end_date: str) -> bool:
                     return False
             except Exception:
                 pass
-        
+
         return True
     except Exception as e:
         logger.debug(f"Error in date range check: {e}")
@@ -580,7 +580,7 @@ def update_logs(
                 if search_lower in log.get("message", "").lower()
                 or search_lower in log.get("correlation_id", "").lower()
             ]
-        
+
         # Filter by date range
         if start_date or end_date:
             filtered_logs = [
@@ -706,16 +706,16 @@ def generate_sample_logs():
     """Generate logs from real files and monitoring system"""
     # Get real logs from files
     real_logs = read_log_files(limit=200)
-    
+
     # Get logs from monitoring system
     monitoring_logs = read_monitoring_events(limit=50)
-    
+
     # Combine all log sources
     logs = real_logs + monitoring_logs
-    
+
     # Sort by timestamp descending (newest first)
     logs.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
-    
+
     return logs
 
 
@@ -733,13 +733,13 @@ def export_logs(n_clicks, level, search, start_date, end_date):
     try:
         # Get all logs
         all_logs = generate_sample_logs()
-        
+
         # Apply same filters
         filtered_logs = all_logs
-        
+
         if level and level != "ALL":
             filtered_logs = [log for log in filtered_logs if log.get("level") == level]
-        
+
         if search:
             search_lower = search.lower()
             filtered_logs = [
@@ -747,19 +747,19 @@ def export_logs(n_clicks, level, search, start_date, end_date):
                 if search_lower in log.get("message", "").lower()
                 or search_lower in log.get("correlation_id", "").lower()
             ]
-        
+
         if start_date or end_date:
             filtered_logs = [
                 log for log in filtered_logs
                 if _log_in_date_range(log.get("timestamp"), start_date, end_date)
             ]
-        
+
         # Convert to CSV
         csv_str = _logs_to_csv(filtered_logs)
-        
+
         filename = f"logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         return dcc.send_string(csv_str, filename)
-    
+
     except Exception as e:
         logger.error(f"Error exporting logs: {e}")
         return None
@@ -769,10 +769,10 @@ def _logs_to_csv(logs: list) -> str:
     """Convert logs to CSV format"""
     output = StringIO()
     writer = csv.writer(output)
-    
+
     # Write header
     writer.writerow(["Timestamp", "Level", "Module", "Message", "Correlation ID"])
-    
+
     # Write log rows
     for log in logs:
         writer.writerow([
@@ -782,7 +782,7 @@ def _logs_to_csv(logs: list) -> str:
             log.get("message", ""),
             log.get("correlation_id", ""),
         ])
-    
+
     return output.getvalue()
 
 
@@ -801,26 +801,26 @@ def clear_logs(n_clicks):
                     # Keep only the last 50 lines (most recent)
                     with open(path, "r", encoding="utf-8", errors="ignore") as f:
                         lines = f.readlines()
-                    
+
                     # Keep last 50 lines
                     recent_lines = lines[-50:] if len(lines) > 50 else lines
-                    
+
                     # Write back to file
                     with open(path, "w", encoding="utf-8") as f:
                         f.writelines(recent_lines)
-                    
+
                     cleared_files.append(path.name)
                     logger.info(f"Cleared {path.name}: removed {len(lines) - len(recent_lines)} lines")
                 except Exception as e:
                     logger.warning(f"Error clearing {path.name}: {e}")
-        
+
         if cleared_files:
             message = f"✅ Cleared logs from: {', '.join(cleared_files)}"
             return dbc.Alert(message, color="success", className="mb-0")
         else:
             message = "ℹ️ No log files to clear"
             return dbc.Alert(message, color="info", className="mb-0")
-    
+
     except Exception as e:
         logger.error(f"Error in clear_logs: {e}")
         return dbc.Alert(f"❌ Error clearing logs: {str(e)}", color="danger", className="mb-0")

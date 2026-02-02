@@ -16,7 +16,7 @@ import sys
 import uuid
 from contextvars import ContextVar
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 # Context variables for correlation tracking (thread-safe)
 SERVICE_NAME: ContextVar[str] = ContextVar("service_name", default="unknown")
@@ -27,7 +27,7 @@ CALL_ID: ContextVar[str] = ContextVar("call_id", default="")
 class StructuredFormatter(logging.Formatter):
     """
     JSON formatter for structured logging.
-    
+
     Outputs logs in JSON format with:
     - timestamp (ISO 8601)
     - level (ERROR, WARNING, INFO, DEBUG)
@@ -78,7 +78,7 @@ class StructuredFormatter(logging.Formatter):
 class PlainFormatter(logging.Formatter):
     """
     Plain text formatter for development/console use.
-    
+
     Outputs in human-readable format:
     2025-12-19 12:34:56 [SERVICE] [LEVEL] logger_name: message [symbol=BTC, order_id=123]
     """
@@ -119,12 +119,12 @@ def setup_logging(
 ) -> None:
     """
     Configure structured logging for a service.
-    
+
     Args:
         service_name: Name of the service (e.g., "api", "trading-agent", "dashboard")
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         use_json: If True, use JSON formatter; else use plain formatter
-    
+
     Usage:
         setup_logging("trading-agent", log_level="INFO", use_json=False)
         logger = logging.getLogger(__name__)
@@ -164,7 +164,7 @@ def setup_logging(
         try:
             from logging.handlers import RotatingFileHandler
             file_handler = RotatingFileHandler(
-                log_file, 
+                log_file,
                 maxBytes=10*1024*1024,  # 10MB
                 backupCount=3
             )
@@ -178,7 +178,7 @@ def setup_logging(
 def get_logger(name: str) -> logging.LoggerAdapter:
     """
     Get a logger with built-in context support.
-    
+
     Usage:
         logger = get_logger(__name__)
         logger.info("Processing trade", extra={"symbol": "BTCUSDT", "order_id": "123"})

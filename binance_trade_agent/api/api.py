@@ -3,23 +3,22 @@ FastAPI Data Service for Binance Trading Agent
 Exposes portfolio, risk, and market data to the Dash UI
 """
 
-import logging
 import os
 import traceback
 from datetime import datetime
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text, inspect
+from sqlalchemy import inspect, text
 
 from ..agents.market_data_agent import MarketDataAgent
 from ..agents.risk_management_agent import EnhancedRiskManagementAgent
 from ..clients.redis_cache import RedisCache
 from ..common.config import config
-from ..common.logging_config import setup_logging, get_logger, set_call_id, generate_call_id
-from ..core.portfolio_manager import PortfolioManager
-from ..core.performance_analytics import get_performance_analytics
+from ..common.logging_config import get_logger, setup_logging
 from ..core import db
+from ..core.performance_analytics import get_performance_analytics
+from ..core.portfolio_manager import PortfolioManager
 
 # Setup structured logging for this service
 setup_logging(
@@ -98,12 +97,12 @@ def read_root():
 def health_check():
     """
     Health check endpoint for orchestration and monitoring.
-    
+
     Checks:
     1. Database connectivity (can connect to DB)
     2. Schema presence (trades and positions tables exist)
     3. Basic system readiness
-    
+
     Returns 200 if all checks pass, 503 if any check fails.
     """
     health_status = {
@@ -114,7 +113,7 @@ def health_check():
             "schema": "pending",
         },
     }
-    
+
     try:
         # Check 1: Database connectivity
         try:
@@ -125,28 +124,28 @@ def health_check():
         except Exception as e:
             health_status["checks"]["database"] = f"unhealthy: {str(e)}"
             raise
-        
+
         # Check 2: Schema presence (verify required tables exist)
         try:
             inspector = inspect(db.get_engine())
             tables = inspector.get_table_names()
-            
+
             required_tables = {"trades", "positions"}
             missing_tables = required_tables - set(tables)
-            
+
             if missing_tables:
                 health_status["checks"]["schema"] = f"incomplete: missing tables {missing_tables}"
                 raise Exception(f"Schema incomplete: missing tables {missing_tables}")
-            
+
             health_status["checks"]["schema"] = "healthy"
         except Exception as e:
             health_status["checks"]["schema"] = f"unhealthy: {str(e)}"
             raise
-        
+
         # All checks passed
         health_status["status"] = "healthy"
         return health_status
-        
+
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         health_status["status"] = "unhealthy"
@@ -157,16 +156,16 @@ def health_check():
 def readiness_check():
     """
     Readiness probe for Kubernetes/orchestration.
-    
+
     Different from /health - this checks if the service is ready to accept traffic:
     1. Database is connected and has schema
     2. Binance API is accessible (circuit breaker not open)
     3. Cache is available
-    
+
     Returns 200 if ready, 503 if not ready.
     """
     from fastapi.responses import JSONResponse
-    
+
     ready_status = {
         "ready": False,
         "timestamp": datetime.now().isoformat(),
@@ -176,9 +175,9 @@ def readiness_check():
             "cache": "pending",
         },
     }
-    
+
     all_ready = True
-    
+
     # Check 1: Database
     try:
         session = db.get_session()
@@ -187,7 +186,7 @@ def readiness_check():
     except Exception as e:
         ready_status["checks"]["database"] = f"not ready: {str(e)}"
         all_ready = False
-    
+
     # Check 2: Binance API circuit breaker status
     try:
         from ..clients.binance_client import BinanceAPIClient
@@ -199,8 +198,8 @@ def readiness_check():
         else:
             ready_status["checks"]["binance_api"] = f"ready ({cb_status['state']})"
     except Exception as e:
-        ready_status["checks"]["binance_api"] = f"ready (demo mode)"
-    
+        ready_status["checks"]["binance_api"] = "ready (demo mode)"
+
     # Check 3: Cache availability
     try:
         # Cache has already been connected during startup
@@ -208,9 +207,9 @@ def readiness_check():
     except Exception as e:
         ready_status["checks"]["cache"] = f"not ready: {str(e)}"
         all_ready = False
-    
+
     ready_status["ready"] = all_ready
-    
+
     if all_ready:
         return ready_status
     else:
@@ -378,7 +377,7 @@ async def get_performance_summary():
 
 
 @app.get("/api/v1/performance/trades")
-async def get_trade_history(limit: int = 50):
+async def get_performance_trade_history(limit: int = 50):
     """Get recent trade history."""
     try:
         analytics = get_performance_analytics(config.portfolio_initial_value)
@@ -407,11 +406,11 @@ async def get_paper_trading_status():
     """Get paper trading portfolio state and statistics."""
     import json
     from pathlib import Path
-    
+
     paper_dir = Path("data/paper_trading")
     state_file = paper_dir / "portfolio_state.json"
     signal_file = paper_dir / "signal_log.jsonl"
-    
+
     # Count signals first
     signal_count = 0
     last_signal_time = None
@@ -424,24 +423,24 @@ async def get_paper_trading_status():
                     # Get timestamp from last signal
                     last_signal = json.loads(lines[-1])
                     last_signal_time = last_signal.get("timestamp")
-        except:
+        except Exception:
             pass
-    
+
     # Check portfolio state file
     if state_file.exists():
         try:
             with open(state_file) as f:
                 state = json.load(f)
-            
+
             saved_at = state.get("saved_at", "")
             try:
                 last_update = datetime.fromisoformat(saved_at)
                 age_seconds = (datetime.now() - last_update).total_seconds()
                 active = age_seconds < 120
-            except:
+            except Exception:
                 active = False
                 age_seconds = 0
-            
+
             return {
                 "active": active,
                 "last_update": saved_at,
@@ -451,14 +450,14 @@ async def get_paper_trading_status():
             }
         except Exception as e:
             pass
-    
+
     # No portfolio state, but check if we have recent signals
     if signal_count > 0 and last_signal_time:
         try:
             last_update = datetime.fromisoformat(last_signal_time)
             age_seconds = (datetime.now() - last_update).total_seconds()
             active = age_seconds < 120
-            
+
             return {
                 "active": active,
                 "last_update": last_signal_time,
@@ -475,9 +474,9 @@ async def get_paper_trading_status():
                 },
                 "signals_count": signal_count,
             }
-        except:
+        except Exception:
             pass
-    
+
     return {
         "active": False,
         "message": "Paper trading not running",
@@ -491,19 +490,19 @@ async def get_paper_trading_signals(limit: int = 50):
     """Get recent paper trading signals."""
     import json
     from pathlib import Path
-    
+
     signal_file = Path("data/paper_trading/signal_log.jsonl")
-    
+
     if not signal_file.exists():
         return {"signals": [], "total": 0}
-    
+
     try:
         signals = []
         with open(signal_file) as f:
             for line in f:
                 if line.strip():
                     signals.append(json.loads(line))
-        
+
         # Return most recent
         return {
             "signals": signals[-limit:][::-1],  # Reverse for newest first
@@ -518,19 +517,19 @@ async def get_paper_trading_trades(limit: int = 50):
     """Get paper trading trade history."""
     import json
     from pathlib import Path
-    
+
     trade_file = Path("data/paper_trading/trade_log.jsonl")
-    
+
     if not trade_file.exists():
         return {"trades": [], "total": 0}
-    
+
     try:
         trades = []
         with open(trade_file) as f:
             for line in f:
                 if line.strip():
                     trades.append(json.loads(line))
-        
+
         # Return most recent
         return {
             "trades": trades[-limit:][::-1],  # Reverse for newest first
