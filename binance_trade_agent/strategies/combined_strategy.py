@@ -191,7 +191,7 @@ class CombinedStrategy(BaseStrategy):
             volume_multiplier = self.get_parameter("volume_multiplier")
             volume_confirmed = True
             volume_ratio = 1.0
-            
+
             if require_volume and combined_signal != SignalType.HOLD:
                 volume_confirmed, volume_ratio = self.check_volume_confirmation(
                     market_data, volume_multiplier
@@ -205,12 +205,12 @@ class CombinedStrategy(BaseStrategy):
             use_trend_filter = self.get_parameter("use_trend_filter")
             trend_info = {"trend": "NEUTRAL", "allows_buy": True, "allows_sell": True}
             trend_filtered = False
-            
+
             if use_trend_filter and combined_signal != SignalType.HOLD:
                 ema_fast = self.get_parameter("trend_ema_fast")
                 ema_slow = self.get_parameter("trend_ema_slow")
                 trend_info = self.get_trend_filter(market_data, ema_fast, ema_slow)
-                
+
                 # Check if signal is allowed by trend
                 if combined_signal == SignalType.BUY and not trend_info["allows_buy"]:
                     # Don't buy in a downtrend
@@ -238,18 +238,18 @@ class CombinedStrategy(BaseStrategy):
 
             # Calculate combined levels with ATR stops if enabled
             current_price = float(market_data[-1]["close"])
-            
+
             use_atr_stops = self.get_parameter("use_atr_stops")
             if use_atr_stops and combined_signal != SignalType.HOLD:
                 # Use ATR-based dynamic stops
                 atr_period = self.get_parameter("atr_period")
                 atr_stop_mult = self.get_parameter("atr_stop_multiplier")
                 atr_tp_mult = self.get_parameter("atr_take_profit_multiplier")
-                
+
                 atr_value = self.calculate_atr(market_data, atr_period)
                 if atr_value is not None:
                     stop_loss, take_profit = self.calculate_atr_stops(
-                        market_data, 
+                        market_data,
                         is_long=(combined_signal == SignalType.BUY),
                         atr_multiplier=atr_stop_mult,
                         take_profit_multiplier=atr_tp_mult

@@ -5,7 +5,6 @@ Production-ready financial trading dashboard with real-time data
 
 import os
 import sys
-import logging
 
 import dash
 import dash_bootstrap_components as dbc
@@ -17,7 +16,8 @@ sys.path.insert(
     os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
 )
 
-from binance_trade_agent.common.logging_config import setup_logging, get_logger
+from binance_trade_agent.common.logging_config import get_logger, setup_logging
+from binance_trade_agent.dashboard.auth import require_auth
 from binance_trade_agent.dashboard.components import navbar
 from binance_trade_agent.dashboard.pages import (
     advanced,
@@ -31,7 +31,6 @@ from binance_trade_agent.dashboard.pages import (
     signals_risk,
     system_health,
 )
-from binance_trade_agent.dashboard.auth import require_auth
 
 # Setup structured logging for dashboard
 setup_logging(
@@ -135,7 +134,7 @@ app.layout = dbc.Container(
         navbar.create_navbar(PAGES),
         # Main content area
         dbc.Container(
-            [html.Div(id="page-content", style={"minHeight": "80vh", "padding": "2rem 0"})],
+            [html.Div(id="page-content", className="page-content")],
             fluid=True,
             style={"backgroundColor": "#1a1d23", "color": "#f4f2ee"},
         ),

@@ -160,28 +160,28 @@ class BaseStrategy(ABC):
         return True  # Default: support all symbols
 
     def check_volume_confirmation(
-        self, 
-        market_data: List[Dict[str, Any]], 
+        self,
+        market_data: List[Dict[str, Any]],
         volume_multiplier: float = 1.5,
         lookback_period: int = 20
     ) -> Tuple[bool, float]:
         """
         Check if current volume confirms the signal.
-        
+
         Higher volume = more reliable signals
         Returns (is_confirmed, volume_ratio)
-        
+
         Args:
             market_data: OHLCV candle data
             volume_multiplier: Minimum ratio vs average (default 1.5x)
             lookback_period: Periods for average calculation
-            
+
         Returns:
             Tuple of (confirmation_status, volume_ratio)
         """
         if not market_data or len(market_data) < lookback_period:
             return True, 1.0  # Not enough data, don't block
-        
+
         try:
             # Extract volumes
             volumes = []
@@ -189,21 +189,21 @@ class BaseStrategy(ABC):
                 vol = candle.get("volume") or candle.get("vol") or candle.get("v")
                 if vol is not None:
                     volumes.append(float(vol))
-            
+
             if len(volumes) < lookback_period:
                 return True, 1.0  # Not enough volume data
-            
+
             current_volume = volumes[-1]
             avg_volume = sum(volumes[-lookback_period-1:-1]) / lookback_period
-            
+
             if avg_volume == 0:
                 return True, 1.0
-            
+
             volume_ratio = current_volume / avg_volume
             is_confirmed = volume_ratio >= volume_multiplier
-            
+
             return is_confirmed, volume_ratio
-            
+
         except Exception:
             return True, 1.0  # On error, don't block
 
@@ -214,28 +214,28 @@ class BaseStrategy(ABC):
     ) -> float:
         """
         Calculate Average True Range (ATR) for volatility-based stops.
-        
+
         ATR measures volatility by decomposing the entire range of an asset price
         for a given period. Used for dynamic stop-loss placement.
-        
+
         Args:
             market_data: OHLCV candle data
             period: ATR period (default 14)
-            
+
         Returns:
             ATR value
         """
         if len(market_data) < period + 1:
             return 0.0
-        
+
         try:
             true_ranges = []
-            
+
             for i in range(1, len(market_data)):
                 high = float(market_data[i].get("high", market_data[i]["close"]))
                 low = float(market_data[i].get("low", market_data[i]["close"]))
                 prev_close = float(market_data[i-1]["close"])
-                
+
                 # True Range = max(high-low, |high-prev_close|, |low-prev_close|)
                 tr = max(
                     high - low,
@@ -243,13 +243,13 @@ class BaseStrategy(ABC):
                     abs(low - prev_close)
                 )
                 true_ranges.append(tr)
-            
+
             # ATR is the moving average of True Range
             if len(true_ranges) < period:
                 return sum(true_ranges) / len(true_ranges) if true_ranges else 0.0
-            
+
             return sum(true_ranges[-period:]) / period
-            
+
         except Exception:
             return 0.0
 
@@ -263,27 +263,27 @@ class BaseStrategy(ABC):
     ) -> Tuple[Optional[float], Optional[float]]:
         """
         Calculate ATR-based stop loss and take profit levels.
-        
+
         Args:
             current_price: Current asset price
             atr: ATR value
             signal: Trading signal (BUY/SELL)
             atr_multiplier: Multiplier for stop loss distance (default 2x ATR)
             take_profit_multiplier: Multiplier for take profit (default 3x ATR)
-            
+
         Returns:
             Tuple of (stop_loss, take_profit) or (None, None) for HOLD
         """
         if signal.value == "HOLD" or atr == 0:
             return None, None
-        
+
         if signal.value == "BUY":
             stop_loss = current_price - (atr * atr_multiplier)
             take_profit = current_price + (atr * take_profit_multiplier)
         else:  # SELL
             stop_loss = current_price + (atr * atr_multiplier)
             take_profit = current_price - (atr * take_profit_multiplier)
-        
+
         return stop_loss, take_profit
 
     def get_risk_metrics(self, market_data: List[Dict[str, Any]]) -> Dict[str, float]:
@@ -312,32 +312,32 @@ class BaseStrategy(ABC):
     ) -> Optional[float]:
         """
         Calculate Exponential Moving Average.
-        
+
         Args:
             market_data: OHLCV candle data
             period: EMA period
-            
+
         Returns:
             EMA value or None if insufficient data
         """
         if len(market_data) < period:
             return None
-        
+
         try:
             closes = [float(candle["close"]) for candle in market_data]
-            
+
             # Calculate EMA using the standard formula
             multiplier = 2 / (period + 1)
-            
+
             # Start with SMA for first EMA value
             ema = sum(closes[:period]) / period
-            
+
             # Calculate EMA for remaining values
             for i in range(period, len(closes)):
                 ema = (closes[i] * multiplier) + (ema * (1 - multiplier))
-            
+
             return ema
-            
+
         except Exception:
             return None
 
@@ -348,33 +348,33 @@ class BaseStrategy(ABC):
     ) -> List[float]:
         """
         Calculate EMA series for all data points.
-        
+
         Args:
             market_data: OHLCV candle data
             period: EMA period
-            
+
         Returns:
             List of EMA values
         """
         if len(market_data) < period:
             return []
-        
+
         try:
             closes = [float(candle["close"]) for candle in market_data]
             multiplier = 2 / (period + 1)
-            
+
             # Start with SMA
             ema_values = []
             ema = sum(closes[:period]) / period
             ema_values.extend([ema] * period)  # Fill initial values with first EMA
-            
+
             # Calculate EMA for remaining values
             for i in range(period, len(closes)):
                 ema = (closes[i] * multiplier) + (ema * (1 - multiplier))
                 ema_values.append(ema)
-            
+
             return ema_values
-            
+
         except Exception:
             return []
 
@@ -386,17 +386,17 @@ class BaseStrategy(ABC):
     ) -> Dict[str, Any]:
         """
         Calculate trend filter using EMA crossover (50/200 EMA).
-        
+
         A classic trend-following filter:
         - BULLISH: 50 EMA > 200 EMA (uptrend)
         - BEARISH: 50 EMA < 200 EMA (downtrend)
         - NEUTRAL: Not enough data or EMAs are very close
-        
+
         Args:
             market_data: OHLCV candle data
             fast_period: Fast EMA period (default 50)
             slow_period: Slow EMA period (default 200)
-            
+
         Returns:
             Dict with trend info:
             - trend: "BULLISH", "BEARISH", or "NEUTRAL"
@@ -416,11 +416,11 @@ class BaseStrategy(ABC):
                 "allows_sell": True,
                 "reason": "Insufficient data for trend analysis"
             }
-        
+
         try:
             ema_fast = self.calculate_ema(market_data, fast_period)
             ema_slow = self.calculate_ema(market_data, slow_period)
-            
+
             if ema_fast is None or ema_slow is None:
                 return {
                     "trend": "NEUTRAL",
@@ -431,16 +431,16 @@ class BaseStrategy(ABC):
                     "allows_sell": True,
                     "reason": "EMA calculation failed"
                 }
-            
+
             current_price = float(market_data[-1]["close"])
-            
+
             # Calculate trend strength as percentage difference
             trend_strength = abs(ema_fast - ema_slow) / current_price * 100
-            
+
             # Determine trend direction
             # Using a small threshold (0.1%) to avoid noise
             threshold = current_price * 0.001  # 0.1% of price
-            
+
             if ema_fast > ema_slow + threshold:
                 trend = "BULLISH"
                 allows_buy = True
@@ -453,7 +453,7 @@ class BaseStrategy(ABC):
                 trend = "NEUTRAL"
                 allows_buy = True
                 allows_sell = True
-            
+
             return {
                 "trend": trend,
                 "ema_fast": round(ema_fast, 2),
@@ -463,7 +463,7 @@ class BaseStrategy(ABC):
                 "allows_sell": allows_sell,
                 "reason": f"50 EMA {'above' if ema_fast > ema_slow else 'below'} 200 EMA"
             }
-            
+
         except Exception as e:
             return {
                 "trend": "NEUTRAL",

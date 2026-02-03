@@ -14,8 +14,7 @@ import argparse
 import logging
 import os
 import sys
-from datetime import datetime
-from typing import Dict, List
+from typing import Dict
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -23,7 +22,7 @@ from sqlalchemy.orm import sessionmaker
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from binance_trade_agent.core.portfolio_manager import Base, PositionORM, TradeORM
+from binance_trade_agent.core.portfolio_manager import PositionORM, TradeORM
 
 logging.basicConfig(
     level=logging.INFO,
@@ -153,7 +152,7 @@ class SQLiteToPostgresMigrator:
     def migrate_trades(self, batch_size: int = 500) -> int:
         """
         Migrate trades from SQLite to PostgreSQL using bulk operations.
-        
+
         Uses PostgreSQL ON CONFLICT DO NOTHING for idempotent behavior.
         This is significantly faster than per-row checks for large datasets.
 
@@ -198,14 +197,14 @@ class SQLiteToPostgresMigrator:
             # Process in batches for memory efficiency
             for i in range(0, total, batch_size):
                 batch = trade_data[i : i + batch_size]
-                
+
                 try:
                     with postgres_session.begin():
                         # Use bulk insert with ON CONFLICT DO NOTHING
                         # This handles idempotency: if trade_id exists, skip it
                         postgres_session.execute(
                             text("""
-                                INSERT INTO trades 
+                                INSERT INTO trades
                                 (trade_id, symbol, side, quantity, price, fee, timestamp, order_id, correlation_id, pnl)
                                 VALUES (:trade_id, :symbol, :side, :quantity, :price, :fee, :timestamp, :order_id, :correlation_id, :pnl)
                                 ON CONFLICT (trade_id) DO NOTHING
@@ -213,9 +212,9 @@ class SQLiteToPostgresMigrator:
                             batch
                         )
                         migrated_count += len(batch)
-                        
+
                     logger.info(f"Bulk inserted batch: {i + len(batch)}/{total} trades...")
-                    
+
                 except Exception as batch_error:
                     logger.error(f"Error in batch {i}-{i+len(batch)}: {batch_error}")
                     raise
@@ -234,7 +233,7 @@ class SQLiteToPostgresMigrator:
     def migrate_positions(self, batch_size: int = 100) -> int:
         """
         Migrate positions from SQLite to PostgreSQL using upsert pattern.
-        
+
         Uses PostgreSQL ON CONFLICT DO UPDATE for idempotent behavior.
         Positions are replaced entirely (not merged) with latest data.
 
@@ -277,14 +276,14 @@ class SQLiteToPostgresMigrator:
             # Process in batches
             for i in range(0, total, batch_size):
                 batch = position_data[i : i + batch_size]
-                
+
                 try:
                     with postgres_session.begin():
                         # Use upsert: ON CONFLICT DO UPDATE
                         # If position with same symbol exists, replace entire row
                         postgres_session.execute(
                             text("""
-                                INSERT INTO positions 
+                                INSERT INTO positions
                                 (symbol, side, quantity, average_price, current_price, unrealized_pnl, realized_pnl, timestamp)
                                 VALUES (:symbol, :side, :quantity, :average_price, :current_price, :unrealized_pnl, :realized_pnl, :timestamp)
                                 ON CONFLICT (symbol) DO UPDATE SET
@@ -299,9 +298,9 @@ class SQLiteToPostgresMigrator:
                             batch
                         )
                         migrated_count += len(batch)
-                        
+
                     logger.info(f"Upserted batch: {i + len(batch)}/{total} positions...")
-                    
+
                 except Exception as batch_error:
                     logger.error(f"Error in batch {i}-{i+len(batch)}: {batch_error}")
                     raise

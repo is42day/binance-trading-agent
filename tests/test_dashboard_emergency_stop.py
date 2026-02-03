@@ -5,8 +5,6 @@ Tests the advanced page emergency stop button
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from binance_trade_agent.dashboard.utils.data_fetch import get_trading_components
 
 
@@ -79,8 +77,9 @@ class TestEmergencyStopFunctionality:
 
     def test_emergency_stop_method_signature(self):
         """Test that set_emergency_stop has correct signature"""
-        from binance_trade_agent.agents.risk_management_agent import EnhancedRiskManagementAgent
         import inspect
+
+        from binance_trade_agent.agents.risk_management_agent import EnhancedRiskManagementAgent
 
         risk_agent = EnhancedRiskManagementAgent()
 
