@@ -8,7 +8,7 @@ on:
 
 env:
   # Use in-memory SQLite for CI (no Postgres needed for unit tests)
-  DATABASE_URL: sqlite:///:memory:
+  DATABASE_URL: "sqlite:///:memory:"
   BINANCE_API_KEY: dummy_key_for_ci
   BINANCE_API_SECRET: dummy_secret_for_ci
   BINANCE_API_URL: https://testnet.binance.vision
