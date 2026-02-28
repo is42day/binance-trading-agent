@@ -99,6 +99,32 @@ export interface PerformanceBySymbol {
   avg_pnl: number;
 }
 
+export interface PaperTradeEntry {
+  trade_id?: string;
+  symbol: string;
+  side: string;
+  entry_price: number;
+  exit_price?: number;
+  quantity: number;
+  pnl?: number;
+  pnl_percent?: number;
+  strategy?: string;
+  signal_confidence?: number;
+}
+
+export interface PaperTradeRecord {
+  event?: string;
+  timestamp?: string;
+  trade?: PaperTradeEntry;
+  portfolio_balance?: number;
+  // Flat fields when it's a direct trade (not wrapped)
+  symbol?: string;
+  side?: string;
+  quantity?: number;
+  price?: number;
+  pnl?: number;
+}
+
 export interface PaperPortfolio {
   current_balance: number;
   total_pnl: number;

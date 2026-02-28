@@ -1,4 +1,5 @@
 import { usePaperTradingStatus, usePaperTradingSignals, usePaperTradingTrades } from '../hooks/useApi';
+import type { PaperTradeRecord } from '../types';
 import MetricCard from '../components/MetricCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
@@ -145,26 +146,26 @@ export default function PaperTrading() {
               </thead>
               <tbody>
                 {trades && trades.length > 0 ? (
-                  trades.map((item, i) => {
-                    // paper trades are nested: {event, timestamp, trade: {...}, portfolio_balance}
-                    const raw = item as unknown as Record<string, unknown>;
-                    const t = (raw.trade ?? raw) as Record<string, unknown>;
-                    const ts = raw.timestamp ?? t.timestamp;
-                    const side = (t.side as string | undefined)?.toUpperCase();
-                    const pnl = t.pnl as number | undefined;
+                  trades.map((item: PaperTradeRecord, i) => {
+                    // paper trades may be nested: {event, timestamp, trade: {...}}
+                    // or flat when stored directly
+                    const t = item.trade ?? item;
+                    const side = t.side?.toUpperCase();
+                    const pnl = t.pnl;
+                    const entryPrice = item.trade?.entry_price ?? item.price;
                     return (
                       <tr key={i} className="border-b border-gray-700/50 hover:bg-gray-700/30">
-                        <td className="px-4 py-2 text-white font-medium">{t.symbol as string}</td>
+                        <td className="px-4 py-2 text-white font-medium">{t.symbol}</td>
                         <td className={`px-4 py-2 font-medium ${side === 'BUY' ? 'text-green-400' : 'text-red-400'}`}>
                           {side ?? '—'}
                         </td>
-                        <td className="px-4 py-2 text-right text-gray-300">{fmt(t.quantity as number | undefined, 6)}</td>
-                        <td className="px-4 py-2 text-right text-gray-300">${fmt(t.entry_price as number | undefined)}</td>
+                        <td className="px-4 py-2 text-right text-gray-300">{fmt(t.quantity, 6)}</td>
+                        <td className="px-4 py-2 text-right text-gray-300">${fmt(entryPrice)}</td>
                         <td className={`px-4 py-2 text-right ${(pnl ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                           {pnl !== undefined ? `$${fmt(pnl)}` : '—'}
                         </td>
                         <td className="px-4 py-2 text-gray-400 text-xs">
-                          {ts ? new Date(ts as string).toLocaleString() : '—'}
+                          {item.timestamp ? new Date(item.timestamp).toLocaleString() : '—'}
                         </td>
                       </tr>
                     );

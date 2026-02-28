@@ -12,6 +12,7 @@ import type {
   PerformanceSummary,
   PerformanceBySymbol,
   PaperTradingStatus,
+  PaperTradeRecord,
   Signal,
   HealthStatus,
   ReadyStatus,
@@ -153,10 +154,10 @@ export function usePaperTradingSignals(limit = 50) {
 }
 
 export function usePaperTradingTrades(limit = 50) {
-  return useQuery<Trade[]>({
+  return useQuery<PaperTradeRecord[]>({
     queryKey: ['paper-trading', 'trades', limit],
     queryFn: async () => {
-      const data = await fetcher<{ trades: Trade[]; total: number }>(
+      const data = await fetcher<{ trades: PaperTradeRecord[]; total: number }>(
         `/api/v1/paper-trading/trades?limit=${limit}`
       );
       return data.trades ?? [];
