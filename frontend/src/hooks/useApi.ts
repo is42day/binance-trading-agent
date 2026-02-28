@@ -6,7 +6,7 @@ import type {
   Position,
   Trade,
   RiskStatus,
-  TrailingStop,
+  TrailingStopsResponse,
   MarketPrice,
   SystemConfig,
   PerformanceSummary,
@@ -36,7 +36,10 @@ export function usePortfolioSummary() {
 export function usePortfolioPositions() {
   return useQuery<Position[]>({
     queryKey: ['portfolio', 'positions'],
-    queryFn: () => fetcher('/api/v1/portfolio/positions'),
+    queryFn: async () => {
+      const data = await fetcher<{ positions: Position[] }>('/api/v1/portfolio/positions');
+      return data.positions ?? [];
+    },
     staleTime: 10_000,
     refetchInterval: 30_000,
   });
@@ -45,7 +48,10 @@ export function usePortfolioPositions() {
 export function useTradeHistory(limit = 20) {
   return useQuery<Trade[]>({
     queryKey: ['portfolio', 'trade-history', limit],
-    queryFn: () => fetcher(`/api/v1/portfolio/trade-history?limit=${limit}`),
+    queryFn: async () => {
+      const data = await fetcher<{ trades: Trade[] }>(`/api/v1/portfolio/trade-history?limit=${limit}`);
+      return data.trades ?? [];
+    },
     staleTime: 10_000,
     refetchInterval: 30_000,
   });
@@ -61,7 +67,7 @@ export function useRiskStatus() {
 }
 
 export function useTrailingStops() {
-  return useQuery<TrailingStop[]>({
+  return useQuery<TrailingStopsResponse>({
     queryKey: ['risk', 'trailing-stops'],
     queryFn: () => fetcher('/api/v1/risk/trailing-stops'),
     staleTime: 10_000,
@@ -98,7 +104,12 @@ export function usePerformanceSummary() {
 export function usePerformanceTrades(limit = 50) {
   return useQuery<Trade[]>({
     queryKey: ['performance', 'trades', limit],
-    queryFn: () => fetcher(`/api/v1/performance/trades?limit=${limit}`),
+    queryFn: async () => {
+      const data = await fetcher<{ trades: Trade[]; total_trades: number }>(
+        `/api/v1/performance/trades?limit=${limit}`
+      );
+      return data.trades ?? [];
+    },
     staleTime: 10_000,
     refetchInterval: 30_000,
   });
@@ -107,7 +118,12 @@ export function usePerformanceTrades(limit = 50) {
 export function usePerformanceBySymbol() {
   return useQuery<PerformanceBySymbol[]>({
     queryKey: ['performance', 'by-symbol'],
-    queryFn: () => fetcher('/api/v1/performance/by-symbol'),
+    queryFn: async () => {
+      const data = await fetcher<Record<string, Omit<PerformanceBySymbol, 'symbol'>>>(
+        '/api/v1/performance/by-symbol'
+      );
+      return Object.entries(data).map(([symbol, metrics]) => ({ symbol, ...metrics }));
+    },
     staleTime: 10_000,
     refetchInterval: 30_000,
   });
@@ -125,7 +141,12 @@ export function usePaperTradingStatus() {
 export function usePaperTradingSignals(limit = 50) {
   return useQuery<Signal[]>({
     queryKey: ['paper-trading', 'signals', limit],
-    queryFn: () => fetcher(`/api/v1/paper-trading/signals?limit=${limit}`),
+    queryFn: async () => {
+      const data = await fetcher<{ signals: Signal[]; total: number }>(
+        `/api/v1/paper-trading/signals?limit=${limit}`
+      );
+      return data.signals ?? [];
+    },
     staleTime: 10_000,
     refetchInterval: 30_000,
   });
@@ -134,7 +155,12 @@ export function usePaperTradingSignals(limit = 50) {
 export function usePaperTradingTrades(limit = 50) {
   return useQuery<Trade[]>({
     queryKey: ['paper-trading', 'trades', limit],
-    queryFn: () => fetcher(`/api/v1/paper-trading/trades?limit=${limit}`),
+    queryFn: async () => {
+      const data = await fetcher<{ trades: Trade[]; total: number }>(
+        `/api/v1/paper-trading/trades?limit=${limit}`
+      );
+      return data.trades ?? [];
+    },
     staleTime: 10_000,
     refetchInterval: 30_000,
   });

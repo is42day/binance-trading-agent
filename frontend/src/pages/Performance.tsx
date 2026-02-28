@@ -25,8 +25,9 @@ export default function Performance() {
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <MetricCard
             title="Win Rate"
-            value={`${fmt(summary?.win_rate ? summary.win_rate * 100 : 0)}%`}
-            valueClass={(summary?.win_rate ?? 0) >= 0.5 ? 'text-green-400' : 'text-red-400'}
+            value={`${fmt(summary?.win_rate)}%`}
+            subtitle={`${summary?.winning_trades ?? 0}W / ${summary?.losing_trades ?? 0}L`}
+            valueClass={(summary?.win_rate ?? 0) >= 50 ? 'text-green-400' : 'text-red-400'}
           />
           <MetricCard
             title="Sharpe Ratio"
@@ -35,13 +36,31 @@ export default function Performance() {
           />
           <MetricCard
             title="Max Drawdown"
-            value={`${fmt(summary?.max_drawdown ? summary.max_drawdown * 100 : 0)}%`}
+            value={`${fmt(summary?.max_drawdown_pct)}%`}
+            subtitle={summary?.max_drawdown !== undefined ? `$${fmt(summary.max_drawdown)}` : undefined}
             valueClass="text-red-400"
           />
           <MetricCard
             title="Profit Factor"
             value={fmt(summary?.profit_factor)}
             valueClass={(summary?.profit_factor ?? 0) >= 1.5 ? 'text-green-400' : 'text-yellow-400'}
+          />
+        </div>
+      )}
+
+      {summary && (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <MetricCard title="Total Trades" value={String(summary.total_trades ?? 0)} />
+          <MetricCard title="Closed Trades" value={String(summary.closed_trades ?? 0)} />
+          <MetricCard
+            title="Total P&L"
+            value={`$${fmt(summary.total_pnl)}`}
+            valueClass={(summary.total_pnl ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}
+          />
+          <MetricCard
+            title="Total Return"
+            value={`${fmt(summary.total_return_pct)}%`}
+            valueClass={(summary.total_return_pct ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}
           />
         </div>
       )}
@@ -71,18 +90,18 @@ export default function Performance() {
                   bySymbol.map((s, i) => (
                     <tr key={i} className="border-b border-gray-700/50 hover:bg-gray-700/30">
                       <td className="px-4 py-2 text-white font-medium">{s.symbol}</td>
-                      <td className="px-4 py-2 text-right text-gray-300">{s.trades}</td>
-                      <td className="px-4 py-2 text-right text-gray-300">{fmt(s.win_rate ? s.win_rate * 100 : 0)}%</td>
+                      <td className="px-4 py-2 text-right text-gray-300">{s.total_trades}</td>
+                      <td className="px-4 py-2 text-right text-gray-300">{fmt(s.win_rate)}%</td>
                       <td className={`px-4 py-2 text-right ${s.total_pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                         ${fmt(s.total_pnl)}
                       </td>
                       <td className={`px-4 py-2 text-right ${(s.avg_pnl ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {s.avg_pnl !== undefined ? `$${fmt(s.avg_pnl)}` : '—'}
+                        ${fmt(s.avg_pnl)}
                       </td>
                     </tr>
                   ))
                 ) : (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">No data available</td></tr>
+                  <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">No performance data available</td></tr>
                 )}
               </tbody>
             </table>

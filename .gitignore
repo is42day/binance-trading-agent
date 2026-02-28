@@ -107,3 +107,7 @@ Thumbs.db
 
 # Ignore test data
 binance_trade_agent/tests/test_data/
+
+# Frontend build artifacts and dependencies
+frontend/node_modules/
+frontend/dist/

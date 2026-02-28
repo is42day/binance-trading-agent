@@ -2,13 +2,15 @@ import { useSystemConfig, useHealthCheck, useReadyCheck } from '../hooks/useApi'
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 
-function StatusBadge({ ok, label }: { ok: boolean | undefined; label: string }) {
+function StatusBadge({ ok, label }: { ok: boolean | string | undefined; label: string }) {
+  const isOk = ok === true || ok === 'ready' || ok === 'healthy' || ok === 'ok';
+  const displayText = typeof ok === 'string' ? ok : (isOk ? 'OK' : 'FAIL');
   return (
     <div className="flex items-center gap-2">
-      <span className={`w-2 h-2 rounded-full ${ok ? 'bg-green-500' : 'bg-red-500'}`} />
+      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isOk ? 'bg-green-500' : 'bg-red-500'}`} />
       <span className="text-gray-300 text-sm">{label}</span>
-      <span className={`ml-auto text-xs font-medium ${ok ? 'text-green-400' : 'text-red-400'}`}>
-        {ok ? 'OK' : 'FAIL'}
+      <span className={`ml-auto text-xs font-medium truncate max-w-[140px] ${isOk ? 'text-green-400' : 'text-red-400'}`}>
+        {displayText}
       </span>
     </div>
   );
@@ -32,9 +34,9 @@ export default function SystemHealth() {
             <ErrorMessage message="Health check failed — API may be offline." />
           ) : (
             <div className="space-y-3">
-              <StatusBadge ok={health?.status === 'ok'} label="API Status" />
-              <StatusBadge ok={health?.database === 'ok' || health?.database === 'connected'} label="Database" />
-              <StatusBadge ok={health?.schema === 'ok' || health?.schema === 'valid'} label="Schema" />
+              <StatusBadge ok={health?.status === 'healthy' || health?.status === 'ok'} label="API Status" />
+              <StatusBadge ok={health?.checks?.database} label="Database" />
+              <StatusBadge ok={health?.checks?.schema} label="Schema" />
             </div>
           )}
         </div>
@@ -48,9 +50,9 @@ export default function SystemHealth() {
           ) : (
             <div className="space-y-3">
               <StatusBadge ok={ready?.ready} label="Overall Ready" />
-              <StatusBadge ok={ready?.database} label="Database" />
-              <StatusBadge ok={ready?.binance_api} label="Binance API" />
-              <StatusBadge ok={ready?.cache} label="Cache" />
+              <StatusBadge ok={ready?.checks?.database} label="Database" />
+              <StatusBadge ok={ready?.checks?.binance_api} label="Binance API" />
+              <StatusBadge ok={ready?.checks?.cache} label="Cache" />
             </div>
           )}
         </div>
@@ -71,8 +73,8 @@ export default function SystemHealth() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-400 text-sm">Testnet</span>
-                <span className={`text-sm font-medium ${config?.testnet ? 'text-yellow-400' : 'text-gray-400'}`}>
-                  {config?.testnet ? 'Enabled' : 'Disabled'}
+                <span className={`text-sm font-medium ${config?.binance_testnet ? 'text-yellow-400' : 'text-gray-400'}`}>
+                  {config?.binance_testnet ? 'Enabled' : 'Disabled'}
                 </span>
               </div>
               {config?.supported_symbols && (

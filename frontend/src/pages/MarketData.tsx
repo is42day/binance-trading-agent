@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useMarketPrice } from '../hooks/useApi';
+import type { MarketPrice } from '../types';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 
@@ -37,7 +38,7 @@ export default function MarketData() {
     setPriceHistory([]);
   }, [symbol]);
 
-  const change = market?.change_percent_24h;
+  const change = (market as (MarketPrice & { change_percent_24h?: number }) | undefined)?.change_percent_24h;
 
   return (
     <div className="space-y-6">

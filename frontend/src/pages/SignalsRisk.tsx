@@ -13,6 +13,8 @@ export default function SignalsRisk() {
   const { data: stops, isLoading: stopsLoading, isError: stopsError } = useTrailingStops();
   const { data: config } = useSystemConfig();
 
+  const stopEntries = stops?.positions ? Object.entries(stops.positions) : [];
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-white">Signals & Risk</h2>
@@ -31,33 +33,47 @@ export default function SignalsRisk() {
             />
             <MetricCard
               title="Current Drawdown"
-              value={`${fmt(risk?.current_drawdown ? risk.current_drawdown * 100 : 0)}%`}
-              valueClass={(risk?.current_drawdown ?? 0) > (risk?.max_drawdown_limit ?? 1) * 0.8 ? 'text-red-400' : 'text-white'}
+              value={`$${fmt(risk?.current_drawdown ?? 0)}`}
+              valueClass={(risk?.current_drawdown ?? 0) > 0 ? 'text-red-400' : 'text-white'}
             />
             <MetricCard
               title="Daily Trades"
-              value={`${risk?.daily_trades ?? 0} / ${risk?.max_daily_trades ?? 'N/A'}`}
+              value={String(risk?.daily_trades ?? 0)}
             />
             <MetricCard
-              title="Max Drawdown Limit"
-              value={`${fmt(risk?.max_drawdown_limit ? risk.max_drawdown_limit * 100 : 0)}%`}
+              title="Active Risk Rules"
+              value={String(risk?.risk_rules_active ?? 0)}
             />
           </div>
 
-          {config && (
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+            <MetricCard
+              title="Consecutive Losses"
+              value={String(risk?.consecutive_losses ?? 0)}
+              valueClass={(risk?.consecutive_losses ?? 0) > 2 ? 'text-yellow-400' : 'text-white'}
+            />
+            <MetricCard
+              title="Trailing Stops Active"
+              value={String(risk?.trailing_stops_active ?? stops?.active_stops ?? 0)}
+            />
+            <MetricCard
+              title="Recent Trades Count"
+              value={String(risk?.recent_trades_count ?? 0)}
+            />
+          </div>
+
+          {config?.risk_config && (
             <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
               <h3 className="text-lg font-semibold text-white mb-3">Risk Configuration</h3>
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 text-sm">
-                {Object.entries(config)
-                  .filter(([, v]) => typeof v !== 'object' || Array.isArray(v))
-                  .map(([k, v]) => (
-                    <div key={k} className="bg-gray-700/50 rounded p-2">
-                      <p className="text-gray-400 text-xs">{k.replace(/_/g, ' ')}</p>
-                      <p className="text-white font-medium">
-                        {Array.isArray(v) ? v.join(', ') : String(v)}
-                      </p>
-                    </div>
-                  ))}
+                {Object.entries(config.risk_config as Record<string, unknown>).map(([k, v]) => (
+                  <div key={k} className="bg-gray-700/50 rounded p-2">
+                    <p className="text-gray-400 text-xs">{k.replace(/_/g, ' ')}</p>
+                    <p className="text-white font-medium">
+                      {Array.isArray(v) ? v.join(', ') : String(v)}
+                    </p>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -66,7 +82,9 @@ export default function SignalsRisk() {
 
       <div className="bg-gray-800 rounded-lg border border-gray-700">
         <div className="p-4 border-b border-gray-700">
-          <h3 className="text-lg font-semibold text-white">Trailing Stops</h3>
+          <h3 className="text-lg font-semibold text-white">
+            Trailing Stops {stops?.active_stops !== undefined && `(${stops.active_stops} active)`}
+          </h3>
         </div>
         {stopsLoading ? (
           <LoadingSpinner />
@@ -78,24 +96,26 @@ export default function SignalsRisk() {
               <thead>
                 <tr className="text-gray-400 border-b border-gray-700">
                   <th className="px-4 py-3 text-left">Symbol</th>
+                  <th className="px-4 py-3 text-left">Side</th>
                   <th className="px-4 py-3 text-right">Entry Price</th>
-                  <th className="px-4 py-3 text-right">Current Price</th>
-                  <th className="px-4 py-3 text-right">Stop Price</th>
+                  <th className="px-4 py-3 text-right">Current Stop</th>
                   <th className="px-4 py-3 text-right">Trail %</th>
-                  <th className="px-4 py-3 text-right">P&L</th>
+                  <th className="px-4 py-3 text-right">Registered</th>
                 </tr>
               </thead>
               <tbody>
-                {stops && stops.length > 0 ? (
-                  stops.map((s, i) => (
-                    <tr key={i} className="border-b border-gray-700/50 hover:bg-gray-700/30">
-                      <td className="px-4 py-2 text-white font-medium">{s.symbol}</td>
+                {stopEntries.length > 0 ? (
+                  stopEntries.map(([symbol, s]) => (
+                    <tr key={symbol} className="border-b border-gray-700/50 hover:bg-gray-700/30">
+                      <td className="px-4 py-2 text-white font-medium">{symbol}</td>
+                      <td className={`px-4 py-2 font-medium ${s.side?.toLowerCase() === 'buy' ? 'text-green-400' : 'text-red-400'}`}>
+                        {s.side?.toUpperCase()}
+                      </td>
                       <td className="px-4 py-2 text-right text-gray-300">${fmt(s.entry_price)}</td>
-                      <td className="px-4 py-2 text-right text-gray-300">${fmt(s.current_price)}</td>
-                      <td className="px-4 py-2 text-right text-yellow-400">${fmt(s.stop_price)}</td>
-                      <td className="px-4 py-2 text-right text-gray-300">{fmt(s.trail_percent)}%</td>
-                      <td className={`px-4 py-2 text-right ${(s.pnl ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {s.pnl !== undefined ? `$${fmt(s.pnl)}` : '—'}
+                      <td className="px-4 py-2 text-right text-yellow-400">${fmt(s.current_stop)}</td>
+                      <td className="px-4 py-2 text-right text-gray-300">{fmt(s.trailing_pct ? s.trailing_pct * 100 : 0)}%</td>
+                      <td className="px-4 py-2 text-right text-gray-400 text-xs">
+                        {s.registered_at ? new Date(s.registered_at).toLocaleString() : '—'}
                       </td>
                     </tr>
                   ))

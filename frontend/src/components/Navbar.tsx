@@ -12,7 +12,7 @@ const navItems = [
 
 export default function Navbar() {
   const { data: health, isError } = useHealthCheck();
-  const isOnline = !isError && health?.status === 'ok';
+  const isOnline = !isError && (health?.status === 'healthy' || health?.status === 'ok');
 
   return (
     <aside className="w-64 min-h-screen bg-gray-900 border-r border-gray-700 flex flex-col">
