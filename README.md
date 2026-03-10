@@ -50,7 +50,7 @@ docker run -d --env-file .env -v "$(pwd)/logs:/app/logs" -v "$(pwd)/data:/app/da
 ```
 
 ### 4. Access the System
-- **React Dashboard**: http://localhost:3000 (Modern React + TypeScript UI - **recommended**)
+- **React Dashboard**: http://localhost:8080 (Modern React + TypeScript UI - **recommended**)
 - **API**: http://localhost:8000/docs (REST API + OpenAPI docs)
 - **Legacy Dash Dashboard**: http://localhost:8050 (Python Dash UI - still available)
 - **Trading Agent Logs**: `docker logs trading-agent -f`
@@ -59,7 +59,7 @@ docker run -d --env-file .env -v "$(pwd)/logs:/app/logs" -v "$(pwd)/data:/app/da
 
 ## 📊 Dashboard Features
 
-### React + TypeScript Frontend (Port 3000) — **Recommended**
+### React + TypeScript Frontend (Port 8080) — **Recommended**
 A modern, professional trading dashboard built with React 19, TypeScript, TailwindCSS, and Recharts:
 
 - **Dashboard** — Portfolio value, P&L, open positions, recent trades table
@@ -191,7 +191,7 @@ docker-compose up -d
 │                                                                              │
 │  ┌────────────────┐   ┌────────────────┐   ┌────────────────┐              │
 │  │React Frontend  │   │    FastAPI     │   │  Trading Agent │              │
-│  │  (Port 3000)   │◄─►│   (Port 8000)  │   │  (Background)  │              │
+│  │  (Port 8080)   │◄─►│   (Port 8000)  │   │  (Background)  │              │
 │  │React+TypeScript│   │   REST API     │   │  Autonomous    │              │
 │  └───────┬────────┘   └───────┬────────┘   └───────┬────────┘              │
 │          │                    │                    │                        │

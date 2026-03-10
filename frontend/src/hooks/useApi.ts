@@ -106,10 +106,32 @@ export function usePerformanceTrades(limit = 50) {
   return useQuery<Trade[]>({
     queryKey: ['performance', 'trades', limit],
     queryFn: async () => {
-      const data = await fetcher<{ trades: Trade[]; total_trades: number }>(
+      // The performance analytics endpoint uses entry_price/entry_time field names
+      // while the UI Trade type uses price/timestamp — map them here.
+      interface PerformanceTradeRaw {
+        symbol: string;
+        side: string;
+        entry_price: number;
+        exit_price?: number;
+        quantity: number;
+        entry_time: string;
+        exit_time?: string;
+        pnl?: number;
+        pnl_pct?: number;
+        is_closed?: boolean;
+        notes?: string;
+      }
+      const data = await fetcher<{ trades: PerformanceTradeRaw[]; total_trades: number }>(
         `/api/v1/performance/trades?limit=${limit}`
       );
-      return data.trades ?? [];
+      return (data.trades ?? []).map((t) => ({
+        symbol: t.symbol,
+        side: t.side,
+        quantity: t.quantity,
+        price: t.entry_price,
+        timestamp: t.entry_time,
+        pnl: t.pnl,
+      }));
     },
     staleTime: 10_000,
     refetchInterval: 30_000,
