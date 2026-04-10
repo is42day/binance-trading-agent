@@ -90,6 +90,27 @@ services:
       retries: 3
       start_period: 10s
 
+  # React + TypeScript Frontend (replaces Dash dashboard on port 8080)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: binance-frontend
+    ports:
+      - "8080:80"
+    networks:
+      - trading-network
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   # Dash Dashboard service: real-time UI
   dashboard:
     build:

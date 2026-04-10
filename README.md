@@ -50,34 +50,29 @@ docker run -d --env-file .env -v "$(pwd)/logs:/app/logs" -v "$(pwd)/data:/app/da
 ```
 
 ### 4. Access the System
-- **Dashboard**: http://localhost:8050 (Real-time portfolio, trades, market data)
-- **API**: http://localhost:8000/api/v1/portfolio/trade-history (REST API)
+- **React Dashboard**: http://localhost:8080 (Modern React + TypeScript UI - **recommended**)
+- **API**: http://localhost:8000/docs (REST API + OpenAPI docs)
+- **Legacy Dash Dashboard**: http://localhost:8050 (Python Dash UI - still available)
 - **Trading Agent Logs**: `docker logs trading-agent -f`
 
 ---
 
 ## 📊 Dashboard Features
 
-**Portfolio Overview**
-- Total portfolio value and P&L
-- Open positions by symbol
-- Recent trades table (auto-refresh every 30s)
-- Performance metrics
+### React + TypeScript Frontend (Port 8080) — **Recommended**
+A modern, professional trading dashboard built with React 19, TypeScript, TailwindCSS, and Recharts:
 
-**Market Data**
-- Real-time order book (bid/ask spreads)
-- Price charts and technical indicators
-- Volume analysis
+- **Dashboard** — Portfolio value, P&L, open positions, recent trades table
+- **Market Data** — Symbol selector, live price, 24h change, live price trend chart
+- **Paper Trading** — Paper trading status, portfolio stats, signals & trades log
+- **Signals & Risk** — Emergency stop status, drawdown, trailing stops table, risk config
+- **Performance** — Win rate, Sharpe ratio, profit factor, performance by symbol
+- **System Health** — Health/readiness checks, API status, configuration display
 
-**Risk Management**
-- Current risk level assessment
-- Position limits and constraints
-- Stop-loss and take-profit tracking
+> Auto-refreshes every 30 seconds; shows graceful "API Offline" state when backend is unavailable.
 
-**System Health**
-- API status and connectivity
-- Trading agent uptime
-- Error tracking and logs
+### Legacy Dash Dashboard (Port 8050)
+Python Dash-based UI — still available but deprecated in favor of the React frontend.
 
 ---
 
@@ -101,30 +96,27 @@ Four specialized agents working in sequence:
 - Daily and hourly trade frequency limits
 - Minimum time between trades
 - Emergency stop capability
-- Drawdown monitoring
+- Drawdown monitoring with trailing stops
 
 ### 📈 Trading Strategies
 - **RSI Strategy** - Relative Strength Index based signals
 - **MACD Strategy** - Moving Average Convergence Divergence
 - **Combined Strategy** - Hybrid approach (current default)
+- **Edge / Smart Entry strategies** - Advanced signal generation
 
 ### 🔌 Rest API
-All data accessible via FastAPI endpoints:
+All data accessible via FastAPI endpoints (docs at http://localhost:8000/docs):
 ```bash
 GET  /api/v1/portfolio/summary          # Portfolio metrics
 GET  /api/v1/portfolio/trade-history    # Recent trades
 GET  /api/v1/portfolio/positions        # Current positions
 GET  /api/v1/market/price/<symbol>      # Current price
 GET  /api/v1/risk/status                # Risk assessment
+GET  /api/v1/performance/summary        # Performance analytics
+GET  /api/v1/paper-trading/status       # Paper trading state
+GET  /health                            # Health check
+GET  /ready                             # Readiness probe
 ```
-
-### 📊 Web Dashboard
-Beautiful Dash-based UI with:
-- Real-time portfolio overview
-- Recent trades table
-- Market data visualization
-- System health monitoring
-- Performance analytics
 
 ---
 
@@ -198,9 +190,9 @@ docker-compose up -d
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  ┌────────────────┐   ┌────────────────┐   ┌────────────────┐              │
-│  │   Dashboard    │   │    FastAPI     │   │  Trading Agent │              │
-│  │   (Port 8050)  │◄─►│   (Port 8000)  │   │  (Background)  │              │
-│  │   Dash/Plotly  │   │   REST API     │   │  Autonomous    │              │
+│  │React Frontend  │   │    FastAPI     │   │  Trading Agent │              │
+│  │  (Port 8080)   │◄─►│   (Port 8000)  │   │  (Background)  │              │
+│  │React+TypeScript│   │   REST API     │   │  Autonomous    │              │
 │  └───────┬────────┘   └───────┬────────┘   └───────┬────────┘              │
 │          │                    │                    │                        │
 │          ▼                    ▼                    ▼                        │
@@ -236,7 +228,8 @@ docker-compose up -d
 
 - **Framework**: Python 3.10+
 - **Trading**: Binance API (python-binance)
-- **Web UI**: Dash (Plotly)
+- **Frontend**: React 19 + TypeScript + Vite + TailwindCSS + Recharts *(new)*
+- **Legacy UI**: Dash (Plotly) *(deprecated)*
 - **API**: FastAPI
 - **Database**: SQLAlchemy ORM + PostgreSQL (production) / SQLite (dev)
 - **Migrations**: Alembic
