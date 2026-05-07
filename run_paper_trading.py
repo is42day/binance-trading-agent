@@ -70,6 +70,17 @@ Available Strategies:
         default=120,
         help="Check interval in seconds (default: 120)"
     )
+    parser.add_argument(
+        "--iterations",
+        type=int,
+        default=0,
+        help="Stop after N iterations (default: 0 = run until stopped)"
+    )
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="Reset paper portfolio before running"
+    )
     
     args = parser.parse_args()
     
@@ -82,6 +93,10 @@ Available Strategies:
     print(f"  Symbols:      {', '.join(args.symbols)}")
     print(f"  Balance:      ${args.balance:.2f}")
     print(f"  Interval:     {args.interval}s")
+    if args.iterations:
+        print(f"  Iterations:   {args.iterations}")
+    if args.reset:
+        print("  Reset:        YES")
     print("=" * 60)
     print("\nPress Ctrl+C to stop\n")
     
@@ -93,6 +108,8 @@ Available Strategies:
         strategy=args.strategy,
         balance=args.balance,
         interval=args.interval,
+        max_iterations=args.iterations,
+        reset=args.reset,
     )
 
 

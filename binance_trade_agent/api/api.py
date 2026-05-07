@@ -7,8 +7,9 @@ import os
 import traceback
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import inspect, text
 
 from ..agents.market_data_agent import MarketDataAgent
@@ -17,6 +18,7 @@ from ..clients.redis_cache import RedisCache
 from ..common.config import config
 from ..common.logging_config import get_logger, setup_logging
 from ..core import db
+from ..core.exchange_reconciliation import ExchangeReconciliationService
 from ..core.performance_analytics import get_performance_analytics
 from ..core.portfolio_manager import PortfolioManager
 
@@ -36,10 +38,42 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS middleware for local development
+def _configured_cors_origins():
+    origins = os.getenv(
+        "API_CORS_ORIGINS",
+        "http://localhost:8050,http://127.0.0.1:8050",
+    )
+    return [origin.strip() for origin in origins.split(",") if origin.strip()]
+
+
+def require_api_token(authorization: str | None = Header(default=None)):
+    """
+    Optional bearer-token guard.
+
+    Set API_AUTH_TOKEN in production to require Authorization: Bearer <token>.
+    Leaving it unset keeps local/test workflows compatible.
+    """
+    auth_required = os.getenv("API_AUTH_REQUIRED", "false").lower() in {
+        "true",
+        "1",
+        "yes",
+        "on",
+    }
+    expected = os.getenv("API_AUTH_TOKEN")
+    if auth_required and not expected:
+        logger.error("API_AUTH_REQUIRED is true but API_AUTH_TOKEN is not configured")
+        raise HTTPException(status_code=503, detail="API authentication is not configured")
+    if not expected:
+        return
+
+    if authorization != f"Bearer {expected}":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for simplicity
+    allow_origins=_configured_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -149,7 +183,7 @@ def health_check():
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         health_status["status"] = "unhealthy"
-        return health_status
+        return JSONResponse(status_code=503, content=health_status)
 
 
 @app.get("/ready")
@@ -216,7 +250,7 @@ def readiness_check():
         return JSONResponse(status_code=503, content=ready_status)
 
 
-@app.get("/api/v1/system/circuit-breaker")
+@app.get("/api/v1/system/circuit-breaker", dependencies=[Depends(require_api_token)])
 async def get_circuit_breaker_status():
     """Get circuit breaker status for Binance API calls."""
     try:
@@ -233,7 +267,31 @@ async def get_circuit_breaker_status():
         }
 
 
-@app.get("/api/v1/portfolio/summary")
+@app.get("/api/v1/system/exchange-orders/open", dependencies=[Depends(require_api_token)])
+async def get_open_exchange_orders(symbol: str | None = None):
+    """Get locally tracked exchange orders that still need reconciliation."""
+    try:
+        return {"orders": portfolio_manager.get_open_exchange_orders(symbol=symbol)}
+    except Exception as e:
+        logger.error(f"Error fetching open exchange orders: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/system/reconcile", dependencies=[Depends(require_api_token)])
+async def reconcile_exchange_orders(symbol: str | None = None):
+    """Reconcile locally tracked open exchange orders with Binance."""
+    try:
+        service = ExchangeReconciliationService(
+            client=market_agent.client,
+            portfolio=portfolio_manager,
+        )
+        return service.reconcile_open_orders(symbol=symbol)
+    except Exception as e:
+        logger.error(f"Error reconciling exchange orders: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/portfolio/summary", dependencies=[Depends(require_api_token)])
 async def get_portfolio_summary():
     """Get a summary of the portfolio including P&L and value."""
     cache_key = "portfolio:summary"
@@ -261,7 +319,7 @@ async def get_portfolio_summary():
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.get("/api/v1/portfolio/positions")
+@app.get("/api/v1/portfolio/positions", dependencies=[Depends(require_api_token)])
 async def get_all_positions():
     """Get all open positions."""
     try:
@@ -271,7 +329,7 @@ async def get_all_positions():
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.get("/api/v1/portfolio/trade-history")
+@app.get("/api/v1/portfolio/trade-history", dependencies=[Depends(require_api_token)])
 async def get_trade_history(limit: int = 50):
     """Get recent trade history."""
     try:
@@ -281,7 +339,7 @@ async def get_trade_history(limit: int = 50):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.get("/api/v1/risk/status")
+@app.get("/api/v1/risk/status", dependencies=[Depends(require_api_token)])
 async def get_risk_status():
     """Get the current status of the risk management agent."""
     cache_key = "risk:status"
@@ -302,7 +360,7 @@ async def get_risk_status():
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.get("/api/v1/risk/trailing-stops")
+@app.get("/api/v1/risk/trailing-stops", dependencies=[Depends(require_api_token)])
 async def get_trailing_stops():
     """Get all active trailing stops."""
     try:
@@ -311,7 +369,7 @@ async def get_trailing_stops():
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.get("/api/v1/risk/trailing-stops/{symbol}")
+@app.get("/api/v1/risk/trailing-stops/{symbol}", dependencies=[Depends(require_api_token)])
 async def get_trailing_stop_for_symbol(symbol: str):
     """Get trailing stop info for a specific symbol."""
     try:
@@ -325,7 +383,7 @@ async def get_trailing_stop_for_symbol(symbol: str):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.get("/api/v1/market/price/{symbol}")
+@app.get("/api/v1/market/price/{symbol}", dependencies=[Depends(require_api_token)])
 async def get_market_price(symbol: str):
     """Get the latest market price for a given symbol, with caching."""
     symbol_upper = symbol.upper()
@@ -352,7 +410,7 @@ async def get_market_price(symbol: str):
         raise HTTPException(status_code=500, detail=f"API error: {e}") from e
 
 
-@app.get("/api/v1/system/config")
+@app.get("/api/v1/system/config", dependencies=[Depends(require_api_token)])
 async def get_system_config():
     """Get key configuration parameters."""
     try:
@@ -366,7 +424,7 @@ async def get_system_config():
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.get("/api/v1/performance/summary")
+@app.get("/api/v1/performance/summary", dependencies=[Depends(require_api_token)])
 async def get_performance_summary():
     """Get comprehensive performance analytics summary."""
     try:
@@ -376,7 +434,7 @@ async def get_performance_summary():
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.get("/api/v1/performance/trades")
+@app.get("/api/v1/performance/trades", dependencies=[Depends(require_api_token)])
 async def get_performance_trade_history(limit: int = 50):
     """Get recent trade history."""
     try:
@@ -389,7 +447,7 @@ async def get_performance_trade_history(limit: int = 50):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.get("/api/v1/performance/by-symbol")
+@app.get("/api/v1/performance/by-symbol", dependencies=[Depends(require_api_token)])
 async def get_performance_by_symbol():
     """Get performance breakdown by trading symbol."""
     try:
@@ -401,7 +459,7 @@ async def get_performance_by_symbol():
 
 # --- Paper Trading Endpoints ---
 
-@app.get("/api/v1/paper-trading/status")
+@app.get("/api/v1/paper-trading/status", dependencies=[Depends(require_api_token)])
 async def get_paper_trading_status():
     """Get paper trading portfolio state and statistics."""
     import json
@@ -485,7 +543,7 @@ async def get_paper_trading_status():
     }
 
 
-@app.get("/api/v1/paper-trading/signals")
+@app.get("/api/v1/paper-trading/signals", dependencies=[Depends(require_api_token)])
 async def get_paper_trading_signals(limit: int = 50):
     """Get recent paper trading signals."""
     import json
@@ -512,7 +570,7 @@ async def get_paper_trading_signals(limit: int = 50):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.get("/api/v1/paper-trading/trades")
+@app.get("/api/v1/paper-trading/trades", dependencies=[Depends(require_api_token)])
 async def get_paper_trading_trades(limit: int = 50):
     """Get paper trading trade history."""
     import json

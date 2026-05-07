@@ -8,6 +8,8 @@ import dash_bootstrap_components as dbc
 import requests
 from dash import Input, Output, callback, dcc, html
 
+from binance_trade_agent.dashboard.api_client import get_api_headers
+
 logger = logging.getLogger(__name__)
 
 # API base URL - use 'api' hostname in Docker, fallback to localhost for local dev
@@ -17,7 +19,11 @@ API_BASE_URL = os.getenv("API_BASE_URL", "http://api:8000")
 def fetch_paper_status():
     """Fetch paper trading status from API"""
     try:
-        resp = requests.get(f"{API_BASE_URL}/api/v1/paper-trading/status", timeout=5)
+        resp = requests.get(
+            f"{API_BASE_URL}/api/v1/paper-trading/status",
+            headers=get_api_headers(),
+            timeout=5,
+        )
         if resp.status_code == 200:
             return resp.json()
     except Exception as e:
@@ -28,7 +34,11 @@ def fetch_paper_status():
 def fetch_paper_signals(limit=50):
     """Fetch paper trading signals from API"""
     try:
-        resp = requests.get(f"{API_BASE_URL}/api/v1/paper-trading/signals?limit={limit}", timeout=5)
+        resp = requests.get(
+            f"{API_BASE_URL}/api/v1/paper-trading/signals?limit={limit}",
+            headers=get_api_headers(),
+            timeout=5,
+        )
         if resp.status_code == 200:
             return resp.json()
     except Exception as e:
@@ -39,7 +49,11 @@ def fetch_paper_signals(limit=50):
 def fetch_paper_trades(limit=50):
     """Fetch paper trading trades from API"""
     try:
-        resp = requests.get(f"{API_BASE_URL}/api/v1/paper-trading/trades?limit={limit}", timeout=5)
+        resp = requests.get(
+            f"{API_BASE_URL}/api/v1/paper-trading/trades?limit={limit}",
+            headers=get_api_headers(),
+            timeout=5,
+        )
         if resp.status_code == 200:
             return resp.json()
     except Exception as e:

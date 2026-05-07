@@ -125,7 +125,7 @@ class TradingOrchestrator:
                 self.logger.info("Step 4: Executing trade", extra=extra)
                 execution_result = await self._execute_trade(trade_decision, correlation_id)
 
-                if execution_result:
+                if execution_result and execution_result.get("success"):
                     trade_decision.executed = True
                     trade_decision.order_id = execution_result.get("order_id")
                     trade_decision.execution_price = execution_result.get("price", price)
@@ -134,7 +134,10 @@ class TradingOrchestrator:
                     exec_price = trade_decision.execution_price or price
 
                     # Register trailing stop for the executed trade
-                    if self.risk_agent.config.get("trailing_stop_enabled", True):
+                    if (
+                        execution_result.get("status") in {"FILLED", "PARTIALLY_FILLED"}
+                        and self.risk_agent.config.get("trailing_stop_enabled", True)
+                    ):
                         self.risk_agent.register_trailing_stop(
                             symbol=symbol,
                             entry_price=exec_price,
@@ -145,18 +148,23 @@ class TradingOrchestrator:
                             extra=extra,
                         )
 
-                    # Record trade in performance analytics
-                    try:
-                        analytics = get_performance_analytics(config.portfolio_initial_value)
-                        analytics.record_trade_entry(
-                            symbol=symbol,
-                            side=signal_result["signal"],
-                            entry_price=exec_price,
-                            quantity=quantity,
-                            notes=f"Confidence: {signal_result['confidence']:.1%}",
-                        )
-                    except Exception as e:
-                        self.logger.warning(f"Failed to record trade in analytics: {e}")
+                        # Record trade in performance analytics
+                        try:
+                            analytics = get_performance_analytics(config.portfolio_initial_value)
+                            analytics.record_trade_entry(
+                                symbol=symbol,
+                                side=signal_result["signal"],
+                                entry_price=exec_price,
+                                quantity=quantity,
+                                notes=f"Confidence: {signal_result['confidence']:.1%}",
+                            )
+                        except Exception as e:
+                            self.logger.warning(f"Failed to record trade in analytics: {e}")
+                elif execution_result:
+                    self.logger.error(
+                        f"Trade execution rejected: {execution_result.get('error', execution_result)}",
+                        extra=extra,
+                    )
             else:
                 self.logger.info(
                     f"Trade not executed - Risk approved: {risk_approved}, "
@@ -253,11 +261,15 @@ class TradingOrchestrator:
 
             if signal_upper == "BUY":
                 result = self.execution_agent.place_buy_order(
-                    symbol=trade_decision.symbol, quantity=trade_decision.quantity
+                    symbol=trade_decision.symbol,
+                    quantity=trade_decision.quantity,
+                    correlation_id=correlation_id,
                 )
             elif signal_upper == "SELL":
                 result = self.execution_agent.place_sell_order(
-                    symbol=trade_decision.symbol, quantity=trade_decision.quantity
+                    symbol=trade_decision.symbol,
+                    quantity=trade_decision.quantity,
+                    correlation_id=correlation_id,
                 )
             else:
                 self.logger.warning(

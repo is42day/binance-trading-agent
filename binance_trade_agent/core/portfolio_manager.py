@@ -4,13 +4,14 @@ Portfolio Management Module - Tracks positions, trades, and P&L using SQLAlchemy
 
 import json
 import logging
+import os
 import time
 from dataclasses import dataclass
 from datetime import datetime
 from functools import wraps
 from typing import Any, Callable, Dict, List, Optional
 
-from sqlalchemy import Column, DateTime, Float, String
+from sqlalchemy import Column, DateTime, Float, String, Text, UniqueConstraint, inspect, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.orm import declarative_base
@@ -127,8 +128,14 @@ class TradeORM(Base):
     fee = Column(Float, nullable=False)
     timestamp = Column(DateTime, nullable=False)
     order_id = Column(String, nullable=True)
+    client_order_id = Column(String, nullable=True)
     correlation_id = Column(String, nullable=True)
     pnl = Column(Float, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("order_id", name="uq_trades_order_id"),
+        UniqueConstraint("client_order_id", name="uq_trades_client_order_id"),
+    )
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert ORM object to dictionary"""
@@ -141,9 +148,63 @@ class TradeORM(Base):
             "fee": self.fee,
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
             "order_id": self.order_id,
+            "client_order_id": self.client_order_id,
             "correlation_id": self.correlation_id,
             "pnl": self.pnl,
             "total_value": (self.quantity * self.price) + self.fee,
+        }
+
+
+class ExchangeOrderORM(Base):
+    """ORM model for exchange order lifecycle tracking."""
+
+    __tablename__ = "exchange_orders"
+
+    client_order_id = Column(String, primary_key=True)
+    order_id = Column(String, nullable=True)
+    symbol = Column(String, nullable=False)
+    side = Column(String, nullable=False)
+    order_type = Column(String, nullable=False)
+    status = Column(String, nullable=False)
+    quantity = Column(Float, nullable=False)
+    executed_quantity = Column(Float, nullable=False, default=0.0)
+    price = Column(Float, nullable=True)
+    avg_fill_price = Column(Float, nullable=True)
+    fee = Column(Float, nullable=False, default=0.0)
+    correlation_id = Column(String, nullable=True)
+    raw_response = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False)
+    updated_at = Column(DateTime, nullable=False)
+    last_reconciled_at = Column(DateTime, nullable=True)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert ORM object to dictionary."""
+        raw_response = None
+        if self.raw_response:
+            try:
+                raw_response = json.loads(self.raw_response)
+            except (json.JSONDecodeError, TypeError):
+                raw_response = self.raw_response
+
+        return {
+            "client_order_id": self.client_order_id,
+            "order_id": self.order_id,
+            "symbol": self.symbol,
+            "side": self.side,
+            "order_type": self.order_type,
+            "status": self.status,
+            "quantity": self.quantity,
+            "executed_quantity": self.executed_quantity,
+            "price": self.price,
+            "avg_fill_price": self.avg_fill_price,
+            "fee": self.fee,
+            "correlation_id": self.correlation_id,
+            "raw_response": raw_response,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "last_reconciled_at": (
+                self.last_reconciled_at.isoformat() if self.last_reconciled_at else None
+            ),
         }
 
 
@@ -174,6 +235,26 @@ class HeartbeatORM(Base):
         }
 
 
+class SystemStateORM(Base):
+    """ORM model for shared system control state."""
+
+    __tablename__ = "system_state"
+
+    key = Column(String, primary_key=True)
+    value = Column(String, nullable=False)
+    updated_at = Column(DateTime, nullable=False)
+    updated_by = Column(String, nullable=True)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert ORM object to dictionary."""
+        return {
+            "key": self.key,
+            "value": self.value,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "updated_by": self.updated_by,
+        }
+
+
 # ============================================================================
 # Portfolio Manager - SQLAlchemy-Based Implementation
 # ============================================================================
@@ -192,29 +273,83 @@ class PortfolioManager:
                                If False, creates own engine (legacy mode for tests).
         """
         self.logger = logging.getLogger(self.__class__.__name__)
+        self._read_cache: Dict[str, Any] = {}
+        self._read_cache_expires_at: Dict[str, float] = {}
+        self._read_cache_ttl_seconds = float(os.getenv("PORTFOLIO_READ_CACHE_TTL_SECONDS", "0.25"))
+        self._dispose_on_clear = (
+            not db.os.getenv("DATABASE_URL")
+            and db_path != "/app/data/portfolio.db"
+        )
 
         if use_shared_session:
             # Use centralized DB configuration (recommended)
             # Set DB_PATH env var if db_path provided and DATABASE_URL not set
             if not db.os.getenv("DATABASE_URL") and db_path != "/app/data/portfolio.db":
-                db.os.environ["DB_PATH"] = db_path
+                normalized_path = db.normalize_sqlite_path(db_path)
+                if db.os.environ.get("DB_PATH") != normalized_path:
+                    db.os.environ["DB_PATH"] = normalized_path
+                    db.reset_engine()
 
             self.engine = db.get_engine()
             self.SessionLocal = db.get_session_factory()
+            Base.metadata.create_all(self.engine, checkfirst=True)
+            self._ensure_runtime_schema_compatibility()
             self.db_path = None  # Not used with shared session
         else:
             # Legacy mode: create own SQLite engine (for backward compatibility)
             from sqlalchemy import create_engine
             from sqlalchemy.orm import sessionmaker
 
-            self.db_path = db_path
-            self.engine = create_engine(f"sqlite:///{db_path}", echo=False)
+            self.db_path = db.normalize_sqlite_path(db_path)
+            self.engine = create_engine(f"sqlite:///{self.db_path}", echo=False)
             Base.metadata.create_all(self.engine, checkfirst=True)
+            self._ensure_runtime_schema_compatibility()
             self.SessionLocal = sessionmaker(bind=self.engine)
+
+    def _ensure_runtime_schema_compatibility(self):
+        """
+        Patch older SQLite/dev schemas that predate recent nullable columns.
+
+        Production PostgreSQL should be managed by Alembic. This guard keeps
+        local SQLite databases and legacy test DBs readable after model changes.
+        """
+        if self.engine.dialect.name != "sqlite":
+            return
+
+        inspector = inspect(self.engine)
+        tables = set(inspector.get_table_names())
+        if "trades" not in tables:
+            return
+
+        trade_columns = {column["name"] for column in inspector.get_columns("trades")}
+        with self.engine.begin() as connection:
+            if "client_order_id" not in trade_columns:
+                connection.execute(text("ALTER TABLE trades ADD COLUMN client_order_id VARCHAR"))
+
+        Base.metadata.create_all(self.engine, checkfirst=True)
 
     def get_session(self) -> SQLAlchemySession:
         """Get a new database session"""
         return self.SessionLocal()
+
+    def _get_cached_read(self, key: str):
+        if self._read_cache_ttl_seconds <= 0:
+            return None
+        if time.monotonic() >= self._read_cache_expires_at.get(key, 0):
+            self._read_cache.pop(key, None)
+            self._read_cache_expires_at.pop(key, None)
+            return None
+        return self._read_cache.get(key)
+
+    def _set_cached_read(self, key: str, value: Any):
+        if self._read_cache_ttl_seconds <= 0:
+            return
+        self._read_cache[key] = value
+        self._read_cache_expires_at[key] = time.monotonic() + self._read_cache_ttl_seconds
+
+    def _clear_read_cache(self):
+        self._read_cache.clear()
+        self._read_cache_expires_at.clear()
 
     @retry_on_db_error(max_retries=3, backoff_seconds=0.5)
     def add_trade(
@@ -228,6 +363,7 @@ class PortfolioManager:
         order_id: Optional[str] = None,
         correlation_id: Optional[str] = None,
         pnl: Optional[float] = None,
+        client_order_id: Optional[str] = None,
     ) -> TradeORM:
         """
         Add a new trade to the portfolio and update position atomically.
@@ -248,6 +384,7 @@ class PortfolioManager:
                     fee=fee,
                     timestamp=datetime.now(),
                     order_id=order_id,
+                    client_order_id=client_order_id,
                     correlation_id=correlation_id,
                     pnl=pnl,
                 )
@@ -257,6 +394,7 @@ class PortfolioManager:
                 self._update_position_from_trade(session, trade)
 
             # Transaction automatically committed if no exception
+            self._clear_read_cache()
             self.logger.info(f"Added trade: {side} {quantity} {symbol} @ ${price:.2f}")
             return trade
 
@@ -367,10 +505,8 @@ class PortfolioManager:
 
                 position.timestamp = datetime.now()
 
-            session.commit()
             self.logger.info(f"Position updated for {symbol}")
         except Exception as e:
-            session.rollback()
             self.logger.error(f"Error updating position: {str(e)}")
             raise
 
@@ -397,6 +533,7 @@ class PortfolioManager:
                         position.unrealized_pnl = 0.0
 
             session.commit()
+            self._clear_read_cache()
             self.logger.info(f"Updated prices for {len(prices)} symbols")
         except Exception as e:
             session.rollback()
@@ -416,10 +553,136 @@ class PortfolioManager:
 
     def get_all_positions(self) -> List[Dict[str, Any]]:
         """Get all positions as dictionaries"""
+        cache_key = "all_positions"
+        cached = self._get_cached_read(cache_key)
+        if cached is not None:
+            return cached
+
         session = self.get_session()
         try:
             positions = session.query(PositionORM).all()
-            return [pos.to_dict() for pos in positions]
+            result = [pos.to_dict() for pos in positions]
+            self._set_cached_read(cache_key, result)
+            return result
+        finally:
+            session.close()
+
+    def get_trade_by_order_id(self, order_id: str) -> Optional[Dict[str, Any]]:
+        """Get a trade by exchange order ID."""
+        if not order_id:
+            return None
+
+        session = self.get_session()
+        try:
+            trade = session.query(TradeORM).filter_by(order_id=str(order_id)).first()
+            return trade.to_dict() if trade else None
+        finally:
+            session.close()
+
+    def get_trade_by_client_order_id(self, client_order_id: str) -> Optional[Dict[str, Any]]:
+        """Get a trade by exchange client order ID."""
+        if not client_order_id:
+            return None
+
+        session = self.get_session()
+        try:
+            trade = session.query(TradeORM).filter_by(client_order_id=client_order_id).first()
+            return trade.to_dict() if trade else None
+        finally:
+            session.close()
+
+    @retry_on_db_error(max_retries=3, backoff_seconds=0.5)
+    def upsert_exchange_order(self, order_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Insert or update exchange order lifecycle state."""
+        client_order_id = order_data.get("client_order_id")
+        if not client_order_id:
+            raise ValueError("client_order_id is required")
+
+        now = datetime.now()
+        session = self.get_session()
+        try:
+            with session.begin():
+                order = session.get(ExchangeOrderORM, client_order_id)
+                if order is None:
+                    order = ExchangeOrderORM(
+                        client_order_id=client_order_id,
+                        created_at=order_data.get("created_at") or now,
+                        updated_at=now,
+                        symbol=order_data["symbol"],
+                        side=order_data["side"],
+                        order_type=order_data["order_type"],
+                        status=order_data.get("status", "UNKNOWN"),
+                        quantity=float(order_data.get("quantity") or 0),
+                        executed_quantity=float(order_data.get("executed_quantity") or 0),
+                    )
+                    session.add(order)
+
+                order.order_id = str(order_data.get("order_id") or order.order_id or "")
+                order.symbol = order_data.get("symbol", order.symbol)
+                order.side = order_data.get("side", order.side)
+                order.order_type = order_data.get("order_type", order.order_type)
+                order.status = order_data.get("status", order.status)
+                order.quantity = float(order_data.get("quantity", order.quantity) or 0)
+                order.executed_quantity = float(
+                    order_data.get("executed_quantity", order.executed_quantity) or 0
+                )
+                order.price = order_data.get("price", order.price)
+                order.avg_fill_price = order_data.get("avg_fill_price", order.avg_fill_price)
+                order.fee = float(order_data.get("fee", order.fee) or 0)
+                order.correlation_id = order_data.get("correlation_id", order.correlation_id)
+                raw_response = order_data.get("raw_response")
+                if raw_response is not None:
+                    order.raw_response = json.dumps(raw_response, default=str)
+                order.updated_at = now
+                if order_data.get("last_reconciled_at"):
+                    order.last_reconciled_at = order_data["last_reconciled_at"]
+
+            self._clear_read_cache()
+            return self.get_exchange_order(client_order_id) or {}
+        finally:
+            session.close()
+
+    def get_exchange_order(self, client_order_id: str) -> Optional[Dict[str, Any]]:
+        """Get an exchange order by client order ID."""
+        session = self.get_session()
+        try:
+            order = session.get(ExchangeOrderORM, client_order_id)
+            return order.to_dict() if order else None
+        finally:
+            session.close()
+
+    def get_open_exchange_orders(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get locally tracked orders that may still need reconciliation.
+
+        Filled orders are returned only when no matching local trade exists. This
+        covers the crash window between recording an exchange fill and booking
+        the portfolio trade.
+        """
+        reconcilable_statuses = {"NEW", "PARTIALLY_FILLED", "PENDING_NEW", "UNKNOWN", "FILLED"}
+        session = self.get_session()
+        try:
+            query = session.query(ExchangeOrderORM).filter(
+                ExchangeOrderORM.status.in_(reconcilable_statuses)
+            )
+            if symbol:
+                query = query.filter_by(symbol=symbol)
+
+            results = []
+            for order in query.order_by(ExchangeOrderORM.created_at.asc()):
+                if order.status == "FILLED":
+                    existing_trade = None
+                    if order.client_order_id:
+                        existing_trade = (
+                            session.query(TradeORM)
+                            .filter_by(client_order_id=order.client_order_id)
+                            .first()
+                        )
+                    if not existing_trade and order.order_id:
+                        existing_trade = session.query(TradeORM).filter_by(order_id=order.order_id).first()
+                    if existing_trade:
+                        continue
+                results.append(order.to_dict())
+            return results
         finally:
             session.close()
 
@@ -445,6 +708,11 @@ class PortfolioManager:
         self, symbol: Optional[str] = None, limit: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """Get trade history, optionally filtered by symbol"""
+        cache_key = f"trade_history:{symbol}:{limit}"
+        cached = self._get_cached_read(cache_key)
+        if cached is not None:
+            return cached
+
         session = self.get_session()
         try:
             query = session.query(TradeORM)
@@ -452,17 +720,26 @@ class PortfolioManager:
             if symbol:
                 query = query.filter_by(symbol=symbol)
 
-            trades = query.order_by(TradeORM.timestamp.desc()).all()
+            query = query.order_by(TradeORM.timestamp.desc())
 
             if limit:
-                trades = trades[:limit]
+                query = query.limit(limit)
 
-            return [trade.to_dict() for trade in trades]
+            trades = query.all()
+
+            result = [trade.to_dict() for trade in trades]
+            self._set_cached_read(cache_key, result)
+            return result
         finally:
             session.close()
 
     def get_portfolio_stats(self) -> Dict[str, Any]:
         """Calculate portfolio statistics"""
+        cache_key = "portfolio_stats"
+        cached = self._get_cached_read(cache_key)
+        if cached is not None:
+            return cached
+
         session = self.get_session()
         try:
             positions = session.query(PositionORM).all()
@@ -488,7 +765,7 @@ class PortfolioManager:
                     drawdown = peak_pnl - running_pnl
                     max_drawdown = max(max_drawdown, drawdown)
 
-            return {
+            result = {
                 "total_value": total_value,
                 "total_pnl": total_pnl,
                 "total_fees": total_fees,
@@ -497,6 +774,8 @@ class PortfolioManager:
                 "max_drawdown": max_drawdown,
                 "positions_count": len(positions),
             }
+            self._set_cached_read(cache_key, result)
+            return result
         finally:
             session.close()
 
@@ -506,10 +785,12 @@ class PortfolioManager:
         try:
             positions = session.query(PositionORM).all()
             trades = session.query(TradeORM).all()
+            exchange_orders = session.query(ExchangeOrderORM).all()
 
             data = {
                 "positions": [pos.to_dict() for pos in positions],
                 "trades": [trade.to_dict() for trade in trades],
+                "exchange_orders": [order.to_dict() for order in exchange_orders],
                 "stats": self.get_portfolio_stats(),
                 "export_timestamp": datetime.now().isoformat(),
             }
@@ -524,10 +805,16 @@ class PortfolioManager:
         try:
             session.query(PositionORM).delete()
             session.query(TradeORM).delete()
+            session.query(ExchangeOrderORM).delete()
             session.commit()
+            self._clear_read_cache()
             self.logger.info("Portfolio cleared")
         finally:
             session.close()
+            if self._dispose_on_clear:
+                self.engine.dispose()
+                if db.os.getenv("DB_PATH"):
+                    db.reset_engine()
 
     # ========================================================================
     # Heartbeat Management - Service Liveness Monitoring
@@ -543,7 +830,7 @@ class PortfolioManager:
             status: Status string (e.g., "healthy", "degraded", "unhealthy")
             details: Optional dict with additional details (will be JSON-encoded)
         """
-        session = self.session_factory()
+        session = self.get_session()
         try:
             with session.begin():
                 details_json = json.dumps(details) if details else None
@@ -581,7 +868,7 @@ class PortfolioManager:
         Returns:
             Dictionary with heartbeat data, or None if not found
         """
-        session = self.session_factory()
+        session = self.get_session()
         try:
             heartbeat = session.query(HeartbeatORM).filter(
                 HeartbeatORM.service_name == service_name
@@ -598,10 +885,46 @@ class PortfolioManager:
         Returns:
             List of heartbeat dictionaries
         """
-        session = self.session_factory()
+        session = self.get_session()
         try:
             heartbeats = session.query(HeartbeatORM).all()
             return [hb.to_dict() for hb in heartbeats]
+        finally:
+            session.close()
+
+    # ========================================================================
+    # Shared System State
+    # ========================================================================
+
+    @retry_on_db_error(max_retries=3, backoff_seconds=0.5)
+    def set_system_state(self, key: str, value: str, updated_by: Optional[str] = None):
+        """Set a shared system state key."""
+        session = self.get_session()
+        try:
+            with session.begin():
+                state = session.query(SystemStateORM).filter_by(key=key).first()
+                if state:
+                    state.value = value
+                    state.updated_at = datetime.now()
+                    state.updated_by = updated_by
+                else:
+                    session.add(
+                        SystemStateORM(
+                            key=key,
+                            value=value,
+                            updated_at=datetime.now(),
+                            updated_by=updated_by,
+                        )
+                    )
+        finally:
+            session.close()
+
+    def get_system_state(self, key: str) -> Optional[Dict[str, Any]]:
+        """Get a shared system state key."""
+        session = self.get_session()
+        try:
+            state = session.query(SystemStateORM).filter_by(key=key).first()
+            return state.to_dict() if state else None
         finally:
             session.close()
 
@@ -675,6 +998,8 @@ __all__ = [
     "Base",
     "PositionORM",
     "TradeORM",
+    "ExchangeOrderORM",
+    "SystemStateORM",
     "PortfolioManager",
     "demo_portfolio_management",
 ]

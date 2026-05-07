@@ -165,6 +165,11 @@ make migrate-sqlite
 docker-compose up -d
 ```
 
+For a single-VPS deployment that runs the complete stack on its own, use the
+[VPS deployment runbook](docs/VPS_DEPLOYMENT.md). It covers required secrets,
+preflight checks, safe port bindings, health checks, backups, and live-trading
+opt-in.
+
 ### Migration Features
 
 - **Idempotent**: Can run multiple times safely

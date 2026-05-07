@@ -93,7 +93,7 @@ class SignalAgent:
             # Need 250+ candles for 200 EMA trend filter
             ohlcv_data = self.market_agent.fetch_ohlcv(symbol, interval="1h", limit=250)
 
-            if not ohlcv_data or len(ohlcv_data) < 50:
+            if not ohlcv_data or len(ohlcv_data) < 2:
                 # Not enough data for reliable signals
                 signal_result = {
                     "signal": "hold",
@@ -301,7 +301,7 @@ class SignalAgent:
             # Fetch market data - need 250+ for trend filter
             ohlcv_data = self.market_agent.fetch_ohlcv(symbol, interval="1h", limit=250)
 
-            if not ohlcv_data or len(ohlcv_data) < 50:
+            if not ohlcv_data:
                 return {"error": "Insufficient market data"}
 
             # Get strategy comparison

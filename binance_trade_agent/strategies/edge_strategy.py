@@ -17,7 +17,7 @@ from typing import Optional
 
 import requests
 
-from .base_strategy import BaseStrategy
+from .base_strategy import BaseStrategy, SignalType, StrategyResult
 
 logger = logging.getLogger(__name__)
 
@@ -421,6 +421,18 @@ class EdgeStrategy(BaseStrategy):
             },
         }
 
-    def analyze(self, market_data: list, symbol: str = None) -> dict:
+    def analyze(self, market_data: list, symbol: str = None) -> StrategyResult:
         """Analyze market data - wrapper for generate_signal"""
-        return self.generate_signal(symbol or "BTCUSDT", market_data)
+        signal = self.generate_signal(symbol or "BTCUSDT", market_data)
+        action = signal.get("action", "HOLD")
+        try:
+            signal_type = SignalType[action.upper()]
+        except KeyError:
+            signal_type = SignalType.HOLD
+
+        metadata = {key: value for key, value in signal.items() if key not in {"action", "confidence"}}
+        return StrategyResult(
+            signal=signal_type,
+            confidence=float(signal.get("confidence", 0.0)),
+            metadata=metadata,
+        )

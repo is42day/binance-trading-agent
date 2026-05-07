@@ -25,6 +25,8 @@ export default function MarketData() {
 
   useEffect(() => {
     if (market?.price) {
+      // Price history intentionally mirrors the latest async market sample.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPriceHistory(prev => {
         const now = new Date().toLocaleTimeString();
         const next = [...prev, { time: now, price: market.price }];
@@ -35,6 +37,7 @@ export default function MarketData() {
 
   // reset history when symbol changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPriceHistory([]);
   }, [symbol]);
 

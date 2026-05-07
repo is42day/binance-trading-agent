@@ -58,6 +58,12 @@ app = dash.Dash(
 #   DASHBOARD_AUTH_ENABLED (default: true, set to false to disable)
 require_auth(app)
 
+
+@app.server.get("/health")
+def dashboard_health():
+    """Unauthenticated health endpoint for Docker and VPS monitoring."""
+    return {"status": "healthy", "service": "dashboard"}
+
 # Configure app metadata
 app.title = "Binance Trading Agent"
 app.index_string = """

@@ -17,6 +17,7 @@ from binance_trade_agent.common.logging_config import (
     get_logger,
     setup_logging,
 )
+from binance_trade_agent.core.exchange_reconciliation import ExchangeReconciliationService
 from binance_trade_agent.core.orchestrator import TradingOrchestrator
 from binance_trade_agent.core.performance_analytics import get_performance_analytics
 
@@ -80,6 +81,39 @@ class AutonomousTradingLoop:
         self.trades_executed = 0
         self.start_time = None
         self.stop_flag = False
+
+        if os.getenv("EXCHANGE_RECONCILE_ON_START", "true").lower() in {
+            "true",
+            "1",
+            "yes",
+            "on",
+        }:
+            self._reconcile_exchange_orders()
+
+    def _reconcile_exchange_orders(self):
+        """Reconcile locally tracked exchange orders before trading resumes."""
+        try:
+            service = ExchangeReconciliationService(
+                client=self.orchestrator.execution_agent.client,
+                portfolio=self.orchestrator.execution_agent.portfolio,
+            )
+            result = service.reconcile_open_orders()
+            self.logger.info(
+                "Exchange reconciliation complete: "
+                f"checked={result['checked']}, "
+                f"updated={result['updated']}, "
+                f"booked_trades={result['booked_trades']}, "
+                f"errors={len(result['errors'])}"
+            )
+        except Exception as exc:
+            if os.getenv("EXCHANGE_RECONCILE_REQUIRED", "true").lower() in {
+                "true",
+                "1",
+                "yes",
+                "on",
+            }:
+                raise
+            self.logger.warning(f"Exchange reconciliation failed but startup will continue: {exc}")
 
     async def _update_trailing_stops(self):
         """

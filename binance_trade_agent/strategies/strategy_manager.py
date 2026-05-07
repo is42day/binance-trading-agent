@@ -237,7 +237,7 @@ class StrategyManager:
             return None
 
         try:
-            result = strategy.analyze(market_data, symbol)
+            result = self._normalize_strategy_result(strategy.analyze(market_data, symbol))
 
             # Record performance
             self._record_performance(strategy_name, result, market_data, symbol)
@@ -247,6 +247,45 @@ class StrategyManager:
         except Exception as e:
             self.logger.error(f"Strategy {strategy_name} analysis failed: {str(e)}")
             return None
+
+    def _normalize_strategy_result(self, result: Any) -> StrategyResult:
+        """Normalize legacy dict strategy outputs to the StrategyResult contract."""
+        if isinstance(result, StrategyResult):
+            return result
+
+        if isinstance(result, dict):
+            raw_signal = result.get("signal", result.get("action", "HOLD"))
+            try:
+                signal = SignalType[str(raw_signal).upper()]
+            except KeyError:
+                signal = SignalType.HOLD
+
+            metadata = {
+                key: value
+                for key, value in result.items()
+                if key
+                not in {
+                    "signal",
+                    "action",
+                    "confidence",
+                    "price_target",
+                    "stop_loss",
+                    "take_profit",
+                    "indicators",
+                }
+            }
+
+            return StrategyResult(
+                signal=signal,
+                confidence=float(result.get("confidence", 0.0)),
+                price_target=result.get("price_target"),
+                stop_loss=result.get("stop_loss"),
+                take_profit=result.get("take_profit"),
+                indicators=result.get("indicators", {}),
+                metadata=metadata,
+            )
+
+        raise TypeError(f"Unsupported strategy result type: {type(result).__name__}")
 
     def analyze_with_all_strategies(
         self, market_data: List[Dict[str, Any]], symbol: str = None
