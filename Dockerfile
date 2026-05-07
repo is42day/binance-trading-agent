@@ -38,8 +38,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Bring in virtualenv with ownership set during copy
 COPY --from=builder --chown=trading:trading /opt/venv /opt/venv
 
+# Install setuptools explicitly in the venv before supervisor
+RUN /opt/venv/bin/pip install --no-cache-dir setuptools
+
 # Supervisord inside the venv
-RUN pip install --no-cache-dir supervisor
+RUN /opt/venv/bin/pip install --no-cache-dir supervisor
 
 # Workdir
 WORKDIR /app

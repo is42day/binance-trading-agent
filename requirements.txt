@@ -1,3 +1,5 @@
+setuptools>=68.0.0
+wheel>=0.41.0
 alembic==1.13.1
 langchain==0.1.19
 python-binance==1.0.19

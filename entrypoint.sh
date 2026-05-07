@@ -53,6 +53,12 @@ else
     echo "[ENTRYPOINT] Skipping PostgreSQL wait and migrations"
 fi
 
-# Start supervisord with the provided configuration
+# If arguments are provided, run them directly (for individual service containers)
+if [ $# -gt 0 ]; then
+    echo "[ENTRYPOINT] Running command: $@"
+    exec "$@"
+fi
+
+# Otherwise, start supervisord with the provided configuration
 echo "[ENTRYPOINT] Starting supervisord..."
 exec supervisord -c /app/supervisord.conf
