@@ -84,11 +84,14 @@ class PaperTradingLoop:
         initial_balance: float = 100.0,  # Match user's €100 test
         trade_interval_seconds: int = 120,
         position_size_pct: float = 0.25,  # 25% per trade max
+        max_iterations: int = 0,
+        reset: bool = False,
     ):
         self.symbols = symbols or ["BTCUSDT"]
         self.strategy_name = strategy_name
         self.trade_interval = trade_interval_seconds
         self.position_size_pct = position_size_pct
+        self.max_iterations = max_iterations
 
         # Use mainnet data client
         self.data_client = MainnetDataClient()
@@ -101,6 +104,8 @@ class PaperTradingLoop:
 
         # Paper trading engine
         self.paper_engine = get_paper_trading_engine(initial_balance=initial_balance)
+        if reset:
+            self.paper_engine.reset(initial_balance=initial_balance)
 
         # Control flags
         self.stop_flag = False
@@ -279,6 +284,10 @@ class PaperTradingLoop:
             if iteration % 5 == 0:
                 self._print_summary()
 
+            if self.max_iterations and iteration >= self.max_iterations:
+                logger.info("Max paper-trading iterations reached. Stopping.")
+                break
+
             # Wait for next iteration
             await asyncio.sleep(self.trade_interval)
 
@@ -319,6 +328,8 @@ def run_paper_trading(
     strategy: str = "combined_edge",
     balance: float = 100.0,
     interval: int = 120,
+    max_iterations: int = 0,
+    reset: bool = False,
 ):
     """
     Run paper trading from command line.
@@ -343,6 +354,8 @@ def run_paper_trading(
         strategy_name=strategy,
         initial_balance=balance,
         trade_interval_seconds=interval,
+        max_iterations=max_iterations,
+        reset=reset,
     )
 
     # Handle Ctrl+C gracefully
@@ -364,6 +377,8 @@ if __name__ == "__main__":
     parser.add_argument("--strategy", default="combined_edge", help="Strategy name")
     parser.add_argument("--balance", type=float, default=100.0, help="Initial balance in USDT")
     parser.add_argument("--interval", type=int, default=120, help="Trading interval in seconds")
+    parser.add_argument("--iterations", type=int, default=0, help="Stop after N iterations")
+    parser.add_argument("--reset", action="store_true", help="Reset paper portfolio before running")
 
     args = parser.parse_args()
 
@@ -372,4 +387,6 @@ if __name__ == "__main__":
         strategy=args.strategy,
         balance=args.balance,
         interval=args.interval,
+        max_iterations=args.iterations,
+        reset=args.reset,
     )

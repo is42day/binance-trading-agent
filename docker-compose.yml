@@ -1,3 +1,9 @@
+x-service-logging: &service-logging
+  driver: "json-file"
+  options:
+    max-size: "${DOCKER_LOG_MAX_SIZE:-10m}"
+    max-file: "${DOCKER_LOG_MAX_FILES:-5}"
+
 services:
   # PostgreSQL database for production-grade multi-writer support
   postgres:
@@ -6,10 +12,10 @@ services:
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-binance_trading}
       - POSTGRES_USER=${POSTGRES_USER:-trading_user}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-trading_pass_CHANGE_ME}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       - PGDATA=/var/lib/postgresql/data/pgdata
-    ports:
-      - "5432:5432"
+    expose:
+      - "5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -20,6 +26,7 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    logging: *service-logging
 
   # One-shot migration service: runs alembic upgrade head and exits
   # Other services depend on this to ensure schema is present before they start
@@ -37,7 +44,7 @@ services:
       alembic upgrade head &&
       echo '[MIGRATE] Schema migration completed successfully'"
     environment:
-      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-trading_user}:${POSTGRES_PASSWORD:-trading_pass_CHANGE_ME}@postgres:5432/${POSTGRES_DB:-binance_trading}
+      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-trading_user}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-binance_trading}
       - PYTHONPATH=/app
     volumes:
       - ./data:/app/data
@@ -48,6 +55,7 @@ services:
       postgres:
         condition: service_healthy
     restart: "no"  # One-shot: don't restart on exit
+    logging: *service-logging
 
   # FastAPI service: data access, trading operations API
   api:
@@ -58,19 +66,25 @@ services:
     container_name: binance-api
     entrypoint: ["/bin/sh", "-c"]
     command: >
-      "uvicorn binance_trade_agent.api.api:app --host 0.0.0.0 --port 8000"
+      "python -m binance_trade_agent.scripts.preflight --service api &&
+      uvicorn binance_trade_agent.api.api:app --host 0.0.0.0 --port 8000"
     environment:
       - BINANCE_API_KEY=${BINANCE_API_KEY:-}
       - BINANCE_API_SECRET=${BINANCE_API_SECRET:-}
       - BINANCE_API_URL=${BINANCE_API_URL:-https://testnet.binance.vision}
-      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-trading_user}:${POSTGRES_PASSWORD:-trading_pass_CHANGE_ME}@postgres:5432/${POSTGRES_DB:-binance_trading}
+      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-trading_user}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-binance_trading}
       - DB_POOL_SIZE=${DB_POOL_SIZE:-5}
       - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-10}
       - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-30}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - API_AUTH_REQUIRED=${API_AUTH_REQUIRED:-true}
+      - API_AUTH_TOKEN=${API_AUTH_TOKEN:?Set API_AUTH_TOKEN in .env}
+      - API_CORS_ORIGINS=${API_CORS_ORIGINS:-http://localhost:8050,http://127.0.0.1:8050}
+      - RISK_SHARED_STATE_ENABLED=${RISK_SHARED_STATE_ENABLED:-true}
       - PYTHONPATH=/app
     ports:
-      - "8000:8000"
+      - "${API_BIND_ADDRESS:-127.0.0.1}:${API_PORT:-8000}:8000"
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -83,8 +97,9 @@ services:
       migrate:
         condition: service_completed_successfully
     restart: unless-stopped
+    logging: *service-logging
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health >/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -120,28 +135,30 @@ services:
     container_name: binance-dashboard
     entrypoint: ["/bin/sh", "-c"]
     command: >
-      "cd /app/binance_trade_agent/dashboard && python run.py"
+      "python -m binance_trade_agent.scripts.preflight --service dashboard &&
+      cd /app/binance_trade_agent/dashboard && python run.py"
     environment:
-      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-trading_user}:${POSTGRES_PASSWORD:-trading_pass_CHANGE_ME}@postgres:5432/${POSTGRES_DB:-binance_trading}
+      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-trading_user}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-binance_trading}
       - DB_POOL_SIZE=${DB_POOL_SIZE:-5}
       - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-10}
       - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-30}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - RISK_SHARED_STATE_ENABLED=${RISK_SHARED_STATE_ENABLED:-true}
       - PYTHONPATH=/app
       - REDIS_HOST=redis
       - API_HOST=api
       - API_PORT=8000
-      # Dashboard authentication (change for production!)
+      - API_AUTH_TOKEN=${API_AUTH_TOKEN:?Set API_AUTH_TOKEN in .env}
       - DASHBOARD_USERNAME=${DASHBOARD_USERNAME:-admin}
-      - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD:-changeme}
+      - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD:?Set DASHBOARD_PASSWORD in .env}
       - DASHBOARD_AUTH_ENABLED=${DASHBOARD_AUTH_ENABLED:-true}
     ports:
-      - "8050:8050"
+      - "${DASHBOARD_BIND_ADDRESS:-0.0.0.0}:${DASHBOARD_PORT:-8050}:8050"
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./config.toml:/app/config.toml:ro
-      - ./binance_trade_agent:/app/binance_trade_agent  # Dev: mount source for hot reload
     networks:
       - trading-network
     depends_on:
@@ -154,8 +171,9 @@ services:
       api:
         condition: service_started
     restart: unless-stopped
+    logging: *service-logging
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8050/ || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8050/health >/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -170,21 +188,30 @@ services:
     container_name: binance-trading-agent
     entrypoint: ["/bin/sh", "-c"]
     command: >
-      "python -m binance_trade_agent.main"
+      "python -m binance_trade_agent.scripts.preflight --service trading-agent &&
+      python -m binance_trade_agent.main"
     environment:
       - BINANCE_API_KEY=${BINANCE_API_KEY:-}
       - BINANCE_API_SECRET=${BINANCE_API_SECRET:-}
       - BINANCE_API_URL=${BINANCE_API_URL:-https://testnet.binance.vision}
       - MCP_SERVER_PORT=8080
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - RISK_SHARED_STATE_ENABLED=${RISK_SHARED_STATE_ENABLED:-true}
       - PYTHONPATH=/app
       - REDIS_HOST=redis
-      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-trading_user}:${POSTGRES_PASSWORD:-trading_pass_CHANGE_ME}@postgres:5432/${POSTGRES_DB:-binance_trading}
+      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-trading_user}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-binance_trading}
       - DB_POOL_SIZE=${DB_POOL_SIZE:-5}
       - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-10}
       - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-30}
+      - TRADING_SYMBOLS=${TRADING_SYMBOLS:-BTCUSDT}
+      - TRADING_INTERVAL_SECONDS=${TRADING_INTERVAL_SECONDS:-120}
+      - TRADING_DURATION_MINUTES=${TRADING_DURATION_MINUTES:-0}
+      - STRATEGY_NAME=${STRATEGY_NAME:-combined}
+      - EXCHANGE_RECONCILE_ON_START=${EXCHANGE_RECONCILE_ON_START:-true}
+      - EXCHANGE_RECONCILE_REQUIRED=${EXCHANGE_RECONCILE_REQUIRED:-true}
     ports:
-      - "8081:8080"  # MCP Server
+      - "${MCP_BIND_ADDRESS:-127.0.0.1}:${MCP_HOST_PORT:-8081}:8080"  # MCP Server
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -199,18 +226,18 @@ services:
       redis:
         condition: service_started
     restart: unless-stopped
+    logging: *service-logging
     # Note: MCP server uses stdio, health checks via metrics or logs
-    env_file:
-      - .env
 
   redis:
     image: redis:7.2-alpine
     container_name: binance-redis
-    ports:
-      - "6379:6379"
+    expose:
+      - "6379"
     restart: unless-stopped
     networks:
       - trading-network
+    logging: *service-logging
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

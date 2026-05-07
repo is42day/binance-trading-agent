@@ -2,16 +2,43 @@
 TradeExecutionAgent: Handles order placement, status, and cancellation via BinanceAPIClient.
 """
 
+import hashlib
+import uuid
+
 from binance.exceptions import BinanceAPIException
 
 from ..clients.binance_client import BinanceAPIClient
+from ..core.portfolio_manager import PortfolioManager
 
 
 class TradeExecutionAgent:
     def __init__(self):
         self.client = BinanceAPIClient()
+        self.portfolio = PortfolioManager("/app/data/web_portfolio.db")
 
-    def place_order(self, symbol, side, order_type, quantity, price=None):
+    def _build_client_order_id(
+        self,
+        symbol: str,
+        side: str,
+        order_type: str,
+        quantity: float,
+        correlation_id: str | None = None,
+    ) -> str:
+        """Build a Binance-compatible idempotency key for an order intent."""
+        seed = correlation_id or f"{symbol}:{side}:{order_type}:{quantity}:{uuid.uuid4()}"
+        digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()[:20]
+        return f"bta_{digest}"
+
+    def place_order(
+        self,
+        symbol,
+        side,
+        order_type,
+        quantity,
+        price=None,
+        correlation_id=None,
+        client_order_id=None,
+    ):
         """
         Place an order on Binance and persist it to the portfolio DB if successful.
         Args:
@@ -23,69 +50,118 @@ class TradeExecutionAgent:
         Returns:
             dict: Structured response with order_id and price.
         """
-        import uuid
-
-        from ..core.portfolio_manager import PortfolioManager
-
         try:
-            order = self.client.create_order(symbol, side, order_type, quantity, price)
+            client_order_id = client_order_id or self._build_client_order_id(
+                symbol=symbol,
+                side=side,
+                order_type=order_type,
+                quantity=quantity,
+                correlation_id=correlation_id,
+            )
+            order = self.client.create_order(
+                symbol,
+                side,
+                order_type,
+                quantity,
+                price,
+                client_order_id=client_order_id,
+            )
 
-            # Persist trade whether or not orderId is present (for testnet compatibility)
-            if isinstance(order, dict):
-                # Use web_portfolio.db for all trades (shown in dashboard)
-                pm = PortfolioManager("/app/data/web_portfolio.db")
+            if not isinstance(order, dict):
+                return {"success": False, "error": "Invalid order response", "original_response": order}
 
-                # Generate a trade ID - use orderId if available, otherwise generate UUID
-                trade_id = str(order.get("orderId", str(uuid.uuid4())[:16]))
+            if order.get("error"):
+                return {"success": False, "error": order["error"], "original_response": order}
 
-                # Get executed quantity - fallback to requested quantity if not available
-                exec_qty = float(order.get("executedQty", quantity))
+            status = str(order.get("status", "UNKNOWN")).upper()
+            if status not in {"FILLED", "PARTIALLY_FILLED", "NEW"}:
+                return {
+                    "success": False,
+                    "error": f"Order not accepted by exchange: status={status}",
+                    "status": status,
+                    "original_response": order,
+                }
 
-                # Get price - try multiple sources
-                order_price = price
-                if "price" in order and order["price"] and float(order["price"]) > 0:
-                    order_price = float(order["price"])
-                elif "fills" in order and order["fills"]:
-                    order_price = float(order["fills"][0].get("price", price or 0))
+            trade_id = str(order.get("orderId", str(uuid.uuid4())[:16]))
+            exchange_client_order_id = order.get("clientOrderId") or client_order_id
 
-                # If price still not found, fetch current market price
-                if not order_price or order_price == 0:
-                    try:
-                        current_price = self.client.get_ticker(symbol).get("lastPrice")
-                        if current_price:
-                            order_price = float(current_price)
-                    except Exception:  # noqa: E722
-                        pass  # Use 0 as fallback
+            exec_qty = float(order.get("executedQty", quantity))
 
-                # Call add_trade with individual parameters
-                pm.add_trade(
+            order_price = price
+            if "price" in order and order["price"] and float(order["price"]) > 0:
+                order_price = float(order["price"])
+            elif "fills" in order and order["fills"]:
+                order_price = float(order["fills"][0].get("price", price or 0))
+
+            if not order_price or order_price == 0:
+                try:
+                    current_price = self.client.get_24h_ticker(symbol).get("lastPrice")
+                    if current_price:
+                        order_price = float(current_price)
+                except Exception:
+                    return {
+                        "success": False,
+                        "error": "Order accepted but execution price could not be determined",
+                        "status": status,
+                        "original_response": order,
+                    }
+
+            order_record = {
+                "client_order_id": exchange_client_order_id,
+                "order_id": order.get("orderId", trade_id),
+                "symbol": symbol,
+                "side": side,
+                "order_type": order_type,
+                "status": status,
+                "quantity": quantity,
+                "executed_quantity": exec_qty,
+                "price": price,
+                "avg_fill_price": order_price,
+                "fee": self._extract_fee(order),
+                "correlation_id": correlation_id,
+                "raw_response": order,
+            }
+            self.portfolio.upsert_exchange_order(order_record)
+
+            if status in {"FILLED", "PARTIALLY_FILLED"} and exec_qty > 0:
+                self.portfolio.add_trade(
                     trade_id=trade_id,
                     symbol=symbol,
                     side=side,
                     quantity=exec_qty,
-                    price=order_price or 0,
-                    fee=0.0,  # Fee can be parsed from fills if needed
+                    price=order_price,
+                    fee=order_record["fee"],
                     order_id=order.get("orderId", trade_id),
+                    client_order_id=exchange_client_order_id,
+                    correlation_id=correlation_id,
                 )
 
-                # Return structured response that includes the extracted price
-                return {
-                    "order_id": order.get("orderId", trade_id),
-                    "price": order_price or 0,
-                    "quantity": exec_qty,
-                    "side": side,
-                    "symbol": symbol,
-                    "status": order.get("status", "UNKNOWN"),
-                    "original_response": order,
-                }
-
-            # If order is not a dict, still try to extract useful info
-            return {"error": "Invalid order response", "original_response": order}
+            return {
+                "success": True,
+                "order_id": order.get("orderId", trade_id),
+                "client_order_id": exchange_client_order_id,
+                "price": order_price,
+                "quantity": exec_qty,
+                "side": side,
+                "symbol": symbol,
+                "status": status,
+                "original_response": order,
+            }
 
         except BinanceAPIException as ex:
-            return {"error": str(ex)}
+            return {"success": False, "error": str(ex)}
         except Exception as ex:
-            return {"error": str(ex)}
+            return {"success": False, "error": str(ex)}
+
+    def _extract_fee(self, order) -> float:
+        """Extract executed commission from Binance fills when present."""
+        total_fee = 0.0
+        for fill in order.get("fills", []) or []:
+            try:
+                total_fee += float(fill.get("commission", 0))
+            except (TypeError, ValueError):
+                continue
+        return total_fee
 
     def get_order_status(self, order_id, symbol):
         """
@@ -121,7 +197,15 @@ class TradeExecutionAgent:
         except Exception as ex:
             return {"error": str(ex)}
 
-    def place_buy_order(self, symbol, quantity, order_type="MARKET", price=None):
+    def place_buy_order(
+        self,
+        symbol,
+        quantity,
+        order_type="MARKET",
+        price=None,
+        correlation_id=None,
+        client_order_id=None,
+    ):
         """
         Place a BUY order.
         Args:
@@ -132,9 +216,25 @@ class TradeExecutionAgent:
         Returns:
             dict: Order response or error info.
         """
-        return self.place_order(symbol, "BUY", order_type, quantity, price)
+        return self.place_order(
+            symbol,
+            "BUY",
+            order_type,
+            quantity,
+            price,
+            correlation_id=correlation_id,
+            client_order_id=client_order_id,
+        )
 
-    def place_sell_order(self, symbol, quantity, order_type="MARKET", price=None):
+    def place_sell_order(
+        self,
+        symbol,
+        quantity,
+        order_type="MARKET",
+        price=None,
+        correlation_id=None,
+        client_order_id=None,
+    ):
         """
         Place a SELL order.
         Args:
@@ -145,7 +245,15 @@ class TradeExecutionAgent:
         Returns:
             dict: Order response or error info.
         """
-        return self.place_order(symbol, "SELL", order_type, quantity, price)
+        return self.place_order(
+            symbol,
+            "SELL",
+            order_type,
+            quantity,
+            price,
+            correlation_id=correlation_id,
+            client_order_id=client_order_id,
+        )
 
 
 if __name__ == "__main__":

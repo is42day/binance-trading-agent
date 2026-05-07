@@ -163,6 +163,33 @@ class TestAgentFlow:
             assert decision.correlation_id is not None
 
     @pytest.mark.asyncio
+    async def test_orchestrator_hold_signal_skips_risk_and_execution(self):
+        """HOLD signals should be recorded without going through trade-only steps."""
+        symbol = "BTCUSDT"
+        quantity = 0.001
+
+        with (
+            patch.object(self.orchestrator, "_get_market_data", return_value=50000.0),
+            patch.object(
+                self.orchestrator,
+                "_generate_signal",
+                return_value={"signal": "HOLD", "confidence": 0.5},
+            ),
+            patch.object(self.orchestrator, "_validate_risk") as mock_risk,
+            patch.object(self.orchestrator, "_execute_trade") as mock_execution,
+        ):
+            decision = await self.orchestrator.execute_trading_workflow(
+                symbol, quantity, correlation_id="hold_test"
+            )
+
+        assert decision.signal_type == "hold"
+        assert decision.risk_approved is False
+        assert decision.executed is False
+        assert self.orchestrator.trade_decisions[-1] == decision
+        mock_risk.assert_not_called()
+        mock_execution.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_orchestrator_with_live_data(self):
         """Test orchestrator with actual live testnet data"""
         symbol = "BTCUSDT"
@@ -324,3 +351,30 @@ class TestAgentFlow:
         assert stats["approved_trades"] == 1
         assert stats["executed_trades"] == 0  # None were executed
         assert stats["approval_rate"] == 0.5
+
+    @pytest.mark.asyncio
+    async def test_backtest_normalizes_legacy_dict_strategy_results(self):
+        """Backtests should accept strategies that still return legacy dict signals."""
+        historical_data = []
+        price = 100.0
+        for i in range(260):
+            price += 0.2 if i < 200 else -0.1
+            historical_data.append(
+                {
+                    "open": price * 0.999,
+                    "high": price * 1.003,
+                    "low": price * 0.997,
+                    "close": price,
+                    "volume": 1000 + i,
+                }
+            )
+
+        result = await self.orchestrator.backtest_strategy(
+            "smart_entry", "BTCUSDT", historical_data
+        )
+
+        assert "error" not in result
+        assert result["total_signals"] > 0
+        assert result["buy_signals"] + result["sell_signals"] + result["hold_signals"] == result[
+            "total_signals"
+        ]

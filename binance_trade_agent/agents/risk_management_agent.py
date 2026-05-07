@@ -4,12 +4,14 @@ Enhanced Risk Management Agent with comprehensive risk controls
 
 import json
 import logging
+import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from ..common.config import config
+from ..core.portfolio_manager import PortfolioManager
 
 
 class RiskLevel(Enum):
@@ -118,8 +120,32 @@ class EnhancedRiskManagementAgent:
         # Trailing stop tracking - tracks highest price for each position
         # Format: {symbol: {"entry_price": float, "side": str, "highest_price": float, "lowest_price": float, "current_stop": float}}
         self.trailing_stops: Dict[str, Dict[str, float]] = {}
+        self.shared_state_enabled = (
+            os.getenv("RISK_SHARED_STATE_ENABLED", "false").lower() == "true"
+            or bool(os.getenv("DATABASE_URL"))
+        )
+        self.state_store = (
+            PortfolioManager("/app/data/web_portfolio.db") if self.shared_state_enabled else None
+        )
 
         self.logger.info("Enhanced Risk Management Agent initialized")
+
+    def _shared_emergency_stop_enabled(self) -> bool:
+        """Read emergency stop from shared DB state, falling back to local config."""
+        if not self.shared_state_enabled or self.state_store is None:
+            return bool(self.config["emergency_stop"])
+
+        try:
+            state = self.state_store.get_system_state("emergency_stop")
+            if not state:
+                return bool(self.config["emergency_stop"])
+            payload = json.loads(state["value"])
+            enabled = bool(payload.get("enabled", False))
+            self.config["emergency_stop"] = enabled
+            return enabled
+        except Exception as e:
+            self.logger.warning(f"Failed to read shared emergency stop state: {e}")
+            return bool(self.config["emergency_stop"])
 
     def _initialize_risk_rules(self) -> List[RiskRule]:
         """Initialize all risk management rules"""
@@ -213,7 +239,7 @@ class EnhancedRiskManagementAgent:
         )
 
         # Check emergency stop
-        if self.config["emergency_stop"]:
+        if self._shared_emergency_stop_enabled():
             assessment.approved = False
             assessment.risk_level = RiskLevel.CRITICAL
             assessment.reasons.append("Emergency stop is active")
@@ -535,6 +561,22 @@ class EnhancedRiskManagementAgent:
     def set_emergency_stop(self, enabled: bool, reason: str = ""):
         """Set emergency stop"""
         self.config["emergency_stop"] = enabled
+        if self.shared_state_enabled and self.state_store is not None:
+            try:
+                self.state_store.set_system_state(
+                    "emergency_stop",
+                    json.dumps(
+                        {
+                            "enabled": enabled,
+                            "reason": reason,
+                            "updated_at": datetime.now().isoformat(),
+                        }
+                    ),
+                    updated_by="risk_management_agent",
+                )
+            except Exception as e:
+                self.logger.error(f"Failed to persist emergency stop state: {e}")
+
         if enabled:
             self.logger.critical(f"EMERGENCY STOP ACTIVATED: {reason}")
         else:
@@ -543,7 +585,7 @@ class EnhancedRiskManagementAgent:
     def get_risk_status(self) -> Dict[str, Any]:
         """Get current risk management status"""
         return {
-            "emergency_stop": self.config["emergency_stop"],
+            "emergency_stop": self._shared_emergency_stop_enabled(),
             "consecutive_losses": self.consecutive_losses,
             "daily_trades": self.daily_trades,
             "current_drawdown": self.current_drawdown,

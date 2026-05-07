@@ -30,6 +30,12 @@ RETRY_DELAY = 0.5  # seconds
 print(f"[API Client] Connecting to: {API_BASE_URL}")
 
 
+def get_api_headers() -> Dict[str, str]:
+    """Return headers needed for dashboard-to-API requests."""
+    token = os.getenv("API_AUTH_TOKEN")
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
+
 def _make_request_with_retry(url: str, max_retries: int = MAX_RETRIES) -> Dict[str, Any]:
     """
     Make HTTP request with retry logic for transient failures.
@@ -45,7 +51,7 @@ def _make_request_with_retry(url: str, max_retries: int = MAX_RETRIES) -> Dict[s
 
     for attempt in range(max_retries):
         try:
-            response = requests.get(url, timeout=REQUEST_TIMEOUT)
+            response = requests.get(url, headers=get_api_headers(), timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.ConnectionError as e:

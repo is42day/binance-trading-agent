@@ -101,31 +101,45 @@ class TradingOrchestrator:
             self.logger.info("Step 2: Generating trading signal", extra=extra)
             signal_result = await self._generate_signal(symbol, correlation_id, strategy_name)
 
-            # Step 3: Risk management validation
-            self.logger.info("Step 3: Risk management validation", extra=extra)
-            risk_result = await self._validate_risk(
-                symbol, signal_result["signal"], quantity, price, correlation_id
-            )
-            risk_approved = risk_result.get("approved", False)
-
             # Create trade decision
+            signal_type = str(signal_result["signal"]).lower()
             trade_decision = TradeDecision(
                 symbol=symbol,
-                signal_type=signal_result["signal"],
+                signal_type=signal_type,
                 confidence=signal_result["confidence"],
                 price=price,
                 quantity=quantity,
                 timestamp=datetime.now(),
                 correlation_id=correlation_id,
-                risk_approved=risk_approved,
+                risk_approved=False,
             )
+
+            if signal_type not in {"buy", "sell"}:
+                self.logger.info(
+                    f"Signal {signal_type.upper()} is not actionable - skipping risk validation and execution",
+                    extra=extra,
+                )
+                self.trade_decisions.append(trade_decision)
+                self.logger.info(
+                    "Trading workflow completed - Executed: False",
+                    extra=extra,
+                )
+                return trade_decision
+
+            # Step 3: Risk management validation
+            self.logger.info("Step 3: Risk management validation", extra=extra)
+            risk_result = await self._validate_risk(
+                symbol, signal_type, quantity, price, correlation_id
+            )
+            risk_approved = risk_result.get("approved", False)
+            trade_decision.risk_approved = risk_approved
 
             # Step 4: Execute trade if approved
             if risk_approved:
                 self.logger.info("Step 4: Executing trade", extra=extra)
                 execution_result = await self._execute_trade(trade_decision, correlation_id)
 
-                if execution_result:
+                if execution_result and execution_result.get("success"):
                     trade_decision.executed = True
                     trade_decision.order_id = execution_result.get("order_id")
                     trade_decision.execution_price = execution_result.get("price", price)
@@ -134,7 +148,10 @@ class TradingOrchestrator:
                     exec_price = trade_decision.execution_price or price
 
                     # Register trailing stop for the executed trade
-                    if self.risk_agent.config.get("trailing_stop_enabled", True):
+                    if (
+                        execution_result.get("status") in {"FILLED", "PARTIALLY_FILLED"}
+                        and self.risk_agent.config.get("trailing_stop_enabled", True)
+                    ):
                         self.risk_agent.register_trailing_stop(
                             symbol=symbol,
                             entry_price=exec_price,
@@ -145,18 +162,23 @@ class TradingOrchestrator:
                             extra=extra,
                         )
 
-                    # Record trade in performance analytics
-                    try:
-                        analytics = get_performance_analytics(config.portfolio_initial_value)
-                        analytics.record_trade_entry(
-                            symbol=symbol,
-                            side=signal_result["signal"],
-                            entry_price=exec_price,
-                            quantity=quantity,
-                            notes=f"Confidence: {signal_result['confidence']:.1%}",
-                        )
-                    except Exception as e:
-                        self.logger.warning(f"Failed to record trade in analytics: {e}")
+                        # Record trade in performance analytics
+                        try:
+                            analytics = get_performance_analytics(config.portfolio_initial_value)
+                            analytics.record_trade_entry(
+                                symbol=symbol,
+                                side=signal_result["signal"],
+                                entry_price=exec_price,
+                                quantity=quantity,
+                                notes=f"Confidence: {signal_result['confidence']:.1%}",
+                            )
+                        except Exception as e:
+                            self.logger.warning(f"Failed to record trade in analytics: {e}")
+                elif execution_result:
+                    self.logger.error(
+                        f"Trade execution rejected: {execution_result.get('error', execution_result)}",
+                        extra=extra,
+                    )
             else:
                 self.logger.info(
                     f"Trade not executed - Risk approved: {risk_approved}, "
@@ -253,11 +275,15 @@ class TradingOrchestrator:
 
             if signal_upper == "BUY":
                 result = self.execution_agent.place_buy_order(
-                    symbol=trade_decision.symbol, quantity=trade_decision.quantity
+                    symbol=trade_decision.symbol,
+                    quantity=trade_decision.quantity,
+                    correlation_id=correlation_id,
                 )
             elif signal_upper == "SELL":
                 result = self.execution_agent.place_sell_order(
-                    symbol=trade_decision.symbol, quantity=trade_decision.quantity
+                    symbol=trade_decision.symbol,
+                    quantity=trade_decision.quantity,
+                    correlation_id=correlation_id,
                 )
             else:
                 self.logger.warning(
@@ -427,7 +453,9 @@ class TradingOrchestrator:
             # Analyze each data point
             for i in range(strategy.requires_minimum_data(), len(historical_data)):
                 data_slice = historical_data[: i + 1]
-                result = strategy.analyze(data_slice, symbol)
+                result = self.signal_agent.strategy_manager._normalize_strategy_result(
+                    strategy.analyze(data_slice, symbol)
+                )
 
                 results.append(
                     {

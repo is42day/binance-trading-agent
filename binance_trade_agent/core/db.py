@@ -6,6 +6,7 @@ for both SQLite (local dev) and PostgreSQL (production)
 
 import logging
 import os
+from pathlib import Path
 from typing import Optional
 
 from sqlalchemy import create_engine, event
@@ -14,6 +15,25 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool, QueuePool
 
 logger = logging.getLogger(__name__)
+
+
+def normalize_sqlite_path(db_path: str) -> str:
+    """
+    Normalize SQLite paths for Docker and local development.
+
+    Docker services use /app/data/*.db. When the code is executed from a
+    Windows/local checkout, that path points at C:/app instead of the repo.
+    In that case, map it to the project-local data directory.
+    """
+    if os.name == "nt" and db_path.startswith("/app/"):
+        db_path = db_path.removeprefix("/app/").replace("/", os.sep)
+
+    path = Path(db_path)
+    if not path.is_absolute():
+        path = Path.cwd() / path
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return str(path)
 
 
 def get_database_url() -> str:
@@ -35,7 +55,7 @@ def get_database_url() -> str:
         return database_url
 
     # Fallback to SQLite
-    db_path = os.getenv("DB_PATH", "/app/data/portfolio.db")
+    db_path = normalize_sqlite_path(os.getenv("DB_PATH", "/app/data/portfolio.db"))
     sqlite_url = f"sqlite:///{db_path}"
     logger.info(f"Using SQLite fallback: {sqlite_url}")
     return sqlite_url
@@ -75,14 +95,15 @@ def create_engine_from_url(
             database_url,
             echo=echo,
             connect_args={"check_same_thread": False},  # Allow multi-threading
-            poolclass=NullPool,  # No connection pooling for SQLite
+            poolclass=NullPool,
         )
 
-        # Enable foreign keys for SQLite (optional but recommended)
         @event.listens_for(engine, "connect")
         def set_sqlite_pragma(dbapi_conn, connection_record):
             cursor = dbapi_conn.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
             cursor.close()
 
         logger.info("Created SQLite engine")

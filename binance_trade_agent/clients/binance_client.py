@@ -501,7 +501,15 @@ class BinanceAPIClient:
             self.client.get_klines, symbol=symbol, interval=interval, limit=limit
         )
 
-    def create_order(self, symbol: str, side: str, order_type: str, quantity: float, price=None):
+    def create_order(
+        self,
+        symbol: str,
+        side: str,
+        order_type: str,
+        quantity: float,
+        price=None,
+        client_order_id: str | None = None,
+    ):
         """
         Create a new order.
 
@@ -521,7 +529,7 @@ class BinanceAPIClient:
                 "symbol": symbol,
                 "orderId": order_id,
                 "orderListId": -1,
-                "clientOrderId": f"mock_{order_id}",
+                "clientOrderId": client_order_id or f"mock_{order_id}",
                 "transactTime": int(time.time() * 1000),
                 "price": str(price) if price else "0.00000000",
                 "origQty": str(quantity),
@@ -534,26 +542,85 @@ class BinanceAPIClient:
             }
 
         if order_type == "MARKET":
+            params = {
+                "symbol": symbol,
+                "side": side,
+                "type": order_type,
+                "quantity": quantity,
+            }
+            if client_order_id:
+                params["newClientOrderId"] = client_order_id
             return self._api_call_with_retry(
                 self.client.create_order,
-                symbol=symbol, side=side, type=order_type, quantity=quantity,
-                max_retries=2  # Fewer retries for orders
+                **params,
+                max_retries=1
             )
         elif order_type == "LIMIT":
             if price is None:
                 raise ValueError("Limit orders require price")
+            params = {
+                "symbol": symbol,
+                "side": side,
+                "type": order_type,
+                "timeInForce": "GTC",
+                "quantity": quantity,
+                "price": str(price),
+            }
+            if client_order_id:
+                params["newClientOrderId"] = client_order_id
             return self._api_call_with_retry(
                 self.client.create_order,
-                symbol=symbol,
-                side=side,
-                type=order_type,
-                timeInForce="GTC",
-                quantity=quantity,
-                price=str(price),
-                max_retries=2
+                **params,
+                max_retries=1
             )
         else:
             raise ValueError("Unsupported order type")
+
+    def get_order(self, symbol: str, order_id: int | None = None, client_order_id: str | None = None):
+        """
+        Get an order by exchange order ID or original client order ID.
+        """
+        if self.config.demo_mode:
+            now = int(time.time() * 1000)
+            return {
+                "symbol": symbol,
+                "orderId": order_id or now,
+                "orderListId": -1,
+                "clientOrderId": client_order_id or f"mock_{order_id or now}",
+                "price": "0.00000000",
+                "origQty": "0.00100000",
+                "executedQty": "0.00100000",
+                "cummulativeQuoteQty": "50.00000000",
+                "status": "FILLED",
+                "timeInForce": "GTC",
+                "type": "MARKET",
+                "side": "BUY",
+                "time": now,
+                "updateTime": now,
+            }
+
+        params = {"symbol": symbol}
+        if order_id:
+            params["orderId"] = order_id
+        elif client_order_id:
+            params["origClientOrderId"] = client_order_id
+        else:
+            raise ValueError("order_id or client_order_id is required")
+
+        return self._api_call_with_retry(self.client.get_order, **params)
+
+    def get_account_trades(self, symbol: str, order_id: int | None = None, limit: int = 100):
+        """
+        Get account trade fills, optionally filtered by order ID.
+        """
+        if self.config.demo_mode:
+            return []
+
+        params = {"symbol": symbol, "limit": limit}
+        if order_id:
+            params["orderId"] = order_id
+
+        return self._api_call_with_retry(self.client.get_my_trades, **params)
 
     def cancel_order(self, symbol: str, order_id: int):
         """

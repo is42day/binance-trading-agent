@@ -16,6 +16,32 @@ start: build
 	@echo "   Dashboard: http://localhost:8050"
 	@echo "   API: http://localhost:8000"
 
+compose-up:
+	docker compose up -d --build
+
+compose-down:
+	docker compose down
+
+compose-logs:
+	docker compose logs -f --tail=200
+
+preflight:
+	python -m binance_trade_agent.scripts.preflight --service api --env-file $(ENV_FILE)
+	python -m binance_trade_agent.scripts.preflight --service dashboard --env-file $(ENV_FILE)
+	python -m binance_trade_agent.scripts.preflight --service trading-agent --env-file $(ENV_FILE)
+
+backup:
+	sh scripts/backup_postgres.sh
+
+testnet-smoke:
+	python -m binance_trade_agent.scripts.testnet_smoke --symbol $${SYMBOL:-BTCUSDT}
+
+testnet-order:
+	CONFIRM_TESTNET_ORDER=true python -m binance_trade_agent.scripts.testnet_smoke --symbol $${SYMBOL:-BTCUSDT} --place-order
+
+paper-smoke:
+	python run_paper_trading.py --symbols $${SYMBOL:-BTCUSDT} --balance $${BALANCE:-100} --interval $${INTERVAL:-1} --iterations $${ITERATIONS:-1} --reset
+
 run:
 	docker run -d --env-file $(ENV_FILE) -p 8000:8000 -p 8050:8050 $(DOCKER_IMAGE)
 

@@ -4,6 +4,7 @@ Extracted from web_ui.py and adapted for Dash callbacks
 """
 
 import asyncio
+import os
 from datetime import datetime
 
 from binance_trade_agent.agents.market_data_agent import MarketDataAgent
@@ -29,6 +30,11 @@ _agent_state = {
 }
 
 
+def _default_dashboard_symbols():
+    configured = os.getenv("DASHBOARD_DEFAULT_SYMBOLS", "BTCUSDT,ETHUSDT")
+    return [symbol.strip().upper() for symbol in configured.split(",") if symbol.strip()]
+
+
 def get_agent_state():
     """Get current agent state"""
     return _agent_state
@@ -44,7 +50,7 @@ def start_agent(symbols=None, interval=120, strategy="combined_default"):
     try:
         # Create autonomous trading loop
         trading_loop = AutonomousTradingLoop(
-            symbols=symbols or config.supported_symbols,
+            symbols=symbols or _default_dashboard_symbols(),
             trade_interval_seconds=interval,
             duration_minutes=0,  # Run indefinitely
             strategy_name=strategy,
@@ -57,7 +63,7 @@ def start_agent(symbols=None, interval=120, strategy="combined_default"):
             # No running loop, try to get the current one
             try:
                 loop = asyncio.get_event_loop()
-                if loop.is_closed():
+                if loop.is_closed() is True:
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
             except RuntimeError:
@@ -280,35 +286,10 @@ def execute_trade(symbol: str, side: str, quantity: float):
     try:
         components = get_trading_components()
         execution_agent = components["execution_agent"]
-        portfolio = components["portfolio"]
-        market_agent = components["market_agent"]
-
-        # Get current price
-        price = market_agent.get_latest_price(symbol)
-
-        # Create trade ID and order ID
-        trade_id = f"web_{int(datetime.now().timestamp())}"
-        order_id = f"order_{int(datetime.now().timestamp())}"
-
-        # Add trade to portfolio
-        portfolio.add_trade(
-            trade_id=trade_id,
-            symbol=symbol,
-            side=side,
-            quantity=quantity,
-            price=price,
-            fee=0.001,
-            order_id=order_id,
-            correlation_id="web_ui",
-        )
-
-        return {
-            "order_id": order_id,
-            "status": "FILLED",
-            "symbol": symbol,
-            "side": side,
-            "quantity": quantity,
-        }
+        result = execution_agent.place_order(symbol, side.upper(), "MARKET", quantity)
+        if not result.get("success"):
+            return {"error": result.get("error", "Trade execution failed")}
+        return result
     except Exception as e:
         return {"error": str(e)}
 
@@ -349,7 +330,7 @@ def get_risk_status():
                     symbol: config.get_symbol_risk_config(symbol)
                     for symbol in config.supported_symbols
                 },
-                "emergency_stop": getattr(risk_agent, "emergency_stop_active", False),
+                "emergency_stop": status.get("emergency_stop", False),
                 "last_updated": datetime.now().isoformat(),
             }
         )

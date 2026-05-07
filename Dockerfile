@@ -30,8 +30,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Non-root user
 RUN groupadd -r trading && useradd -r -g trading trading
 
-# Install runtime dependencies (netcat for connection checks)
+# Install runtime dependencies (netcat for connection checks, curl for health checks)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
     netcat-openbsd \
   && rm -rf /var/lib/apt/lists/*
 
