@@ -38,6 +38,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
+
 def _configured_cors_origins():
     origins = os.getenv(
         "API_CORS_ORIGINS",
@@ -224,6 +225,7 @@ def readiness_check():
     # Check 2: Binance API circuit breaker status
     try:
         from ..clients.binance_client import BinanceAPIClient
+
         client = BinanceAPIClient()
         cb_status = client.get_circuit_breaker_status()
         if cb_status["state"] == "open":
@@ -255,6 +257,7 @@ async def get_circuit_breaker_status():
     """Get circuit breaker status for Binance API calls."""
     try:
         from ..clients.binance_client import BinanceAPIClient
+
         client = BinanceAPIClient()
         return {
             "binance_api": client.get_circuit_breaker_status(),
@@ -410,6 +413,57 @@ async def get_market_price(symbol: str):
         raise HTTPException(status_code=500, detail=f"API error: {e}") from e
 
 
+@app.get("/api/v1/market/symbol-rules/{symbol}", dependencies=[Depends(require_api_token)])
+async def get_market_symbol_rules(symbol: str):
+    """Get Binance exchange filters used for order validation."""
+    try:
+        return market_agent.client.get_symbol_rules(symbol.upper())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"API error: {e}") from e
+
+
+@app.get("/api/v1/market/order-validation", dependencies=[Depends(require_api_token)])
+async def validate_market_order(
+    symbol: str,
+    side: str,
+    order_type: str,
+    quantity: float,
+    price: float | None = None,
+):
+    """Validate order parameters against Binance symbol filters before placement."""
+    try:
+        return market_agent.client.validate_order_params(
+            symbol=symbol.upper(),
+            side=side.upper(),
+            order_type=order_type.upper(),
+            quantity=quantity,
+            price=price,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"API error: {e}") from e
+
+
+@app.get("/api/v1/market/slippage", dependencies=[Depends(require_api_token)])
+async def estimate_market_slippage(
+    symbol: str,
+    side: str,
+    quantity: float,
+    limit: int = 50,
+):
+    """Estimate market-order effective price and slippage from current order book depth."""
+    try:
+        return market_agent.client.estimate_market_order_slippage(
+            symbol=symbol.upper(),
+            side=side.upper(),
+            quantity=quantity,
+            limit=limit,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"API error: {e}") from e
+
+
 @app.get("/api/v1/system/config", dependencies=[Depends(require_api_token)])
 async def get_system_config():
     """Get key configuration parameters."""
@@ -458,6 +512,7 @@ async def get_performance_by_symbol():
 
 
 # --- Paper Trading Endpoints ---
+
 
 @app.get("/api/v1/paper-trading/status", dependencies=[Depends(require_api_token)])
 async def get_paper_trading_status():

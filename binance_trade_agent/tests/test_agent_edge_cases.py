@@ -2,6 +2,7 @@ import pytest
 
 from ..agents.market_data_agent import MarketDataAgent
 from ..agents.trade_execution_agent import TradeExecutionAgent
+from ..clients.binance_client import BinanceAPIClient
 from ..core.portfolio_manager import PortfolioManager
 
 
@@ -61,6 +62,47 @@ def test_trade_execution_limit_order_missing_price_returns_error():
     # When underlying client requires price for LIMIT, the agent returns an error dict
     assert isinstance(res, dict)
     assert "error" in res or "order_id" in res
+
+
+def test_order_validation_rounds_to_exchange_filters():
+    client = BinanceAPIClient()
+    result = client.validate_order_params(
+        symbol="BTCUSDT",
+        side="BUY",
+        order_type="LIMIT",
+        quantity=0.00123456,
+        price=50000.1234,
+    )
+
+    assert result["valid"] is True
+    assert result["normalized_quantity"] == 0.00123
+    assert result["normalized_price"] == 50000.12
+    assert result["warnings"]
+
+
+def test_order_validation_rejects_below_min_notional():
+    client = BinanceAPIClient()
+    result = client.validate_order_params(
+        symbol="BTCUSDT",
+        side="BUY",
+        order_type="LIMIT",
+        quantity=0.00001,
+        price=100.0,
+    )
+
+    assert result["valid"] is False
+    assert any("Notional" in error for error in result["errors"])
+
+
+def test_slippage_estimate_uses_order_book_depth():
+    client = BinanceAPIClient()
+    result = client.estimate_market_order_slippage("BTCUSDT", "BUY", 12.0, limit=5)
+
+    assert result["symbol"] == "BTCUSDT"
+    assert result["side"] == "BUY"
+    assert result["filled_quantity"] == 12.0
+    assert result["effective_price"] >= result["best_ask"]
+    assert result["slippage_pct"] >= 0
 
 
 def test_portfolio_manager_persistence_and_pnl(tmp_path):

@@ -8,6 +8,7 @@ Binance API Client with Production-Ready Features:
 import logging
 import time
 from datetime import datetime, timedelta
+from decimal import Decimal, InvalidOperation, ROUND_DOWN
 from enum import Enum
 from functools import wraps
 from threading import Lock
@@ -28,8 +29,9 @@ logger = logging.getLogger(__name__)
 
 class CircuitState(Enum):
     """Circuit breaker states"""
-    CLOSED = "closed"      # Normal operation
-    OPEN = "open"          # Failing, reject requests
+
+    CLOSED = "closed"  # Normal operation
+    OPEN = "open"  # Failing, reject requests
     HALF_OPEN = "half_open"  # Testing if service recovered
 
 
@@ -111,9 +113,7 @@ class CircuitBreaker:
                 logger.warning("Circuit breaker: HALF_OPEN -> OPEN (recovery failed)")
             elif self._failure_count >= self.failure_threshold:
                 self._state = CircuitState.OPEN
-                logger.warning(
-                    f"Circuit breaker: CLOSED -> OPEN (failures: {self._failure_count})"
-                )
+                logger.warning(f"Circuit breaker: CLOSED -> OPEN (failures: {self._failure_count})")
 
     def can_execute(self) -> bool:
         """Check if requests are allowed"""
@@ -133,7 +133,9 @@ class CircuitBreaker:
             "state": self.state.value,
             "failure_count": self._failure_count,
             "failure_threshold": self.failure_threshold,
-            "last_failure": self._last_failure_time.isoformat() if self._last_failure_time else None,
+            "last_failure": (
+                self._last_failure_time.isoformat() if self._last_failure_time else None
+            ),
         }
 
 
@@ -157,15 +159,14 @@ def with_timeout_and_retry(
         backoff_factor: Multiplier for exponential backoff
         circuit_breaker: Optional circuit breaker instance
     """
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs) -> Any:
             # Check circuit breaker
             if circuit_breaker and not circuit_breaker.can_execute():
                 raise BinanceAPIException(
-                    None,
-                    -1,
-                    "Circuit breaker OPEN - Binance API temporarily unavailable"
+                    None, -1, "Circuit breaker OPEN - Binance API temporarily unavailable"
                 )
 
             last_exception = None
@@ -184,25 +185,24 @@ def with_timeout_and_retry(
                 except BinanceAPIException as e:
                     last_exception = e
 
-                    # Don't retry on client errors (4xx)
-                    if e.status_code and 400 <= e.status_code < 500:
+                    # 429 is a transient rate-limit response; back off and retry.
+                    if e.status_code == 429:
+                        logger.warning("Binance rate limit hit (429); backing off before retry")
+                    # Don't retry on other client errors (4xx)
+                    elif e.status_code and 400 <= e.status_code < 500:
                         if circuit_breaker:
                             circuit_breaker.record_failure()
                         raise
 
-                    logger.warning(
-                        f"Binance API error (attempt {attempt + 1}/{max_retries}): {e}"
-                    )
+                    logger.warning(f"Binance API error (attempt {attempt + 1}/{max_retries}): {e}")
 
                 except Exception as e:
                     last_exception = e
-                    logger.warning(
-                        f"API call failed (attempt {attempt + 1}/{max_retries}): {e}"
-                    )
+                    logger.warning(f"API call failed (attempt {attempt + 1}/{max_retries}): {e}")
 
                 # Wait before retry with exponential backoff
                 if attempt < max_retries - 1:
-                    wait_time = backoff_factor ** attempt
+                    wait_time = backoff_factor**attempt
                     logger.debug(f"Retrying in {wait_time:.1f}s...")
                     time.sleep(wait_time)
 
@@ -213,6 +213,7 @@ def with_timeout_and_retry(
             raise last_exception or Exception("API call failed after all retries")
 
         return wrapper
+
     return decorator
 
 
@@ -263,7 +264,7 @@ class BinanceAPIClient:
                     self.config.binance_api_key,
                     self.config.binance_api_secret,
                     requests_params={"timeout": self.timeout},
-                    testnet=self.config.binance_testnet
+                    testnet=self.config.binance_testnet,
                 )
 
                 # Use testnet for safety unless explicitly disabled
@@ -309,8 +310,10 @@ class BinanceAPIClient:
                 return result
             except BinanceAPIException as e:
                 last_exception = e
-                # Don't retry on 4xx client errors
-                if e.status_code and 400 <= e.status_code < 500:
+                if e.status_code == 429:
+                    logger.warning("Binance rate limit hit (429); backing off before retry")
+                # Don't retry on other 4xx client errors
+                elif e.status_code and 400 <= e.status_code < 500:
                     self._circuit_breaker.record_failure()
                     raise
                 logger.warning(f"Binance API error (attempt {attempt + 1}/{max_retries}): {e}")
@@ -345,9 +348,7 @@ class BinanceAPIClient:
             }
             return mock_prices.get(symbol, 100.0)
 
-        response = self._api_call_with_retry(
-            self.client.get_symbol_ticker, symbol=symbol
-        )
+        response = self._api_call_with_retry(self.client.get_symbol_ticker, symbol=symbol)
         return float(response["price"])
 
     def get_order_book(self, symbol: str, limit: int = 10):
@@ -372,8 +373,242 @@ class BinanceAPIClient:
                 ],
             }
 
-        return self._api_call_with_retry(
-            self.client.get_order_book, symbol=symbol, limit=limit
+        return self._api_call_with_retry(self.client.get_order_book, symbol=symbol, limit=limit)
+
+    def get_exchange_info(self, symbol: str | None = None) -> dict:
+        """Fetch exchange metadata, optionally for a single symbol."""
+        if self.config.demo_mode:
+            symbols = [self._demo_symbol_info(symbol or "BTCUSDT")]
+            return {"timezone": "UTC", "serverTime": int(time.time() * 1000), "symbols": symbols}
+
+        if symbol:
+            return self._api_call_with_retry(self.client.get_symbol_info, symbol=symbol.upper())
+
+        return self._api_call_with_retry(self.client.get_exchange_info)
+
+    def _demo_symbol_info(self, symbol: str) -> dict:
+        """Demo exchange filters shaped like Binance exchangeInfo responses."""
+        return {
+            "symbol": symbol.upper(),
+            "status": "TRADING",
+            "baseAsset": symbol[:-4] if symbol.endswith("USDT") else symbol,
+            "quoteAsset": "USDT" if symbol.endswith("USDT") else "",
+            "filters": [
+                {
+                    "filterType": "PRICE_FILTER",
+                    "minPrice": "0.01000000",
+                    "maxPrice": "10000000.00000000",
+                    "tickSize": "0.01000000",
+                },
+                {
+                    "filterType": "LOT_SIZE",
+                    "minQty": "0.00001000",
+                    "maxQty": "9000.00000000",
+                    "stepSize": "0.00001000",
+                },
+                {
+                    "filterType": "MIN_NOTIONAL",
+                    "minNotional": "5.00000000",
+                    "applyToMarket": True,
+                },
+            ],
+        }
+
+    def get_symbol_rules(self, symbol: str) -> dict:
+        """Return normalized exchange filters used for pre-trade validation."""
+        info = self.get_exchange_info(symbol)
+        if info and "symbols" in info:
+            symbol_info = next(
+                (item for item in info.get("symbols", []) if item.get("symbol") == symbol.upper()),
+                None,
+            )
+        else:
+            symbol_info = info
+
+        if not symbol_info:
+            raise ValueError(f"Symbol not found: {symbol}")
+
+        filters = {item.get("filterType"): item for item in symbol_info.get("filters", [])}
+        min_notional_filter = filters.get("MIN_NOTIONAL") or filters.get("NOTIONAL") or {}
+        return {
+            "symbol": symbol_info.get("symbol", symbol.upper()),
+            "status": symbol_info.get("status"),
+            "base_asset": symbol_info.get("baseAsset"),
+            "quote_asset": symbol_info.get("quoteAsset"),
+            "price_filter": filters.get("PRICE_FILTER", {}),
+            "lot_size": filters.get("LOT_SIZE", {}),
+            "min_notional": min_notional_filter,
+            "raw_filters": filters,
+        }
+
+    def validate_order_params(
+        self,
+        symbol: str,
+        side: str,
+        order_type: str,
+        quantity: float,
+        price: float | None = None,
+    ) -> dict:
+        """Validate and normalize an order against Binance symbol filters."""
+        symbol = symbol.upper()
+        side = side.upper()
+        order_type = order_type.upper()
+        errors = []
+        warnings = []
+
+        rules = self.get_symbol_rules(symbol)
+        price_filter = rules.get("price_filter", {})
+        lot_size = rules.get("lot_size", {})
+        min_notional_filter = rules.get("min_notional", {})
+
+        normalized_quantity = self._round_step(quantity, lot_size.get("stepSize"))
+        normalized_price = None
+        reference_price = price
+
+        if normalized_quantity <= 0:
+            errors.append("Quantity must be greater than zero")
+
+        min_qty = self._to_decimal(lot_size.get("minQty"))
+        max_qty = self._to_decimal(lot_size.get("maxQty"))
+        quantity_decimal = self._to_decimal(normalized_quantity)
+        if min_qty is not None and quantity_decimal < min_qty:
+            errors.append(f"Quantity {normalized_quantity} is below minQty {min_qty}")
+        if max_qty is not None and quantity_decimal > max_qty:
+            errors.append(f"Quantity {normalized_quantity} is above maxQty {max_qty}")
+
+        if order_type == "LIMIT":
+            if price is None:
+                errors.append("Limit orders require price")
+            else:
+                normalized_price = self._round_step(price, price_filter.get("tickSize"))
+                reference_price = normalized_price
+                min_price = self._to_decimal(price_filter.get("minPrice"))
+                max_price = self._to_decimal(price_filter.get("maxPrice"))
+                price_decimal = self._to_decimal(normalized_price)
+                if min_price is not None and price_decimal < min_price:
+                    errors.append(f"Price {normalized_price} is below minPrice {min_price}")
+                if max_price is not None and price_decimal > max_price:
+                    errors.append(f"Price {normalized_price} is above maxPrice {max_price}")
+        elif order_type == "MARKET":
+            if reference_price is None:
+                reference_price = self.get_latest_price(symbol)
+        else:
+            errors.append(f"Unsupported order type: {order_type}")
+
+        notional = None
+        if reference_price is not None:
+            notional = float(
+                self._to_decimal(normalized_quantity) * self._to_decimal(reference_price)
+            )
+            min_notional = self._to_decimal(
+                min_notional_filter.get("minNotional") or min_notional_filter.get("notional")
+            )
+            if min_notional is not None and self._to_decimal(notional) < min_notional:
+                errors.append(f"Notional {notional:.8f} is below minimum {min_notional}")
+        else:
+            warnings.append("Unable to calculate notional without a reference price")
+
+        if float(normalized_quantity) != float(quantity):
+            warnings.append(f"Quantity rounded down from {quantity} to {normalized_quantity}")
+        if normalized_price is not None and float(normalized_price) != float(price):
+            warnings.append(f"Price rounded down from {price} to {normalized_price}")
+
+        return {
+            "valid": not errors,
+            "errors": errors,
+            "warnings": warnings,
+            "symbol": symbol,
+            "side": side,
+            "order_type": order_type,
+            "quantity": quantity,
+            "price": price,
+            "normalized_quantity": normalized_quantity,
+            "normalized_price": normalized_price,
+            "reference_price": reference_price,
+            "notional": notional,
+            "rules": rules,
+        }
+
+    def estimate_market_order_slippage(
+        self, symbol: str, side: str, quantity: float, limit: int = 50
+    ) -> dict:
+        """Estimate effective fill price and slippage for a market order from the order book."""
+        symbol = symbol.upper()
+        side = side.upper()
+        if side not in {"BUY", "SELL"}:
+            raise ValueError("side must be BUY or SELL")
+        if quantity <= 0:
+            raise ValueError("quantity must be greater than zero")
+
+        book = self.get_order_book(symbol, limit=limit)
+        bids = [(float(price), float(qty)) for price, qty in book.get("bids", [])]
+        asks = [(float(price), float(qty)) for price, qty in book.get("asks", [])]
+        levels = asks if side == "BUY" else bids
+        if not bids or not asks or not levels:
+            raise ValueError("Order book is empty")
+
+        best_bid = bids[0][0]
+        best_ask = asks[0][0]
+        mid_price = (best_bid + best_ask) / 2
+
+        remaining = float(quantity)
+        filled = 0.0
+        quote_total = 0.0
+        levels_consumed = 0
+        fills = []
+
+        for level_price, level_qty in levels:
+            if remaining <= 0:
+                break
+            fill_qty = min(remaining, level_qty)
+            quote_total += fill_qty * level_price
+            filled += fill_qty
+            remaining -= fill_qty
+            levels_consumed += 1
+            fills.append({"price": level_price, "quantity": fill_qty})
+
+        effective_price = quote_total / filled if filled else None
+        if effective_price is None:
+            raise ValueError("Unable to fill any quantity from order book")
+
+        if side == "BUY":
+            slippage_pct = (effective_price - mid_price) / mid_price * 100
+        else:
+            slippage_pct = (mid_price - effective_price) / mid_price * 100
+
+        return {
+            "symbol": symbol,
+            "side": side,
+            "requested_quantity": float(quantity),
+            "filled_quantity": filled,
+            "unfilled_quantity": max(remaining, 0.0),
+            "effective_price": effective_price,
+            "mid_price": mid_price,
+            "best_bid": best_bid,
+            "best_ask": best_ask,
+            "slippage_pct": slippage_pct,
+            "levels_consumed": levels_consumed,
+            "fills": fills,
+            "order_book_limit": limit,
+        }
+
+    def _to_decimal(self, value) -> Decimal | None:
+        if value is None:
+            return None
+        try:
+            return Decimal(str(value))
+        except (InvalidOperation, ValueError):
+            return None
+
+    def _round_step(self, value, step) -> float:
+        value_decimal = self._to_decimal(value)
+        step_decimal = self._to_decimal(step)
+        if value_decimal is None:
+            return 0.0
+        if not step_decimal or step_decimal == 0:
+            return float(value_decimal)
+        return float(
+            (value_decimal / step_decimal).to_integral_value(rounding=ROUND_DOWN) * step_decimal
         )
 
     def get_balance(self, asset: str) -> float:
@@ -397,9 +632,7 @@ class BinanceAPIClient:
             }
             return mock_balances.get(asset, 0.0)
 
-        balances = self._api_call_with_retry(
-            self.client.get_asset_balance, asset=asset
-        )
+        balances = self._api_call_with_retry(self.client.get_asset_balance, asset=asset)
         if balances:
             return float(balances["free"])
         else:
@@ -445,9 +678,7 @@ class BinanceAPIClient:
                 "count": 1000,
             }
 
-        return self._api_call_with_retry(
-            self.client.get_ticker, symbol=symbol
-        )
+        return self._api_call_with_retry(self.client.get_ticker, symbol=symbol)
 
     def get_klines(self, symbol: str, interval: str = "1h", limit: int = 100):
         """
@@ -485,16 +716,22 @@ class BinanceAPIClient:
                 close_p = open_p + random.uniform(-0.5, 0.5)
                 volume = round(random.uniform(1.0, 100.0), 6)
                 close_time = open_time + step - 1
-                klines.append([
-                    open_time,
-                    f"{open_p:.8f}",
-                    f"{high_p:.8f}",
-                    f"{low_p:.8f}",
-                    f"{close_p:.8f}",
-                    f"{volume:.6f}",
-                    close_time,
-                    "0", "0", "0", "0", "0",
-                ])
+                klines.append(
+                    [
+                        open_time,
+                        f"{open_p:.8f}",
+                        f"{high_p:.8f}",
+                        f"{low_p:.8f}",
+                        f"{close_p:.8f}",
+                        f"{volume:.6f}",
+                        close_time,
+                        "0",
+                        "0",
+                        "0",
+                        "0",
+                        "0",
+                    ]
+                )
             return klines
 
         return self._api_call_with_retry(
@@ -524,6 +761,12 @@ class BinanceAPIClient:
             Order response dict
         """
         if self.config.demo_mode:
+            validation = self.validate_order_params(symbol, side, order_type, quantity, price)
+            if not validation["valid"]:
+                return {"error": "Order failed validation", "validation": validation}
+            quantity = validation["normalized_quantity"]
+            if validation["normalized_price"] is not None:
+                price = validation["normalized_price"]
             order_id = int(time.time() * 1000)
             return {
                 "symbol": symbol,
@@ -541,6 +784,13 @@ class BinanceAPIClient:
                 "side": side,
             }
 
+        validation = self.validate_order_params(symbol, side, order_type, quantity, price)
+        if not validation["valid"]:
+            return {"error": "Order failed validation", "validation": validation}
+        quantity = validation["normalized_quantity"]
+        if validation["normalized_price"] is not None:
+            price = validation["normalized_price"]
+
         if order_type == "MARKET":
             params = {
                 "symbol": symbol,
@@ -550,11 +800,7 @@ class BinanceAPIClient:
             }
             if client_order_id:
                 params["newClientOrderId"] = client_order_id
-            return self._api_call_with_retry(
-                self.client.create_order,
-                **params,
-                max_retries=1
-            )
+            return self._api_call_with_retry(self.client.create_order, **params, max_retries=1)
         elif order_type == "LIMIT":
             if price is None:
                 raise ValueError("Limit orders require price")
@@ -568,15 +814,13 @@ class BinanceAPIClient:
             }
             if client_order_id:
                 params["newClientOrderId"] = client_order_id
-            return self._api_call_with_retry(
-                self.client.create_order,
-                **params,
-                max_retries=1
-            )
+            return self._api_call_with_retry(self.client.create_order, **params, max_retries=1)
         else:
             raise ValueError("Unsupported order type")
 
-    def get_order(self, symbol: str, order_id: int | None = None, client_order_id: str | None = None):
+    def get_order(
+        self, symbol: str, order_id: int | None = None, client_order_id: str | None = None
+    ):
         """
         Get an order by exchange order ID or original client order ID.
         """
@@ -651,6 +895,5 @@ class BinanceAPIClient:
             }
 
         return self._api_call_with_retry(
-            self.client.cancel_order, symbol=symbol, orderId=order_id,
-            max_retries=2
+            self.client.cancel_order, symbol=symbol, orderId=order_id, max_retries=2
         )

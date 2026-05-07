@@ -313,6 +313,67 @@ class TestAPIMarketPrice:
         assert data1["source"] in ["cache", "live"]
         assert data2["source"] in ["cache", "live"]
 
+    @patch.object(api_module, "market_agent")
+    def test_api_market_symbol_rules_success(self, mock_market, client):
+        """Test exchange-rule endpoint returns normalized filters."""
+        mock_market.client.get_symbol_rules.return_value = {
+            "symbol": "BTCUSDT",
+            "price_filter": {"tickSize": "0.01"},
+            "lot_size": {"stepSize": "0.00001"},
+            "min_notional": {"minNotional": "5"},
+        }
+
+        response = client.get("/api/v1/market/symbol-rules/btcusdt")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["symbol"] == "BTCUSDT"
+        mock_market.client.get_symbol_rules.assert_called_with("BTCUSDT")
+
+    @patch.object(api_module, "market_agent")
+    def test_api_market_order_validation_success(self, mock_market, client):
+        """Test order-validation endpoint surfaces Binance filter validation."""
+        mock_market.client.validate_order_params.return_value = {
+            "valid": True,
+            "errors": [],
+            "warnings": [],
+            "normalized_quantity": 0.001,
+            "normalized_price": 50000.0,
+        }
+
+        response = client.get(
+            "/api/v1/market/order-validation"
+            "?symbol=BTCUSDT&side=BUY&order_type=LIMIT&quantity=0.001&price=50000"
+        )
+
+        assert response.status_code == 200
+        assert response.json()["valid"] is True
+        mock_market.client.validate_order_params.assert_called_with(
+            symbol="BTCUSDT",
+            side="BUY",
+            order_type="LIMIT",
+            quantity=0.001,
+            price=50000.0,
+        )
+
+    @patch.object(api_module, "market_agent")
+    def test_api_market_slippage_success(self, mock_market, client):
+        """Test slippage endpoint returns order book impact estimate."""
+        mock_market.client.estimate_market_order_slippage.return_value = {
+            "symbol": "BTCUSDT",
+            "side": "SELL",
+            "requested_quantity": 2.0,
+            "effective_price": 49999.0,
+            "slippage_pct": 0.01,
+        }
+
+        response = client.get("/api/v1/market/slippage?symbol=BTCUSDT&side=SELL&quantity=2")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["side"] == "SELL"
+        assert "slippage_pct" in data
+
 
 class TestAPISystemConfig:
     """Tests for /api/v1/system/config endpoint"""
