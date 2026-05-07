@@ -101,24 +101,38 @@ class TradingOrchestrator:
             self.logger.info("Step 2: Generating trading signal", extra=extra)
             signal_result = await self._generate_signal(symbol, correlation_id, strategy_name)
 
-            # Step 3: Risk management validation
-            self.logger.info("Step 3: Risk management validation", extra=extra)
-            risk_result = await self._validate_risk(
-                symbol, signal_result["signal"], quantity, price, correlation_id
-            )
-            risk_approved = risk_result.get("approved", False)
-
             # Create trade decision
+            signal_type = str(signal_result["signal"]).lower()
             trade_decision = TradeDecision(
                 symbol=symbol,
-                signal_type=signal_result["signal"],
+                signal_type=signal_type,
                 confidence=signal_result["confidence"],
                 price=price,
                 quantity=quantity,
                 timestamp=datetime.now(),
                 correlation_id=correlation_id,
-                risk_approved=risk_approved,
+                risk_approved=False,
             )
+
+            if signal_type not in {"buy", "sell"}:
+                self.logger.info(
+                    f"Signal {signal_type.upper()} is not actionable - skipping risk validation and execution",
+                    extra=extra,
+                )
+                self.trade_decisions.append(trade_decision)
+                self.logger.info(
+                    "Trading workflow completed - Executed: False",
+                    extra=extra,
+                )
+                return trade_decision
+
+            # Step 3: Risk management validation
+            self.logger.info("Step 3: Risk management validation", extra=extra)
+            risk_result = await self._validate_risk(
+                symbol, signal_type, quantity, price, correlation_id
+            )
+            risk_approved = risk_result.get("approved", False)
+            trade_decision.risk_approved = risk_approved
 
             # Step 4: Execute trade if approved
             if risk_approved:
@@ -439,7 +453,9 @@ class TradingOrchestrator:
             # Analyze each data point
             for i in range(strategy.requires_minimum_data(), len(historical_data)):
                 data_slice = historical_data[: i + 1]
-                result = strategy.analyze(data_slice, symbol)
+                result = self.signal_agent.strategy_manager._normalize_strategy_result(
+                    strategy.analyze(data_slice, symbol)
+                )
 
                 results.append(
                     {
