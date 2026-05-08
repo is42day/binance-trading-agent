@@ -161,6 +161,23 @@ class TestPortfolioCalculationAccuracy:
         total_value = portfolio.get_portfolio_value()
         assert total_value == 43100.0
 
+    def test_exposure_summary_separates_cash_deployed_and_equity(self, portfolio):
+        """Verify exposure summary exposes deploy/cash/equity fields for risk controls."""
+        portfolio.add_trade("T1", "BTCUSDT", "BUY", 0.05, 40000.0, 2.0)
+        portfolio.add_trade("T2", "ETHUSDT", "BUY", 0.5, 2000.0, 1.0)
+        portfolio.update_market_prices({"BTCUSDT": 41000.0, "ETHUSDT": 1900.0})
+
+        exposure = portfolio.get_exposure_summary(initial_equity=5000.0)
+
+        assert exposure["starting_equity"] == 5000.0
+        assert exposure["deployed_value"] == 3000.0
+        assert exposure["total_pnl"] == -3.0
+        assert exposure["estimated_equity"] == 4997.0
+        assert exposure["estimated_cash"] == 1997.0
+        assert round(exposure["exposure_pct"], 4) == round(3000.0 / 4997.0, 4)
+        assert exposure["active_positions_count"] == 2
+        assert set(exposure["positions"]) == {"BTCUSDT", "ETHUSDT"}
+
     def test_average_price_calculation_multiple_entries(self, portfolio):
         """Verify average price calculation on multiple buy orders"""
         # BUY 0.5 BTC at $40,000

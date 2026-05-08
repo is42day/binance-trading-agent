@@ -148,10 +148,10 @@ class TradingOrchestrator:
                     exec_price = trade_decision.execution_price or price
 
                     # Register trailing stop for the executed trade
-                    if (
-                        execution_result.get("status") in {"FILLED", "PARTIALLY_FILLED"}
-                        and self.risk_agent.config.get("trailing_stop_enabled", True)
-                    ):
+                    if execution_result.get("status") in {
+                        "FILLED",
+                        "PARTIALLY_FILLED",
+                    } and self.risk_agent.config.get("trailing_stop_enabled", True):
                         self.risk_agent.register_trailing_stop(
                             symbol=symbol,
                             entry_price=exec_price,
@@ -245,8 +245,16 @@ class TradingOrchestrator:
     ) -> bool:
         """Validate trade against risk management rules"""
         try:
+            exposure = self.execution_agent.portfolio.get_exposure_summary(
+                config.portfolio_initial_value
+            )
             risk_result = self.risk_agent.validate_trade(
-                symbol=symbol, side=signal.lower(), quantity=quantity, price=price
+                symbol=symbol,
+                side=signal.lower(),
+                quantity=quantity,
+                price=price,
+                portfolio_value=exposure["estimated_equity"],
+                current_positions=exposure["positions"],
             )
 
             approved = risk_result.get("approved", False)

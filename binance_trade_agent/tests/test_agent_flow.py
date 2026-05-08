@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from ..agents.market_data_agent import MarketDataAgent
-from ..agents.risk_management_agent import RiskManagementAgent
+from ..agents.risk_management_agent import EnhancedRiskManagementAgent, RiskManagementAgent
 from ..agents.signal_agent import SignalAgent
 from ..agents.trade_execution_agent import TradeExecutionAgent
 from ..core.orchestrator import TradeDecision, TradingOrchestrator
@@ -59,6 +59,46 @@ class TestAgentFlow:
         assert "approved" in risk_result
         assert "reason" in risk_result
         assert isinstance(risk_result["approved"], bool)
+
+    def test_risk_rejects_trade_that_exceeds_total_exposure_cap(self):
+        """Risk should block new buys that would exceed portfolio exposure limits."""
+        risk_agent = EnhancedRiskManagementAgent()
+        current_positions = {
+            "ADAUSDT": {"quantity": 1000, "value": 600.0},
+            "XRPUSDT": {"quantity": 1000, "value": 600.0},
+        }
+
+        result = risk_agent.validate_trade(
+            symbol="DOGEUSDT",
+            side="buy",
+            quantity=5000,
+            price=0.10,
+            portfolio_value=5000.0,
+            current_positions=current_positions,
+        )
+
+        assert result["approved"] is False
+        assert "Total exposure would be" in result["reason"]
+
+    def test_risk_rejects_new_symbol_when_open_position_limit_reached(self):
+        """Risk should block opening new symbols after max open positions is reached."""
+        risk_agent = EnhancedRiskManagementAgent()
+        current_positions = {
+            f"ASSET{i}USDT": {"quantity": 1, "value": 100.0}
+            for i in range(risk_agent.config["max_open_positions"])
+        }
+
+        result = risk_agent.validate_trade(
+            symbol="NEWUSDT",
+            side="buy",
+            quantity=10,
+            price=10.0,
+            portfolio_value=5000.0,
+            current_positions=current_positions,
+        )
+
+        assert result["approved"] is False
+        assert "Open position limit reached" in result["reason"]
 
     def test_risk_to_execution_flow(self):
         """Test risk management to execution flow"""
@@ -375,6 +415,7 @@ class TestAgentFlow:
 
         assert "error" not in result
         assert result["total_signals"] > 0
-        assert result["buy_signals"] + result["sell_signals"] + result["hold_signals"] == result[
-            "total_signals"
-        ]
+        assert (
+            result["buy_signals"] + result["sell_signals"] + result["hold_signals"]
+            == result["total_signals"]
+        )
