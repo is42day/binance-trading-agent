@@ -34,6 +34,7 @@ def retry_on_db_error(max_retries: int = 3, backoff_seconds: float = 0.5):
         max_retries: Maximum number of retry attempts
         backoff_seconds: Initial backoff time (doubles each retry)
     """
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -58,7 +59,9 @@ def retry_on_db_error(max_retries: int = 3, backoff_seconds: float = 0.5):
                     current_backoff *= 2  # Exponential backoff
 
             return func(*args, **kwargs)  # Final attempt
+
         return wrapper
+
     return decorator
 
 
@@ -277,8 +280,7 @@ class PortfolioManager:
         self._read_cache_expires_at: Dict[str, float] = {}
         self._read_cache_ttl_seconds = float(os.getenv("PORTFOLIO_READ_CACHE_TTL_SECONDS", "0.25"))
         self._dispose_on_clear = (
-            not db.os.getenv("DATABASE_URL")
-            and db_path != "/app/data/portfolio.db"
+            not db.os.getenv("DATABASE_URL") and db_path != "/app/data/portfolio.db"
         )
 
         if use_shared_session:
@@ -678,7 +680,9 @@ class PortfolioManager:
                             .first()
                         )
                     if not existing_trade and order.order_id:
-                        existing_trade = session.query(TradeORM).filter_by(order_id=order.order_id).first()
+                        existing_trade = (
+                            session.query(TradeORM).filter_by(order_id=order.order_id).first()
+                        )
                     if existing_trade:
                         continue
                 results.append(order.to_dict())
@@ -692,6 +696,63 @@ class PortfolioManager:
         try:
             positions = session.query(PositionORM).all()
             return sum(pos.quantity * pos.current_price for pos in positions)
+        finally:
+            session.close()
+
+    def get_exposure_summary(self, initial_equity: Optional[float] = None) -> Dict[str, Any]:
+        """Return cash-free exposure metrics for risk controls and dashboards.
+
+        The portfolio database tracks positions and P&L, not exchange cash balances.
+        For risk checks we estimate account equity as configured initial equity plus
+        realized/unrealized P&L, then compare absolute deployed position value to it.
+        """
+        session = self.get_session()
+        try:
+            positions = session.query(PositionORM).all()
+            realized_pnl = sum(pos.realized_pnl for pos in positions)
+            unrealized_pnl = sum(pos.unrealized_pnl for pos in positions)
+            deployed_value = sum(abs(pos.quantity * pos.current_price) for pos in positions)
+            long_value = sum(
+                pos.quantity * pos.current_price for pos in positions if pos.quantity > 0
+            )
+            short_value = sum(
+                abs(pos.quantity * pos.current_price) for pos in positions if pos.quantity < 0
+            )
+            active_positions = [pos for pos in positions if abs(pos.quantity) > 0]
+            starting_equity = (
+                float(initial_equity)
+                if initial_equity is not None
+                else float(os.getenv("PORTFOLIO_INITIAL_VALUE", "100000.0"))
+            )
+            estimated_equity = max(starting_equity + realized_pnl + unrealized_pnl, 0.0)
+            estimated_cash = estimated_equity - deployed_value
+            exposure_pct = deployed_value / estimated_equity if estimated_equity > 0 else 0.0
+
+            return {
+                "starting_equity": starting_equity,
+                "estimated_equity": estimated_equity,
+                "estimated_cash": estimated_cash,
+                "deployed_value": deployed_value,
+                "long_value": long_value,
+                "short_value": short_value,
+                "realized_pnl": realized_pnl,
+                "unrealized_pnl": unrealized_pnl,
+                "total_pnl": realized_pnl + unrealized_pnl,
+                "exposure_pct": exposure_pct,
+                "active_positions_count": len(active_positions),
+                "positions": {
+                    pos.symbol: {
+                        "quantity": pos.quantity,
+                        "value": abs(pos.quantity * pos.current_price),
+                        "side": pos.side,
+                        "average_price": pos.average_price,
+                        "current_price": pos.current_price,
+                        "unrealized_pnl": pos.unrealized_pnl,
+                        "realized_pnl": pos.realized_pnl,
+                    }
+                    for pos in active_positions
+                },
+            }
         finally:
             session.close()
 
@@ -774,6 +835,7 @@ class PortfolioManager:
                 "max_drawdown": max_drawdown,
                 "positions_count": len(positions),
             }
+            result.update(self.get_exposure_summary())
             self._set_cached_read(cache_key, result)
             return result
         finally:
@@ -821,7 +883,9 @@ class PortfolioManager:
     # ========================================================================
 
     @retry_on_db_error(max_retries=3, backoff_seconds=0.5)
-    def update_heartbeat(self, service_name: str, status: str = "healthy", details: Optional[Dict[str, Any]] = None):
+    def update_heartbeat(
+        self, service_name: str, status: str = "healthy", details: Optional[Dict[str, Any]] = None
+    ):
         """
         Update or create a heartbeat record for a service.
 
@@ -836,9 +900,11 @@ class PortfolioManager:
                 details_json = json.dumps(details) if details else None
 
                 # Try to update existing heartbeat
-                heartbeat = session.query(HeartbeatORM).filter(
-                    HeartbeatORM.service_name == service_name
-                ).first()
+                heartbeat = (
+                    session.query(HeartbeatORM)
+                    .filter(HeartbeatORM.service_name == service_name)
+                    .first()
+                )
 
                 if heartbeat:
                     heartbeat.last_update = datetime.now()
@@ -870,9 +936,11 @@ class PortfolioManager:
         """
         session = self.get_session()
         try:
-            heartbeat = session.query(HeartbeatORM).filter(
-                HeartbeatORM.service_name == service_name
-            ).first()
+            heartbeat = (
+                session.query(HeartbeatORM)
+                .filter(HeartbeatORM.service_name == service_name)
+                .first()
+            )
 
             return heartbeat.to_dict() if heartbeat else None
         finally:

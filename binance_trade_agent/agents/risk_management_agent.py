@@ -70,6 +70,7 @@ class EnhancedRiskManagementAgent:
             "max_position_per_symbol": risk_config["max_position_per_symbol"],
             "max_total_exposure": risk_config["max_total_exposure"],
             "max_single_trade_size": risk_config["max_single_trade_size"],
+            "max_open_positions": risk_config["max_open_positions"],
             # Stop-loss and take-profit
             "default_stop_loss_pct": risk_config["default_stop_loss_pct"],
             "default_take_profit_pct": risk_config["default_take_profit_pct"],
@@ -120,10 +121,9 @@ class EnhancedRiskManagementAgent:
         # Trailing stop tracking - tracks highest price for each position
         # Format: {symbol: {"entry_price": float, "side": str, "highest_price": float, "lowest_price": float, "current_stop": float}}
         self.trailing_stops: Dict[str, Dict[str, float]] = {}
-        self.shared_state_enabled = (
-            os.getenv("RISK_SHARED_STATE_ENABLED", "false").lower() == "true"
-            or bool(os.getenv("DATABASE_URL"))
-        )
+        self.shared_state_enabled = os.getenv(
+            "RISK_SHARED_STATE_ENABLED", "false"
+        ).lower() == "true" or bool(os.getenv("DATABASE_URL"))
         self.state_store = (
             PortfolioManager("/app/data/web_portfolio.db") if self.shared_state_enabled else None
         )
@@ -162,7 +162,10 @@ class EnhancedRiskManagementAgent:
                 enabled=True,
                 level=RiskLevel.CRITICAL,
                 description="Limit total portfolio exposure",
-                parameters={"max_exposure_pct": self.config["max_total_exposure"]},
+                parameters={
+                    "max_exposure_pct": self.config["max_total_exposure"],
+                    "max_open_positions": self.config["max_open_positions"],
+                },
             ),
             RiskRule(
                 name="single_trade_size_limit",
@@ -335,14 +338,34 @@ class EnhancedRiskManagementAgent:
                     f"Position would be {new_position_pct:.2%}, exceeds limit {max_position_pct:.2%}"
                 )
 
-        # Check total exposure
+        # Check open position count and total exposure, including the proposed buy.
         if current_positions:
+            open_positions = [
+                pos
+                for pos in current_positions.values()
+                if abs(float(pos.get("quantity", 0) or 0)) > 0
+            ]
+            if (
+                side.lower() == "buy"
+                and symbol not in current_positions
+                and len(open_positions) >= self.config["max_open_positions"]
+            ):
+                assessment.approved = False
+                assessment.reasons.append(
+                    f"Open position limit reached ({len(open_positions)}/{self.config['max_open_positions']})"
+                )
+
             total_exposure = sum(pos.get("value", 0) for pos in current_positions.values())
+            if side.lower() == "buy":
+                total_exposure += trade_value
+            elif side.lower() == "sell":
+                total_exposure = max(0, total_exposure - trade_value)
             total_exposure_pct = total_exposure / portfolio_value
 
             if total_exposure_pct > self.config["max_total_exposure"]:
-                assessment.warnings.append(
-                    f"Total exposure {total_exposure_pct:.2%} near limit {self.config['max_total_exposure']:.2%}"
+                assessment.approved = False
+                assessment.reasons.append(
+                    f"Total exposure would be {total_exposure_pct:.2%}, exceeds limit {self.config['max_total_exposure']:.2%}"
                 )
 
     def _check_frequency_limits(self, assessment: RiskAssessment):
@@ -406,8 +429,9 @@ class EnhancedRiskManagementAgent:
         if self.daily_start_value > 0:
             daily_drawdown = (self.daily_start_value - portfolio_value) / self.daily_start_value
             if daily_drawdown > daily_dd_limit:
-                assessment.warnings.append(
-                    f"Daily drawdown {daily_drawdown:.2%} approaching limit {daily_dd_limit:.2%}"
+                assessment.approved = False
+                assessment.reasons.append(
+                    f"Daily drawdown {daily_drawdown:.2%} exceeds limit {daily_dd_limit:.2%}"
                 )
 
     def _check_consecutive_losses(self, assessment: RiskAssessment):
@@ -749,7 +773,9 @@ class EnhancedRiskManagementAgent:
         else:
             return current_price >= ts["current_stop"]
 
-    def close_trailing_stop(self, symbol: str, close_price: Optional[float] = None) -> Dict[str, Any]:
+    def close_trailing_stop(
+        self, symbol: str, close_price: Optional[float] = None
+    ) -> Dict[str, Any]:
         """
         Close and remove trailing stop tracking for a position.
 

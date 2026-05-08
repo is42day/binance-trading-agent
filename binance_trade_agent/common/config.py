@@ -27,7 +27,9 @@ class Config:
             self.demo_mode = True  # Force demo mode if no API keys
 
         # Testnet Aggressive Mode - converts HOLD to random BUY/SELL for testing
-        self.testnet_aggressive_mode = os.getenv("TESTNET_AGGRESSIVE_MODE", "false").lower() == "true"
+        self.testnet_aggressive_mode = (
+            os.getenv("TESTNET_AGGRESSIVE_MODE", "false").lower() == "true"
+        )
 
         # Multi-Timeframe Confirmation - confirm signals on 4h chart
         self.use_multi_timeframe = os.getenv("USE_MULTI_TIMEFRAME", "true").lower() == "true"
@@ -41,15 +43,16 @@ class Config:
         self.redis_ttl_orderbook = int(os.getenv("REDIS_TTL_ORDERBOOK", "2"))
         self.redis_ttl_ohlcv = int(os.getenv("REDIS_TTL_OHLCV", "5"))
         # Risk Management Configuration
-        self.risk_max_position_per_symbol = float(os.getenv("RISK_MAX_POSITION_PER_SYMBOL", "0.05"))
-        self.risk_max_total_exposure = float(os.getenv("RISK_MAX_TOTAL_EXPOSURE", "0.8"))
-        self.risk_max_single_trade_size = float(os.getenv("RISK_MAX_SINGLE_TRADE_SIZE", "0.02"))
+        self.risk_max_position_per_symbol = float(os.getenv("RISK_MAX_POSITION_PER_SYMBOL", "0.08"))
+        self.risk_max_total_exposure = float(os.getenv("RISK_MAX_TOTAL_EXPOSURE", "0.30"))
+        self.risk_max_single_trade_size = float(os.getenv("RISK_MAX_SINGLE_TRADE_SIZE", "0.05"))
         self.risk_default_stop_loss_pct = float(os.getenv("RISK_DEFAULT_STOP_LOSS_PCT", "0.02"))
         self.risk_default_take_profit_pct = float(os.getenv("RISK_DEFAULT_TAKE_PROFIT_PCT", "0.06"))
         self.risk_trailing_stop_pct = float(os.getenv("RISK_TRAILING_STOP_PCT", "0.01"))
-        self.risk_max_daily_drawdown = float(os.getenv("RISK_MAX_DAILY_DRAWDOWN", "0.05"))
-        self.risk_max_total_drawdown = float(os.getenv("RISK_MAX_TOTAL_DRAWDOWN", "0.15"))
+        self.risk_max_daily_drawdown = float(os.getenv("RISK_MAX_DAILY_DRAWDOWN", "0.01"))
+        self.risk_max_total_drawdown = float(os.getenv("RISK_MAX_TOTAL_DRAWDOWN", "0.05"))
         self.risk_volatility_threshold = float(os.getenv("RISK_VOLATILITY_THRESHOLD", "0.05"))
+        self.risk_max_open_positions = int(os.getenv("RISK_MAX_OPEN_POSITIONS", "4"))
 
         # Trading Configuration
         self.trading_default_quantity_btc = float(
@@ -93,7 +96,9 @@ class Config:
             },
             "SOLUSDT": {
                 "max_position": float(os.getenv("SOL_MAX_POSITION", "0.06")),
-                "volatility_multiplier": float(os.getenv("SOL_VOLATILITY_MULTIPLIER", "1.5")),  # SOL is more volatile
+                "volatility_multiplier": float(
+                    os.getenv("SOL_VOLATILITY_MULTIPLIER", "1.5")
+                ),  # SOL is more volatile
             },
             "BNBUSDT": {
                 "max_position": float(os.getenv("BNB_MAX_POSITION", "0.07")),
@@ -124,8 +129,7 @@ class Config:
 
         # Supported trading pairs
         self.supported_symbols = os.getenv(
-            "SUPPORTED_SYMBOLS",
-            "BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT"
+            "SUPPORTED_SYMBOLS", "BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT"
         ).split(",")
 
     def validate(self):
@@ -178,6 +182,7 @@ class Config:
             "max_daily_drawdown": self.risk_max_daily_drawdown,
             "max_total_drawdown": self.risk_max_total_drawdown,
             "volatility_threshold": self.risk_volatility_threshold,
+            "max_open_positions": self.risk_max_open_positions,
         }
 
     def get(self, key: str, default: Any = None) -> Any:
