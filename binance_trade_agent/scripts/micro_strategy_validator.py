@@ -99,6 +99,7 @@ def add_indicators(frame: pd.DataFrame) -> pd.DataFrame:
     frame["ema9"] = close.ewm(span=9, adjust=False).mean()
     frame["ema21"] = close.ewm(span=21, adjust=False).mean()
     frame["ema50"] = close.ewm(span=50, adjust=False).mean()
+    frame["ema96"] = close.ewm(span=96, adjust=False).mean()
     frame["vol_sma20"] = frame["volume"].rolling(20).mean()
     frame["high20"] = frame["high"].rolling(20).max().shift(1)
     return frame
@@ -274,10 +275,78 @@ def micro_grid(frame: pd.DataFrame, config: SimulationConfig) -> dict:
     return summarize(trades, equity_curve, frame, config.capital)
 
 
+def maker_reversion_grid(frame: pd.DataFrame, config: SimulationConfig) -> dict:
+    """Maker-first pullback grid with wider bands and lower turnover.
+
+    This candidate assumes fills happen via passive limit orders, so it applies
+    configured fees but not taker slippage. It is designed for paper validation
+    before any live use because maker-fill assumptions can be optimistic.
+    """
+    cash = config.capital
+    positions = []
+    trades = []
+    equity_curve = []
+    slot_cash = config.capital * 0.08
+    max_slots = 3
+    z_entry = 1.2
+    take_profit = 0.016
+    stop_loss = 0.04
+
+    for index, row in frame.iterrows():
+        price = row.close
+        if index < 120 or pd.isna(row.sma20) or pd.isna(row.rsi):
+            equity_curve.append(cash + sum(position["quantity"] * price for position in positions))
+            continue
+
+        remaining_positions = []
+        for position in positions:
+            exit_reason = None
+            if price >= position["entry"] * (1 + take_profit):
+                exit_reason = "take"
+            elif price <= position["entry"] * (1 - stop_loss):
+                exit_reason = "stop"
+            elif row.rsi > 58 and price >= row.sma20:
+                exit_reason = "mean"
+
+            if exit_reason:
+                proceeds = position["quantity"] * price * (1 - config.fee_rate)
+                trades.append(
+                    {"pnl": proceeds - position["quantity"] * position["entry"], "reason": exit_reason}
+                )
+                cash += proceeds
+            else:
+                remaining_positions.append(position)
+        positions = remaining_positions
+
+        std20 = row.std20 if not pd.isna(row.std20) and row.std20 else None
+        z_score = (price - row.sma20) / std20 if std20 else 0
+        trend_ok = price > row.ema96 * 0.995 if "ema96" in frame.columns else True
+        volume_ok = price > 0
+        if "vol_sma20" in frame.columns and not pd.isna(row.vol_sma20):
+            volume_ok = row.volume >= row.vol_sma20 * 0.8
+
+        if (
+            trend_ok
+            and volume_ok
+            and len(positions) < max_slots
+            and cash >= slot_cash
+            and z_score <= -z_entry
+            and row.rsi <= 42
+        ):
+            quantity = (slot_cash * (1 - config.fee_rate)) / price
+            cash -= slot_cash
+            positions.append({"entry": price, "quantity": quantity})
+
+        equity_curve.append(cash + sum(position["quantity"] * price for position in positions))
+
+    return summarize(trades, equity_curve, frame, config.capital)
+
+
 STRATEGIES: dict[str, Callable[[pd.DataFrame, SimulationConfig], dict]] = {
     "mean_reversion": mean_reversion,
     "momentum_breakout": momentum_breakout,
     "micro_grid": micro_grid,
+    "maker_reversion_grid": maker_reversion_grid,
 }
 
 
