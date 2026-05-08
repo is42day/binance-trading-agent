@@ -99,6 +99,27 @@ class Config:
                 "max_position": float(os.getenv("BNB_MAX_POSITION", "0.07")),
                 "volatility_multiplier": float(os.getenv("BNB_VOLATILITY_MULTIPLIER", "1.1")),
             },
+            # Altcoins - Smaller position sizes due to higher volatility
+            "ADAUSDT": {
+                "max_position": float(os.getenv("ADA_MAX_POSITION", "0.04")),
+                "volatility_multiplier": float(os.getenv("ADA_VOLATILITY_MULTIPLIER", "1.8")),
+            },
+            "XRPUSDT": {
+                "max_position": float(os.getenv("XRP_MAX_POSITION", "0.04")),
+                "volatility_multiplier": float(os.getenv("XRP_VOLATILITY_MULTIPLIER", "1.7")),
+            },
+            "DOGEUSDT": {
+                "max_position": float(os.getenv("DOGE_MAX_POSITION", "0.03")),
+                "volatility_multiplier": float(os.getenv("DOGE_VOLATILITY_MULTIPLIER", "2.0")),  # Very volatile
+            },
+            "AVAXUSDT": {
+                "max_position": float(os.getenv("AVAX_MAX_POSITION", "0.04")),
+                "volatility_multiplier": float(os.getenv("AVAX_VOLATILITY_MULTIPLIER", "1.9")),
+            },
+            "MATICUSDT": {
+                "max_position": float(os.getenv("MATIC_MAX_POSITION", "0.04")),
+                "volatility_multiplier": float(os.getenv("MATIC_VOLATILITY_MULTIPLIER", "1.8")),
+            },
         }
 
         # Supported trading pairs

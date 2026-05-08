@@ -18,7 +18,15 @@ import type {
   ReadyStatus,
 } from '../types';
 
-const api = axios.create({ baseURL: API_BASE_URL });
+// Get auth token from environment or use the default
+const AUTH_TOKEN = import.meta.env.VITE_API_AUTH_TOKEN ?? 'sk_binance_agent_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9';
+
+const api = axios.create({ 
+  baseURL: API_BASE_URL,
+  headers: {
+    'Authorization': `Bearer ${AUTH_TOKEN}`,
+  },
+});
 
 const fetcher = async <T>(url: string): Promise<T> => {
   const { data } = await api.get<T>(url);

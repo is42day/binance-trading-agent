@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional, Type
 
 from .base_strategy import BaseStrategy, SignalType, StrategyResult
 from .bollinger_strategy import BollingerBandsStrategy
+from .buy_strategy_aggressive import BuyStrategyAggressive
 from .combined_edge_strategy import (
     CombinedEdgeStrategy,
     create_balanced_edge_strategy,
@@ -18,7 +19,9 @@ from .combined_edge_strategy import (
 )
 from .combined_strategy import CombinedStrategy
 from .edge_strategy import EdgeStrategy
+from .execution_strategy import ExecutionStrategy
 from .macd_strategy import MACDStrategy
+from .micro_trading_strategy import MicroTradingStrategy
 from .rsi_strategy import RSIStrategy
 from .smart_entry_strategy import SmartEntryStrategy
 
@@ -40,7 +43,9 @@ class StrategyManager:
             "combined": CombinedStrategy,
             "bollinger": BollingerBandsStrategy,
             "edge": EdgeStrategy,
+            "execution": ExecutionStrategy,
             "smart_entry": SmartEntryStrategy,
+            "micro_trading": MicroTradingStrategy,
             "combined_edge": CombinedEdgeStrategy,
         }
         self.performance_history: Dict[str, List[Dict[str, Any]]] = {}
@@ -145,6 +150,42 @@ class StrategyManager:
             self.register_strategy("edge_conservative", combined_edge_conservative)
         except Exception as e:
             self.logger.error(f"Failed to register edge_conservative strategy: {str(e)}")
+
+        # Micro Trading Strategy - For smaller altcoins with quick profits
+        try:
+            micro_trading = MicroTradingStrategy()
+            self.register_strategy("micro_trading", micro_trading)
+            self.register_strategy("micro", micro_trading)  # Alias
+        except Exception as e:
+            self.logger.error(f"Failed to register micro_trading strategy: {str(e)}")
+
+        # Micro Trading Aggressive - For high-volatility altcoins
+        try:
+            micro_trading_aggressive = MicroTradingStrategy({
+                "rsi_overbought": 60,
+                "rsi_oversold": 40,
+                "quick_profit_target_pct": 0.03,  # 3%
+                "tight_stop_loss_pct": 0.01,  # 1%
+                "min_momentum_strength": 0.4,  # More aggressive entry
+            })
+            self.register_strategy("micro_trading_aggressive", micro_trading_aggressive)
+        except Exception as e:
+            self.logger.error(f"Failed to register micro_trading_aggressive strategy: {str(e)}")
+
+        # Execution Strategy - For testing and getting actual trades
+        try:
+            execution = ExecutionStrategy()
+            self.register_strategy("execution", execution)
+        except Exception as e:
+            self.logger.error(f"Failed to register execution strategy: {str(e)}")
+
+        # Buy Strategy Aggressive - For building positions on dips and seeing results
+        try:
+            buy_aggressive = BuyStrategyAggressive()
+            self.register_strategy("buy_aggressive", buy_aggressive)
+            self.register_strategy("buy", buy_aggressive)  # Alias
+        except Exception as e:
+            self.logger.error(f"Failed to register buy_aggressive strategy: {str(e)}")
 
         self.logger.info(f"Initialized {len(self.strategies)} default strategies")
 

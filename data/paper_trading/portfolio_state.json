@@ -1,8 +1,8 @@
 {
-  "saved_at": "2026-01-31T21:18:13.838109",
+  "saved_at": "2026-05-08T20:21:42.073755",
   "portfolio": {
-    "initial_balance": 100.0,
-    "current_balance": 74.999922208,
+    "initial_balance": 5000.0,
+    "current_balance": 1581.145635033965,
     "total_pnl": 0.0,
     "total_pnl_percent": 0.0,
     "total_trades": 0,
@@ -14,23 +14,56 @@
     "profit_factor": 0,
     "max_drawdown": 0.0,
     "max_drawdown_percent": 0.0,
-    "open_positions": 1,
-    "unrealized_pnl": -0.012493791999997228,
-    "positions_value": 24.987584000000002,
-    "total_value": 99.987506208,
-    "total_pnl_with_unrealized": -0.012493791999997228
+    "open_positions": 4,
+    "unrealized_pnl": -0.9145806160349821,
+    "positions_value": 3417.93978435,
+    "total_value": 4999.085419383965,
+    "total_pnl_with_unrealized": -0.9145806160349821
   },
   "open_positions": {
-    "BTCUSDT": {
-      "trade_id": "PAPER_20260131_211813_BTCUSDT",
-      "entry_price": 78125.24309999999,
-      "current_price": 78086.2,
-      "quantity": 0.00032,
-      "entry_time": "2026-01-31T21:18:13.336236",
-      "strategy": "combined_edge",
-      "value": 24.987584000000002,
-      "pnl": -0.012493791999997228,
-      "pnl_percent": -0.04997501249374204
+    "ADAUSDT": {
+      "trade_id": "PAPER_20260508_202127_ADAUSDT",
+      "entry_price": 0.2699349,
+      "current_price": 0.27,
+      "quantity": 4631.3449,
+      "entry_time": "2026-05-08T20:21:27.774152",
+      "strategy": "buy_aggressive",
+      "value": 1250.463123,
+      "pnl": 0.3015005529900918,
+      "pnl_percent": 0.02411692596993565
+    },
+    "XRPUSDT": {
+      "trade_id": "PAPER_20260508_202130_XRPUSDT",
+      "entry_price": 1.39979955,
+      "current_price": 1.399,
+      "quantity": 670.1405,
+      "entry_time": "2026-05-08T20:21:30.845842",
+      "strategy": "buy_aggressive",
+      "value": 937.5265595,
+      "pnl": -0.5358108367749992,
+      "pnl_percent": -0.05711889248714209
+    },
+    "DOGEUSDT": {
+      "trade_id": "PAPER_20260508_202134_DOGEUSDT",
+      "entry_price": 0.10775385,
+      "current_price": 0.10769,
+      "quantity": 6526.265,
+      "entry_time": "2026-05-08T20:21:34.914510",
+      "strategy": "buy_aggressive",
+      "value": 702.81347785,
+      "pnl": -0.4167020202499998,
+      "pnl_percent": -0.059255423356102795
+    },
+    "AVAXUSDT": {
+      "trade_id": "PAPER_20260508_202140_AVAXUSDT",
+      "entry_price": 9.76488,
+      "current_price": 9.76,
+      "quantity": 54.0099,
+      "entry_time": "2026-05-08T20:21:40.059141",
+      "strategy": "buy_aggressive",
+      "value": 527.136624,
+      "pnl": -0.2635683120000749,
+      "pnl_percent": -0.049975012493767325
     }
   }
 }
