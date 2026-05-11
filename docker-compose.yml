@@ -111,6 +111,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # Pass VITE_API_AUTH_TOKEN to bake a bearer token into the bundle.
+        # Leave unset (default) to use unauthenticated requests with API_AUTH_REQUIRED=false
+        # or rely on nginx proxy/session auth in production.
+        VITE_API_AUTH_TOKEN: ${VITE_API_AUTH_TOKEN:-}
     container_name: binance-frontend
     ports:
       - "8080:80"

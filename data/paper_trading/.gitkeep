@@ -1,0 +1,3 @@
+# This file keeps the data/paper_trading/ directory in version control.
+# Runtime files (*.json, *.jsonl, *.log) are excluded via .gitignore.
+# PaperTradingEngine creates them automatically when it first runs.

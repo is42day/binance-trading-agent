@@ -11,6 +11,10 @@ RUN npm ci
 COPY . .
 ARG VITE_API_URL=
 ENV VITE_API_URL=${VITE_API_URL}
+# Optional: bake a bearer token into the bundle (only for browser-auth deployments).
+# Leave unset to use unauthenticated requests (API_AUTH_REQUIRED=false) or proxy auth.
+ARG VITE_API_AUTH_TOKEN=
+ENV VITE_API_AUTH_TOKEN=${VITE_API_AUTH_TOKEN}
 RUN npm run build
 
 # ---------- Production stage ----------

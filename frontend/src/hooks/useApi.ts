@@ -19,14 +19,14 @@ import type {
   OperatorStatus,
 } from '../types';
 
-// Get auth token from environment or use the default
-const AUTH_TOKEN = import.meta.env.VITE_API_AUTH_TOKEN ?? 'sk_binance_agent_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9';
+// If VITE_API_AUTH_TOKEN is set at build time, attach a Bearer token.
+// If unset, requests are unauthenticated — rely on API_AUTH_REQUIRED=false (local/dev)
+// or proxy/session auth (production). Never bake a default secret into the bundle.
+const AUTH_TOKEN: string = import.meta.env.VITE_API_AUTH_TOKEN ?? '';
 
-const api = axios.create({ 
+const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Authorization': `Bearer ${AUTH_TOKEN}`,
-  },
+  ...(AUTH_TOKEN && { headers: { Authorization: `Bearer ${AUTH_TOKEN}` } }),
 });
 
 const fetcher = async <T>(url: string): Promise<T> => {

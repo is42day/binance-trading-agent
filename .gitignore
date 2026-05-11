@@ -97,6 +97,12 @@ logs/
 trading_cli.db
 tmp/
 
+# Paper trading runtime state — generated at runtime, not version-controlled.
+# The data/paper_trading/ directory is kept via .gitkeep.
+data/paper_trading/*.json
+data/paper_trading/*.jsonl
+data/paper_trading/*.log
+
 # System
 .DS_Store
 Thumbs.db
