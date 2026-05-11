@@ -280,6 +280,12 @@ class PaperTradingLoop:
                 await self._process_symbol(symbol)
                 await asyncio.sleep(1)  # Small delay between symbols
 
+            # Always save portfolio state so the status endpoint shows "active"
+            try:
+                self.paper_engine._save_state()
+            except Exception as e:
+                logger.warning(f"Could not save portfolio state: {e}")
+
             # Print portfolio summary every 5 iterations
             if iteration % 5 == 0:
                 self._print_summary()

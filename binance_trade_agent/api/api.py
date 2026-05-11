@@ -578,6 +578,16 @@ async def get_paper_trading_status():
         except Exception:
             pass
 
+    # Determine activity from signal log freshness (most reliable indicator)
+    signal_age_seconds: float = float('inf')
+    if last_signal_time:
+        try:
+            signal_age_seconds = (datetime.now() - datetime.fromisoformat(last_signal_time)).total_seconds()
+        except Exception:
+            pass
+
+    loop_active = signal_age_seconds < 300  # signal within last 5 min = loop is alive
+
     # Check portfolio state file
     if state_file.exists():
         try:
@@ -588,15 +598,16 @@ async def get_paper_trading_status():
             try:
                 last_update = datetime.fromisoformat(saved_at)
                 age_seconds = (datetime.now() - last_update).total_seconds()
-                active = age_seconds < 120
             except Exception:
-                active = False
-                age_seconds = 0
+                age_seconds = float('inf')
+
+            # Active if either portfolio state OR signal log is fresh
+            active = age_seconds < 180 or loop_active
 
             return {
                 "active": active,
-                "last_update": saved_at,
-                "age_seconds": int(age_seconds),
+                "last_update": last_signal_time or saved_at,
+                "age_seconds": int(min(age_seconds, signal_age_seconds)),
                 "portfolio": state.get("portfolio", {}),
                 "signals_count": signal_count,
             }
@@ -701,7 +712,7 @@ async def start_paper_trading(
     symbols: list[str] = Body(default=["BTCUSDT"], embed=False),
     strategy: str = Body(default="combined_edge"),
     initial_balance: float = Body(default=10000.0),
-    interval_seconds: int = Body(default=120),
+    interval_seconds: int = Body(default=60),
 ):
     """Start the paper trading loop in a background thread."""
     global _paper_loop_instance, _paper_loop_thread
