@@ -18,6 +18,7 @@ from binance.client import Client
 from binance.exceptions import BinanceAPIException
 
 from ..common.config import config
+from .rate_limit_tracker import RateLimitTracker, RateLimitExceeded, ENDPOINT_WEIGHTS
 
 logger = logging.getLogger(__name__)
 
@@ -243,6 +244,7 @@ class BinanceAPIClient:
         """
         self.config = config
         self.timeout = timeout or self.DEFAULT_TIMEOUT
+        self._rate_limiter = RateLimitTracker()
 
         # Initialize circuit breaker
         self._circuit_breaker = CircuitBreaker(
@@ -285,20 +287,35 @@ class BinanceAPIClient:
         """Get circuit breaker status for monitoring"""
         return self._circuit_breaker.get_status()
 
-    def _api_call_with_retry(self, func: Callable, *args, max_retries: int = 3, **kwargs) -> Any:
+    def get_rate_limit_status(self) -> dict:
+        """Return current rate-limit tracker snapshot."""
+        return self._rate_limiter.get_status()
+
+    def _api_call_with_retry(
+        self, func: Callable, *args,
+        max_retries: int = 3,
+        endpoint: str = "unknown",
+        is_order: bool = False,
+        **kwargs,
+    ) -> Any:
         """
-        Execute API call with retry logic and circuit breaker.
+        Execute API call with rate-limit check, retry logic, and circuit breaker.
 
         Args:
-            func: API function to call
-            max_retries: Maximum retry attempts
-            *args, **kwargs: Arguments for the API function
+            func:        API function to call.
+            max_retries: Maximum retry attempts.
+            endpoint:    Key from ENDPOINT_WEIGHTS for weight accounting.
+            is_order:    True for order-creating calls.
+            *args, **kwargs: Forwarded to func.
 
         Returns:
             API response
         """
         if not self._circuit_breaker.can_execute():
             raise Exception("Circuit breaker OPEN - Binance API temporarily unavailable")
+
+        # Check rate-limit budget before making the network call
+        self._rate_limiter.check_and_consume(endpoint, is_order=is_order)
 
         last_exception = None
         backoff = 1.0
@@ -311,12 +328,28 @@ class BinanceAPIClient:
             except BinanceAPIException as e:
                 last_exception = e
                 if e.status_code == 429:
-                    logger.warning("Binance rate limit hit (429); backing off before retry")
+                    # Try to honour Retry-After header if available
+                    retry_after = None
+                    if hasattr(e, "response") and e.response is not None:
+                        ra = e.response.headers.get("Retry-After")
+                        if ra:
+                            try:
+                                retry_after = float(ra)
+                            except ValueError:
+                                pass
+                    self._rate_limiter.record_429(retry_after)
+                    logger.warning(
+                        "Binance 429 received (attempt %d/%d); retry_after=%s",
+                        attempt + 1, max_retries, retry_after,
+                    )
                 # Don't retry on other 4xx client errors
                 elif e.status_code and 400 <= e.status_code < 500:
                     self._circuit_breaker.record_failure()
                     raise
                 logger.warning(f"Binance API error (attempt {attempt + 1}/{max_retries}): {e}")
+            except RateLimitExceeded:
+                # Re-raise immediately — no retry makes sense here
+                raise
             except Exception as e:
                 last_exception = e
                 logger.warning(f"API call failed (attempt {attempt + 1}/{max_retries}): {e}")
@@ -348,7 +381,9 @@ class BinanceAPIClient:
             }
             return mock_prices.get(symbol, 100.0)
 
-        response = self._api_call_with_retry(self.client.get_symbol_ticker, symbol=symbol)
+        response = self._api_call_with_retry(
+            self.client.get_symbol_ticker, symbol=symbol, endpoint="ticker_price"
+        )
         return float(response["price"])
 
     def get_order_book(self, symbol: str, limit: int = 10):
@@ -373,7 +408,9 @@ class BinanceAPIClient:
                 ],
             }
 
-        return self._api_call_with_retry(self.client.get_order_book, symbol=symbol, limit=limit)
+        return self._api_call_with_retry(
+            self.client.get_order_book, symbol=symbol, limit=limit, endpoint="order_book_10"
+        )
 
     def get_exchange_info(self, symbol: str | None = None) -> dict:
         """Fetch exchange metadata, optionally for a single symbol."""
@@ -382,9 +419,11 @@ class BinanceAPIClient:
             return {"timezone": "UTC", "serverTime": int(time.time() * 1000), "symbols": symbols}
 
         if symbol:
-            return self._api_call_with_retry(self.client.get_symbol_info, symbol=symbol.upper())
+            return self._api_call_with_retry(
+                self.client.get_symbol_info, symbol=symbol.upper(), endpoint="exchange_info"
+            )
 
-        return self._api_call_with_retry(self.client.get_exchange_info)
+        return self._api_call_with_retry(self.client.get_exchange_info, endpoint="exchange_info")
 
     def _demo_symbol_info(self, symbol: str) -> dict:
         """Demo exchange filters shaped like Binance exchangeInfo responses."""
@@ -632,7 +671,9 @@ class BinanceAPIClient:
             }
             return mock_balances.get(asset, 0.0)
 
-        balances = self._api_call_with_retry(self.client.get_asset_balance, asset=asset)
+        balances = self._api_call_with_retry(
+            self.client.get_asset_balance, asset=asset, endpoint="account_balance"
+        )
         if balances:
             return float(balances["free"])
         else:
@@ -735,7 +776,8 @@ class BinanceAPIClient:
             return klines
 
         return self._api_call_with_retry(
-            self.client.get_klines, symbol=symbol, interval=interval, limit=limit
+            self.client.get_klines, symbol=symbol, interval=interval, limit=limit,
+            endpoint="klines",
         )
 
     def create_order(
@@ -791,6 +833,14 @@ class BinanceAPIClient:
         if validation["normalized_price"] is not None:
             price = validation["normalized_price"]
 
+        # Live-trading arming gate: refuse live orders unless fully armed
+        if self.config.runtime_mode != "live_armed":
+            raise ValueError(
+                f"Live order placement refused: runtime_mode is '{self.config.runtime_mode}'. "
+                "Set BINANCE_TESTNET=false, DEMO_MODE=false, LIVE_TRADING_ENABLED=true, "
+                "and LIVE_TRADING_ACK=I_ACCEPT_LIVE_BINANCE_SPOT_RISK to arm live trading."
+            )
+
         if order_type == "MARKET":
             params = {
                 "symbol": symbol,
@@ -800,7 +850,10 @@ class BinanceAPIClient:
             }
             if client_order_id:
                 params["newClientOrderId"] = client_order_id
-            return self._api_call_with_retry(self.client.create_order, **params, max_retries=1)
+            return self._api_call_with_retry(
+                self.client.create_order, **params, max_retries=1,
+                endpoint="create_order", is_order=True
+            )
         elif order_type == "LIMIT":
             if price is None:
                 raise ValueError("Limit orders require price")
@@ -814,7 +867,10 @@ class BinanceAPIClient:
             }
             if client_order_id:
                 params["newClientOrderId"] = client_order_id
-            return self._api_call_with_retry(self.client.create_order, **params, max_retries=1)
+            return self._api_call_with_retry(
+                self.client.create_order, **params, max_retries=1,
+                endpoint="create_order", is_order=True
+            )
         else:
             raise ValueError("Unsupported order type")
 
@@ -851,7 +907,7 @@ class BinanceAPIClient:
         else:
             raise ValueError("order_id or client_order_id is required")
 
-        return self._api_call_with_retry(self.client.get_order, **params)
+        return self._api_call_with_retry(self.client.get_order, **params, endpoint="get_order")
 
     def get_account_trades(self, symbol: str, order_id: int | None = None, limit: int = 100):
         """
@@ -895,5 +951,97 @@ class BinanceAPIClient:
             }
 
         return self._api_call_with_retry(
-            self.client.cancel_order, symbol=symbol, orderId=order_id, max_retries=2
+            self.client.cancel_order, symbol=symbol, orderId=order_id,
+            max_retries=2, endpoint="cancel_order",
+        )
+
+    def create_oco_order(
+        self,
+        symbol: str,
+        side: str,
+        quantity: float,
+        price: float,
+        stop_price: float,
+        stop_limit_price: float,
+        client_order_id: str | None = None,
+        stop_client_order_id: str | None = None,
+    ) -> dict:
+        """
+        Place an OCO (One-Cancels-the-Other) order.
+
+        An OCO pairs a limit order with a stop-limit order on the same symbol.
+        If either leg triggers, the exchange cancels the other automatically.
+
+        Args:
+            symbol: Trading pair (e.g. 'BTCUSDT')
+            side: 'BUY' or 'SELL'
+            quantity: Quantity for both legs
+            price: Limit-order price
+            stop_price: Stop trigger price
+            stop_limit_price: Stop-limit price (limit price after trigger)
+            client_order_id: Optional client ID for the limit leg
+            stop_client_order_id: Optional client ID for the stop-limit leg
+
+        Returns:
+            Binance OCO response dict with orderReports list
+        """
+        if self.config.demo_mode:
+            now = int(time.time() * 1000)
+            base_id = now
+            return {
+                "orderListId": base_id,
+                "contingencyType": "OCO",
+                "listStatusType": "EXEC_STARTED",
+                "listOrderStatus": "EXECUTING",
+                "listClientOrderId": client_order_id or f"mock_oco_{base_id}",
+                "transactionTime": now,
+                "symbol": symbol,
+                "orders": [
+                    {"symbol": symbol, "orderId": base_id,
+                     "clientOrderId": client_order_id or f"mock_lmt_{base_id}"},
+                    {"symbol": symbol, "orderId": base_id + 1,
+                     "clientOrderId": stop_client_order_id or f"mock_stp_{base_id}"},
+                ],
+                "orderReports": [
+                    {
+                        "symbol": symbol, "orderId": base_id,
+                        "clientOrderId": client_order_id or f"mock_lmt_{base_id}",
+                        "price": str(price), "origQty": str(quantity),
+                        "executedQty": "0.00000000", "status": "NEW",
+                        "type": "LIMIT_MAKER", "side": side,
+                    },
+                    {
+                        "symbol": symbol, "orderId": base_id + 1,
+                        "clientOrderId": stop_client_order_id or f"mock_stp_{base_id}",
+                        "price": str(stop_limit_price), "stopPrice": str(stop_price),
+                        "origQty": str(quantity),
+                        "executedQty": "0.00000000", "status": "NEW",
+                        "type": "STOP_LOSS_LIMIT", "side": side,
+                    },
+                ],
+            }
+
+        # Live-trading arming gate
+        if self.config.runtime_mode != "live_armed":
+            raise ValueError(
+                f"Live OCO order refused: runtime_mode is '{self.config.runtime_mode}'."
+            )
+
+        params: dict = {
+            "symbol": symbol,
+            "side": side,
+            "quantity": quantity,
+            "price": str(price),
+            "stopPrice": str(stop_price),
+            "stopLimitPrice": str(stop_limit_price),
+            "stopLimitTimeInForce": "GTC",
+        }
+        if client_order_id:
+            params["listClientOrderId"] = client_order_id
+        if stop_client_order_id:
+            params["stopClientOrderId"] = stop_client_order_id
+
+        return self._api_call_with_retry(
+            self.client.create_oco_order, **params,
+            max_retries=1, endpoint="create_oco_order", is_order=True,
         )

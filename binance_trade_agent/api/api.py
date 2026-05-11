@@ -469,6 +469,7 @@ async def get_system_config():
     """Get key configuration parameters."""
     try:
         return {
+            "runtime_mode": config.runtime_mode,
             "demo_mode": config.demo_mode,
             "binance_testnet": config.binance_testnet,
             "risk_config": config.get_risk_config(),
@@ -650,6 +651,294 @@ async def get_paper_trading_trades(limit: int = 50):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# --- Decision Journal Endpoints ---
+
+
+@app.get("/api/v1/trading/decisions/latest", dependencies=[Depends(require_api_token)])
+async def get_latest_decision(symbol: str | None = None):
+    """
+    Return the most recent trading decision, optionally filtered by symbol.
+
+    Query params:
+        symbol: e.g. BTCUSDT  (optional)
+    """
+    try:
+        from ..core.decision_journal import get_decision_journal
+
+        journal = get_decision_journal()
+        decision = journal.get_latest(symbol=symbol)
+        if decision is None:
+            return {"decision": None, "message": "No decisions recorded yet"}
+        return {"decision": decision}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/v1/trading/decisions/history", dependencies=[Depends(require_api_token)])
+async def get_decision_history(symbol: str | None = None, limit: int = 50):
+    """
+    Return recent trading decisions (newest first).
+
+    Query params:
+        symbol: optional symbol filter
+        limit:  max records to return (default 50)
+    """
+    if limit < 1 or limit > 500:
+        raise HTTPException(status_code=400, detail="limit must be between 1 and 500")
+    try:
+        from ..core.decision_journal import get_decision_journal
+
+        journal = get_decision_journal()
+        decisions = journal.get_history(symbol=symbol, limit=limit)
+        return {"decisions": decisions, "total": len(decisions)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# --- Rate-Limit Status Endpoint ---
+
+
+@app.get("/api/v1/system/rate-limits", dependencies=[Depends(require_api_token)])
+async def get_rate_limits():
+    """Return current Binance rate-limit tracker state."""
+    from ..clients.binance_client import BinanceAPIClient
+
+    client = BinanceAPIClient()
+    return client.get_rate_limit_status()
+
+
+# --- Order Lifecycle Endpoints ---
+
+
+@app.get("/api/v1/orders/open", dependencies=[Depends(require_api_token)])
+async def list_open_orders(symbol: str | None = None):
+    """List locally tracked orders in open (non-terminal) states."""
+    from ..core.order_lifecycle import get_order_lifecycle_service
+
+    svc = get_order_lifecycle_service()
+    return {"orders": svc.get_open_orders(symbol=symbol)}
+
+
+@app.get("/api/v1/orders/terminal", dependencies=[Depends(require_api_token)])
+async def list_terminal_orders(symbol: str | None = None, limit: int = 100):
+    """List recently completed/cancelled/expired/rejected orders."""
+    from ..core.order_lifecycle import get_order_lifecycle_service
+
+    svc = get_order_lifecycle_service()
+    return {"orders": svc.get_terminal_orders(symbol=symbol, limit=limit)}
+
+
+@app.get("/api/v1/orders/stale", dependencies=[Depends(require_api_token)])
+async def list_stale_orders(symbol: str | None = None, price_pct_threshold: float = 1.0):
+    """List open LIMIT orders whose price has drifted beyond the threshold."""
+    from ..core.order_lifecycle import get_order_lifecycle_service
+
+    svc = get_order_lifecycle_service()
+    return {"orders": svc.detect_stale_limit_orders(symbol=symbol, price_pct_threshold=price_pct_threshold)}
+
+
+@app.post("/api/v1/orders/{client_order_id}/cancel", dependencies=[Depends(require_api_token)])
+async def cancel_order_endpoint(
+    client_order_id: str,
+    symbol: str,
+    reason: str = "operator_cancelled",
+):
+    """Cancel an open order and record the cancellation reason."""
+    from ..core.order_lifecycle import get_order_lifecycle_service
+
+    svc = get_order_lifecycle_service()
+    try:
+        order = svc.cancel_order(client_order_id, symbol, reason)
+        return {"success": True, "order": order}
+    except ValueError as exc:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+# --- Stream Status Endpoints ---
+
+
+@app.get("/api/v1/market/streams/status", dependencies=[Depends(require_api_token)])
+async def get_stream_status(symbol: str | None = None, interval: str | None = None):
+    """
+    Return WebSocket kline stream health.
+
+    Query params:
+        symbol:   optional filter, e.g. BTCUSDT
+        interval: optional filter, e.g. 1m (requires symbol)
+    """
+    from ..core.market_streams import get_stream_manager
+
+    manager = get_stream_manager()
+
+    if symbol and interval:
+        status = manager.get_status(symbol, interval)
+        if status is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No subscription for {symbol}@kline_{interval}",
+            )
+        return {"streams": [_stream_status_to_dict(status)]}
+
+    statuses = manager.get_all_statuses()
+    if symbol:
+        statuses = [s for s in statuses if s.symbol == symbol.upper()]
+    return {
+        "streams": [_stream_status_to_dict(s) for s in statuses],
+        "total": len(statuses),
+    }
+
+
+def _stream_status_to_dict(status) -> dict:
+    return {
+        "symbol": status.symbol,
+        "interval": status.interval,
+        "connected": status.connected,
+        "last_update": status.last_update,
+        "age_seconds": round(status.age_seconds, 2) if status.age_seconds is not None else None,
+        "is_stale": status.is_stale,
+        "candle_count": status.candle_count,
+        "reconnect_attempts": status.reconnect_attempts,
+        "last_error": status.last_error,
+    }
+
+
+# --- Operator Status Endpoint ---
+
+
+@app.get("/api/v1/operator/status", dependencies=[Depends(require_api_token)])
+async def get_operator_status():
+    """
+    Consolidated operator supervision endpoint.
+
+    Returns everything needed to answer:
+    - Is the bot armed?
+    - Is data fresh?
+    - Why did it not trade?
+    - Are there stuck orders?
+    - Are we near Binance limits?
+    """
+    from ..clients.binance_client import BinanceAPIClient
+    from ..core.decision_journal import get_decision_journal
+    from ..core.market_streams import get_stream_manager
+    from ..core.order_lifecycle import get_order_lifecycle_service
+    from ..core.strategy_validation_gate import get_validation_gate
+
+    result: dict = {"timestamp": datetime.now().isoformat()}
+
+    # --- Runtime mode ---
+    result["runtime_mode"] = config.runtime_mode
+
+    # --- Circuit breaker ---
+    try:
+        cb = BinanceAPIClient().get_circuit_breaker_status()
+        result["circuit_breaker"] = cb
+    except Exception as exc:
+        result["circuit_breaker"] = {"error": str(exc)}
+
+    # --- Rate-limit usage ---
+    try:
+        rl = BinanceAPIClient().get_rate_limit_status()
+        result["rate_limits"] = rl
+    except Exception as exc:
+        result["rate_limits"] = {"error": str(exc)}
+
+    # --- Stream freshness ---
+    try:
+        manager = get_stream_manager()
+        statuses = manager.get_all_statuses()
+        result["stream_freshness"] = [
+            {
+                "symbol": s.symbol,
+                "interval": s.interval,
+                "connected": s.connected,
+                "age_seconds": round(s.age_seconds, 1) if s.age_seconds is not None else None,
+                "is_stale": s.is_stale,
+                "reconnect_attempts": s.reconnect_attempts,
+                "last_error": s.last_error,
+            }
+            for s in statuses
+        ]
+    except Exception as exc:
+        result["stream_freshness"] = {"error": str(exc)}
+
+    # --- Strategy validation gate ---
+    try:
+        gate = get_validation_gate()
+        artifact = gate.get_artifact()
+        if artifact:
+            result["validation_gate"] = {
+                "generated_at": artifact.get("generated_at"),
+                "result": artifact.get("result"),
+                "strategy": artifact.get("strategy"),
+                "symbols": artifact.get("symbols"),
+            }
+        else:
+            result["validation_gate"] = None
+    except Exception as exc:
+        result["validation_gate"] = {"error": str(exc)}
+
+    # --- Execution policy (from config) ---
+    try:
+        from ..core.execution_policy import ExecutionPolicy
+        policy = ExecutionPolicy(
+            execution_mode=config.get_risk_config().get("execution_mode", "maker_first"),
+        )
+        result["execution_policy"] = policy.to_dict()
+    except Exception as exc:
+        result["execution_policy"] = {"error": str(exc)}
+
+    # --- Open orders with stale flag ---
+    try:
+        svc = get_order_lifecycle_service()
+        open_orders = svc.get_open_orders()
+        stale_ids = {o["client_order_id"] for o in svc.detect_stale_limit_orders()}
+        result["open_orders"] = [
+            {**o, "stale": o.get("client_order_id") in stale_ids}
+            for o in open_orders
+        ]
+        result["open_orders_count"] = len(open_orders)
+        result["stale_orders_count"] = len(stale_ids)
+    except Exception as exc:
+        result["open_orders"] = {"error": str(exc)}
+        result["open_orders_count"] = 0
+        result["stale_orders_count"] = 0
+
+    # --- Last blocked trade reason (from decision journal) ---
+    try:
+        journal = get_decision_journal()
+        # Find most recent decision with a blocked_reason
+        recent = journal.get_history(limit=50)
+        last_blocked = next(
+            (d for d in recent if d.get("blocked_reason")), None
+        )
+        result["last_blocked_trade"] = last_blocked
+    except Exception as exc:
+        result["last_blocked_trade"] = {"error": str(exc)}
+
+    # --- Emergency stop state and reason ---
+    try:
+        es_enabled = risk_agent._shared_emergency_stop_enabled()
+        es_reason = None
+        if risk_agent.state_store is not None:
+            try:
+                import json as _json
+                raw = risk_agent.state_store.get_system_state("emergency_stop")
+                if raw:
+                    parsed = _json.loads(raw)
+                    es_reason = parsed.get("reason")
+            except Exception:
+                pass
+        result["emergency_stop"] = {
+            "enabled": es_enabled,
+            "reason": es_reason,
+        }
+    except Exception as exc:
+        result["emergency_stop"] = {"error": str(exc)}
+
+    return result
 
 
 if __name__ == "__main__":

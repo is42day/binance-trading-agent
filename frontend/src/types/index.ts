@@ -174,3 +174,96 @@ export interface ReadyStatus {
     cache?: string;
   };
 }
+
+// ---------------------------------------------------------------------------
+// Operator Status (Task 9 — dashboard operator fields)
+// ---------------------------------------------------------------------------
+
+export type RuntimeMode = 'demo' | 'testnet' | 'live_blocked' | 'live_armed';
+
+export interface CircuitBreakerStatus {
+  state: string;
+  failure_count?: number;
+  last_failure?: string | null;
+  error?: string;
+}
+
+export interface RateLimitStatus {
+  weight_used: number;
+  weight_budget: number;
+  weight_utilization_pct: number;
+  in_holdoff: boolean;
+  retry_after_remaining: number | null;
+  orders_this_second: number;
+  order_budget_per_sec: number;
+  error?: string;
+}
+
+export interface StreamFreshnessItem {
+  symbol: string;
+  interval: string;
+  connected: boolean;
+  age_seconds: number | null;
+  is_stale: boolean;
+  reconnect_attempts: number;
+  last_error: string | null;
+}
+
+export interface ValidationGateInfo {
+  generated_at: string | null;
+  result: string | null;
+  strategy: string | null;
+  symbols: string[] | null;
+  error?: string;
+}
+
+export interface ExecutionPolicyInfo {
+  execution_mode: string;
+  max_spread_pct: number;
+  max_slippage_pct: number;
+  limit_price_offset_bps: number;
+  stale_order_seconds: number;
+  depth_limit: number;
+  error?: string;
+}
+
+export interface OpenOrderItem {
+  client_order_id: string;
+  symbol: string;
+  side: string;
+  order_type: string;
+  status: string;
+  quantity: number;
+  executed_quantity: number;
+  price: number | null;
+  stale: boolean;
+}
+
+export interface BlockedTradeInfo {
+  symbol: string;
+  action: string;
+  blocked_reason: string;
+  timestamp: string;
+  [key: string]: unknown;
+}
+
+export interface EmergencyStopInfo {
+  enabled: boolean;
+  reason: string | null;
+  error?: string;
+}
+
+export interface OperatorStatus {
+  timestamp: string;
+  runtime_mode: RuntimeMode;
+  circuit_breaker: CircuitBreakerStatus;
+  rate_limits: RateLimitStatus;
+  stream_freshness: StreamFreshnessItem[];
+  validation_gate: ValidationGateInfo | null;
+  execution_policy: ExecutionPolicyInfo;
+  open_orders: OpenOrderItem[];
+  open_orders_count: number;
+  stale_orders_count: number;
+  last_blocked_trade: BlockedTradeInfo | null;
+  emergency_stop: EmergencyStopInfo;
+}

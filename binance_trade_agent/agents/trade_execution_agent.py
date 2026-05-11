@@ -165,7 +165,9 @@ class TradeExecutionAgent:
 
     def get_order_status(self, order_id, symbol):
         """
-        Get status of an order.
+        Get status of an order via the BinanceAPIClient wrapper
+        (includes demo mode, retry logic, and rate-limit accounting).
+
         Args:
             order_id (int): Binance order ID.
             symbol (str): Trading pair symbol.
@@ -173,10 +175,8 @@ class TradeExecutionAgent:
             dict: Order status or error info.
         """
         try:
-            status = self.client.client.get_order(symbol=symbol, orderId=order_id)
+            status = self.client.get_order(symbol=symbol, order_id=int(order_id))
             return status
-        except BinanceAPIException as ex:
-            return {"error": str(ex)}
         except Exception as ex:
             return {"error": str(ex)}
 

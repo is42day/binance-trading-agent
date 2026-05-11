@@ -377,6 +377,71 @@ def run_validation(args: argparse.Namespace) -> dict:
     }
 
 
+def build_gate_artifact(
+    validation_output: dict,
+    gate_strategy: str,
+    max_drawdown_threshold_pct: float = 10.0,
+    ttl_seconds: int = 86400,
+) -> dict:
+    """
+    Convert raw validation output into a gate artifact suitable for consumption
+    by :class:`binance_trade_agent.core.strategy_validation_gate.ValidationGate`.
+
+    Gate pass rules (per symbol):
+    - strategy results must exist
+    - ``daily_eur > 0`` after fees and slippage
+    - ``max_drawdown_pct <= max_drawdown_threshold_pct``
+    """
+    import datetime as _dt
+
+    symbols_gate: dict = {}
+    for symbol, strategies in validation_output.get("results", {}).items():
+        metrics = strategies.get(gate_strategy)
+        if metrics is None:
+            symbols_gate[symbol] = {
+                "gate_pass": False,
+                "gate_reason": "strategy_missing",
+                "strategy": gate_strategy,
+            }
+            continue
+
+        daily_eur = metrics.get("daily_eur", 0.0)
+        max_dd = metrics.get("max_drawdown_pct", 999.0)
+        if daily_eur <= 0:
+            reason = "negative_daily_eur"
+            gate_pass = False
+        elif max_dd > max_drawdown_threshold_pct:
+            reason = "drawdown_exceeded"
+            gate_pass = False
+        else:
+            reason = "positive_after_fees"
+            gate_pass = True
+
+        symbols_gate[symbol] = {
+            "gate_pass": gate_pass,
+            "gate_reason": reason,
+            "strategy": gate_strategy,
+            "daily_eur": daily_eur,
+            "max_drawdown_pct": max_dd,
+            "trades": metrics.get("trades", 0),
+            "win_rate": metrics.get("win_rate", 0.0),
+        }
+
+    overall_pass = bool(symbols_gate) and all(
+        s.get("gate_pass") for s in symbols_gate.values()
+    )
+
+    return {
+        "generated_at": _dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "ttl_seconds": ttl_seconds,
+        "gate_strategy": gate_strategy,
+        "max_drawdown_threshold_pct": max_drawdown_threshold_pct,
+        "assumptions": validation_output.get("assumptions", {}),
+        "symbols": symbols_gate,
+        "overall_pass": overall_pass,
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--symbols", nargs="+", default=["BTCUSDT", "ETHUSDT", "SOLUSDT"])
@@ -385,11 +450,53 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--capital", type=float, default=2500.0)
     parser.add_argument("--fee-rate", type=float, default=0.001)
     parser.add_argument("--slippage-rate", type=float, default=0.0002)
+    parser.add_argument(
+        "--gate-strategy",
+        default="micro_grid",
+        choices=list(STRATEGIES.keys()),
+        help="Strategy to use for gate evaluation (default: micro_grid)",
+    )
+    parser.add_argument(
+        "--max-drawdown-threshold-pct",
+        type=float,
+        default=10.0,
+        help="Maximum allowed drawdown %% for gate pass (default: 10.0)",
+    )
+    parser.add_argument(
+        "--ttl-seconds",
+        type=int,
+        default=86400,
+        help="How long the gate artifact is valid in seconds (default: 86400)",
+    )
+    parser.add_argument(
+        "--output-gate",
+        metavar="PATH",
+        default=None,
+        help="Write gate artifact JSON to this path (e.g. data/strategy_validation/latest.json)",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
-    print(json.dumps(run_validation(parse_args()), indent=2))
+    import os
+
+    args = parse_args()
+    validation_output = run_validation(args)
+
+    if args.output_gate:
+        gate = build_gate_artifact(
+            validation_output,
+            gate_strategy=args.gate_strategy,
+            max_drawdown_threshold_pct=args.max_drawdown_threshold_pct,
+            ttl_seconds=args.ttl_seconds,
+        )
+        os.makedirs(os.path.dirname(os.path.abspath(args.output_gate)), exist_ok=True)
+        with open(args.output_gate, "w") as f:
+            json.dump(gate, f, indent=2)
+        print(f"Gate artifact written to: {args.output_gate}")
+        print(json.dumps(gate, indent=2))
+    else:
+        print(json.dumps(validation_output, indent=2))
 
 
 if __name__ == "__main__":

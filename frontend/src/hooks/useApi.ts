@@ -16,6 +16,7 @@ import type {
   Signal,
   HealthStatus,
   ReadyStatus,
+  OperatorStatus,
 } from '../types';
 
 // Get auth token from environment or use the default
@@ -213,6 +214,16 @@ export function useReadyCheck() {
     queryFn: () => fetcher('/ready'),
     staleTime: 10_000,
     refetchInterval: 30_000,
+    retry: 1,
+  });
+}
+
+export function useOperatorStatus() {
+  return useQuery<OperatorStatus>({
+    queryKey: ['operator', 'status'],
+    queryFn: () => fetcher('/api/v1/operator/status'),
+    staleTime: 10_000,
+    refetchInterval: 15_000,
     retry: 1,
   });
 }

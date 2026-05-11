@@ -26,6 +26,14 @@ class Config:
         if not self.binance_api_key or not self.binance_api_secret:
             self.demo_mode = True  # Force demo mode if no API keys
 
+        # Live-trading arming gate
+        self.live_trading_enabled = os.getenv("LIVE_TRADING_ENABLED", "false").lower() == "true"
+        self._live_trading_ack = os.getenv("LIVE_TRADING_ACK", "")
+        self._live_trading_ack_phrase = "I_ACCEPT_LIVE_BINANCE_SPOT_RISK"
+
+        # Derived runtime mode: demo | testnet | live_blocked | live_armed
+        self.runtime_mode = self._derive_runtime_mode()
+
         # Testnet Aggressive Mode - converts HOLD to random BUY/SELL for testing
         self.testnet_aggressive_mode = (
             os.getenv("TESTNET_AGGRESSIVE_MODE", "false").lower() == "true"
@@ -132,11 +140,37 @@ class Config:
             "SUPPORTED_SYMBOLS", "BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT"
         ).split(",")
 
+    def _derive_runtime_mode(self) -> str:
+        """
+        Derive runtime mode from configuration.
+
+        Returns one of:
+            - "demo"         : no API keys, or DEMO_MODE=true
+            - "testnet"      : BINANCE_TESTNET=true, real keys present
+            - "live_blocked" : testnet=false, demo=false, but arming incomplete
+            - "live_armed"   : all four arming conditions satisfied
+        """
+        if self.demo_mode:
+            return "demo"
+        if self.binance_testnet:
+            return "testnet"
+        # Non-demo, non-testnet — check full arming conditions
+        if (
+            self.live_trading_enabled
+            and self._live_trading_ack == self._live_trading_ack_phrase
+        ):
+            return "live_armed"
+        return "live_blocked"
+
     def validate(self):
         """
         Validate configuration for required API keys and testnet settings.
         Raises SystemExit with error if invalid.
         """
+        import logging as _logging
+        _log = _logging.getLogger(__name__)
+        _log.info("Runtime mode: %s", self.runtime_mode)
+
         if self.binance_testnet:
             if not self.binance_api_key or not self.binance_api_secret:
                 print(

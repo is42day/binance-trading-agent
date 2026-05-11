@@ -171,10 +171,12 @@ class ExchangeOrderORM(Base):
     status = Column(String, nullable=False)
     quantity = Column(Float, nullable=False)
     executed_quantity = Column(Float, nullable=False, default=0.0)
+    last_booked_quantity = Column(Float, nullable=False, default=0.0)
     price = Column(Float, nullable=True)
     avg_fill_price = Column(Float, nullable=True)
     fee = Column(Float, nullable=False, default=0.0)
     correlation_id = Column(String, nullable=True)
+    cancel_reason = Column(String, nullable=True)
     raw_response = Column(Text, nullable=True)
     created_at = Column(DateTime, nullable=False)
     updated_at = Column(DateTime, nullable=False)
@@ -198,10 +200,12 @@ class ExchangeOrderORM(Base):
             "status": self.status,
             "quantity": self.quantity,
             "executed_quantity": self.executed_quantity,
+            "last_booked_quantity": self.last_booked_quantity,
             "price": self.price,
             "avg_fill_price": self.avg_fill_price,
             "fee": self.fee,
             "correlation_id": self.correlation_id,
+            "cancel_reason": self.cancel_reason,
             "raw_response": raw_response,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
@@ -255,6 +259,51 @@ class SystemStateORM(Base):
             "value": self.value,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "updated_by": self.updated_by,
+        }
+
+
+class TradingDecisionORM(Base):
+    """ORM model for the trading decision journal."""
+
+    __tablename__ = "trading_decisions"
+
+    id = Column(String, primary_key=True)          # UUID
+    symbol = Column(String, nullable=False)
+    signal = Column(String, nullable=False)         # BUY | SELL | HOLD
+    strategy = Column(String, nullable=True)
+    confidence = Column(Float, nullable=True)
+    blocked_reason = Column(String, nullable=True)  # None when not blocked
+    risk_approved = Column(String, nullable=False, default="false")  # "true"/"false"
+    execution_policy = Column(Text, nullable=True)  # JSON blob
+    metadata_ = Column("metadata", Text, nullable=True)  # JSON blob - extra context
+    timestamp = Column(DateTime, nullable=False)
+
+    def to_dict(self) -> Dict[str, Any]:
+        exec_policy = None
+        if self.execution_policy:
+            try:
+                exec_policy = json.loads(self.execution_policy)
+            except (json.JSONDecodeError, TypeError):
+                exec_policy = self.execution_policy
+
+        extra_meta = None
+        if self.metadata_:
+            try:
+                extra_meta = json.loads(self.metadata_)
+            except (json.JSONDecodeError, TypeError):
+                extra_meta = self.metadata_
+
+        return {
+            "id": self.id,
+            "symbol": self.symbol,
+            "signal": self.signal,
+            "strategy": self.strategy,
+            "confidence": self.confidence,
+            "blocked_reason": self.blocked_reason,
+            "risk_approved": self.risk_approved == "true",
+            "execution_policy": exec_policy,
+            "metadata": extra_meta,
+            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
         }
 
 
@@ -324,9 +373,26 @@ class PortfolioManager:
             return
 
         trade_columns = {column["name"] for column in inspector.get_columns("trades")}
+        exchange_order_columns = (
+            {column["name"] for column in inspector.get_columns("exchange_orders")}
+            if "exchange_orders" in tables
+            else set()
+        )
         with self.engine.begin() as connection:
             if "client_order_id" not in trade_columns:
                 connection.execute(text("ALTER TABLE trades ADD COLUMN client_order_id VARCHAR"))
+            if "exchange_orders" in tables:
+                if "last_booked_quantity" not in exchange_order_columns:
+                    connection.execute(
+                        text(
+                            "ALTER TABLE exchange_orders ADD COLUMN"
+                            " last_booked_quantity REAL NOT NULL DEFAULT 0.0"
+                        )
+                    )
+                if "cancel_reason" not in exchange_order_columns:
+                    connection.execute(
+                        text("ALTER TABLE exchange_orders ADD COLUMN cancel_reason VARCHAR")
+                    )
 
         Base.metadata.create_all(self.engine, checkfirst=True)
 
@@ -628,10 +694,14 @@ class PortfolioManager:
                 order.executed_quantity = float(
                     order_data.get("executed_quantity", order.executed_quantity) or 0
                 )
+                if "last_booked_quantity" in order_data:
+                    order.last_booked_quantity = float(order_data["last_booked_quantity"] or 0)
                 order.price = order_data.get("price", order.price)
                 order.avg_fill_price = order_data.get("avg_fill_price", order.avg_fill_price)
                 order.fee = float(order_data.get("fee", order.fee) or 0)
                 order.correlation_id = order_data.get("correlation_id", order.correlation_id)
+                if "cancel_reason" in order_data:
+                    order.cancel_reason = order_data["cancel_reason"]
                 raw_response = order_data.get("raw_response")
                 if raw_response is not None:
                     order.raw_response = json.dumps(raw_response, default=str)
@@ -687,6 +757,23 @@ class PortfolioManager:
                         continue
                 results.append(order.to_dict())
             return results
+        finally:
+            session.close()
+
+    def get_terminal_exchange_orders(
+        self, symbol: Optional[str] = None, limit: int = 100
+    ) -> List[Dict[str, Any]]:
+        """Return orders in terminal states (FILLED, CANCELED, REJECTED, EXPIRED)."""
+        terminal_statuses = {"FILLED", "CANCELED", "REJECTED", "EXPIRED"}
+        session = self.get_session()
+        try:
+            query = session.query(ExchangeOrderORM).filter(
+                ExchangeOrderORM.status.in_(terminal_statuses)
+            )
+            if symbol:
+                query = query.filter_by(symbol=symbol)
+            query = query.order_by(ExchangeOrderORM.updated_at.desc()).limit(limit)
+            return [o.to_dict() for o in query.all()]
         finally:
             session.close()
 

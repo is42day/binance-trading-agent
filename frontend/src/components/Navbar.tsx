@@ -8,6 +8,7 @@ const navItems = [
   { to: '/signals', label: 'Signals & Risk', icon: '🚦' },
   { to: '/performance', label: 'Performance', icon: '🏆' },
   { to: '/health', label: 'System Health', icon: '💚' },
+  { to: '/operator', label: 'Operator Status', icon: '🎛️' },
 ];
 
 export default function Navbar() {

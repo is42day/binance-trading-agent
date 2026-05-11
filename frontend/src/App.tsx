@@ -7,6 +7,7 @@ import PaperTrading from './pages/PaperTrading';
 import SignalsRisk from './pages/SignalsRisk';
 import Performance from './pages/Performance';
 import SystemHealth from './pages/SystemHealth';
+import OperatorStatus from './pages/OperatorStatus';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,6 +30,7 @@ export default function App() {
             <Route path="signals" element={<SignalsRisk />} />
             <Route path="performance" element={<Performance />} />
             <Route path="health" element={<SystemHealth />} />
+            <Route path="operator" element={<OperatorStatus />} />
           </Route>
         </Routes>
       </BrowserRouter>

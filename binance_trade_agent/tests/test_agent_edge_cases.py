@@ -1,3 +1,5 @@
+import tempfile
+
 import pytest
 
 from ..agents.market_data_agent import MarketDataAgent
@@ -42,7 +44,7 @@ def test_market_data_empty_klines(monkeypatch):
     assert ohlcv == []
 
 
-def test_trade_execution_place_and_cancel_demo(tmp_path):
+def test_trade_execution_place_and_cancel_demo():
     # Demo place order should return a dict with orderId and status
     te = TradeExecutionAgent()
     res = te.place_order("BTCUSDT", "BUY", "MARKET", 0.0001)
@@ -105,9 +107,17 @@ def test_slippage_estimate_uses_order_book_depth():
     assert result["slippage_pct"] >= 0
 
 
-def test_portfolio_manager_persistence_and_pnl(tmp_path):
-    db = tmp_path / "test_portfolio.db"
-    pm = PortfolioManager(str(db))
+def test_portfolio_manager_persistence_and_pnl():
+    with tempfile.TemporaryDirectory() as _tmpdir:
+        db = _tmpdir + "/test_portfolio.db"
+        pm = PortfolioManager(str(db))
+        try:
+            _run_portfolio_persistence(pm)
+        finally:
+            pm.engine.dispose()
+
+
+def _run_portfolio_persistence(pm):
     pm.clear_portfolio()
 
     # Add a demo trade and verify persistence
