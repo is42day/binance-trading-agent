@@ -1,4 +1,10 @@
-import { usePaperTradingStatus, usePaperTradingSignals, usePaperTradingTrades } from '../hooks/useApi';
+import { useState } from 'react';
+import {
+  usePaperTradingStatus,
+  usePaperTradingSignals,
+  usePaperTradingTrades,
+  useResetPaperTradingAction,
+} from '../hooks/useApi';
 import type { PaperTradeRecord } from '../types';
 import MetricCard from '../components/MetricCard';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -13,12 +19,46 @@ export default function PaperTrading() {
   const { data: status, isLoading: statusLoading, isError: statusError } = usePaperTradingStatus();
   const { data: signals, isLoading: signalsLoading, isError: signalsError } = usePaperTradingSignals(20);
   const { data: trades, isLoading: tradesLoading, isError: tradesError } = usePaperTradingTrades(20);
+  const resetPaper = useResetPaperTradingAction();
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
 
   const portfolio = status?.portfolio;
 
+  const handleResetPaper = () => {
+    const balanceInput = window.prompt('Paper starting balance', String(portfolio?.current_balance ?? 5000));
+    if (balanceInput === null) return;
+    const initialBalance = Number(balanceInput);
+    if (!Number.isFinite(initialBalance) || initialBalance <= 0) {
+      setResetMessage('Enter a positive starting balance.');
+      return;
+    }
+    if (!window.confirm(`Reset paper portfolio to $${initialBalance.toLocaleString()}? Existing paper logs will be archived.`)) {
+      return;
+    }
+    resetPaper.mutate(initialBalance, {
+      onSuccess: () => setResetMessage(`Paper portfolio reset to $${initialBalance.toLocaleString()}.`),
+      onError: (err) => setResetMessage(`Paper reset failed: ${String(err)}`),
+    });
+  };
+
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-white">Paper Trading</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-2xl font-bold text-white">Paper Trading</h2>
+        <button
+          type="button"
+          onClick={handleResetPaper}
+          disabled={resetPaper.isPending}
+          className="rounded-md bg-yellow-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-yellow-500 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Reset Paper Portfolio
+        </button>
+      </div>
+      {resetMessage && (
+        <div className="rounded border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-gray-300">
+          {resetMessage}
+        </div>
+      )}
 
       {statusLoading ? (
         <LoadingSpinner />

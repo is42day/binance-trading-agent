@@ -10,6 +10,7 @@ from datetime import datetime
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 from sqlalchemy import inspect, text
 
 from ..agents.market_data_agent import MarketDataAgent
@@ -87,6 +88,18 @@ portfolio_manager = PortfolioManager(db_path=db_path)
 risk_agent = EnhancedRiskManagementAgent()
 market_agent = MarketDataAgent()
 cache = RedisCache(host="redis")  # Use the service name from docker-compose
+
+
+class EmergencyStopRequest(BaseModel):
+    """Operator request to activate or clear the shared emergency stop."""
+
+    reason: str = Field(default="", max_length=500)
+
+
+class PaperResetRequest(BaseModel):
+    """Operator request to reset the paper-trading portfolio."""
+
+    initial_balance: float | None = Field(default=None, gt=0, le=10_000_000)
 
 # --- Lifecycle Events ---
 
@@ -291,6 +304,42 @@ async def reconcile_exchange_orders(symbol: str | None = None):
         return service.reconcile_open_orders(symbol=symbol)
     except Exception as e:
         logger.error(f"Error reconciling exchange orders: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/operator/emergency-stop", dependencies=[Depends(require_api_token)])
+async def activate_emergency_stop(request: EmergencyStopRequest):
+    """Activate the shared emergency stop. All new trades should be blocked."""
+    reason = request.reason.strip()
+    if not reason:
+        raise HTTPException(status_code=400, detail="Emergency stop requires a reason")
+
+    try:
+        risk_agent.set_emergency_stop(True, reason)
+        return {
+            "success": True,
+            "emergency_stop": {"enabled": True, "reason": reason},
+            "timestamp": datetime.now().isoformat(),
+        }
+    except Exception as e:
+        logger.error(f"Error activating emergency stop: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/operator/resume", dependencies=[Depends(require_api_token)])
+async def resume_trading(request: EmergencyStopRequest):
+    """Clear the shared emergency stop after operator confirmation."""
+    reason = request.reason.strip() or "operator_resume"
+
+    try:
+        risk_agent.set_emergency_stop(False, reason)
+        return {
+            "success": True,
+            "emergency_stop": {"enabled": False, "reason": reason},
+            "timestamp": datetime.now().isoformat(),
+        }
+    except Exception as e:
+        logger.error(f"Error clearing emergency stop: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -653,6 +702,26 @@ async def get_paper_trading_trades(limit: int = 50):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@app.post("/api/v1/paper-trading/reset", dependencies=[Depends(require_api_token)])
+async def reset_paper_trading(request: PaperResetRequest):
+    """Reset the paper-trading portfolio and archive existing paper logs."""
+    try:
+        from ..core.paper_trading import get_paper_trading_engine
+
+        engine = get_paper_trading_engine(
+            initial_balance=request.initial_balance or config.portfolio_initial_value
+        )
+        engine.reset(initial_balance=request.initial_balance)
+        return {
+            "success": True,
+            "portfolio": engine.get_portfolio_summary(),
+            "timestamp": datetime.now().isoformat(),
+        }
+    except Exception as e:
+        logger.error(f"Error resetting paper trading: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 # --- Decision Journal Endpoints ---
 
 
@@ -737,6 +806,32 @@ async def list_stale_orders(symbol: str | None = None, price_pct_threshold: floa
 
     svc = get_order_lifecycle_service()
     return {"orders": svc.detect_stale_limit_orders(symbol=symbol, price_pct_threshold=price_pct_threshold)}
+
+
+@app.post("/api/v1/orders/stale/cancel", dependencies=[Depends(require_api_token)])
+async def cancel_stale_orders_endpoint(
+    symbol: str | None = None,
+    price_pct_threshold: float = 1.0,
+):
+    """Cancel all stale locally tracked limit orders and record the reasons."""
+    if price_pct_threshold <= 0:
+        raise HTTPException(status_code=400, detail="price_pct_threshold must be positive")
+
+    from ..core.order_lifecycle import get_order_lifecycle_service
+
+    svc = get_order_lifecycle_service()
+    results = svc.cancel_stale_orders(
+        symbol=symbol.upper() if symbol else None,
+        price_pct_threshold=price_pct_threshold,
+    )
+    cancelled = sum(1 for item in results if item.get("success"))
+    return {
+        "success": True,
+        "cancelled": cancelled,
+        "attempted": len(results),
+        "results": results,
+        "timestamp": datetime.now().isoformat(),
+    }
 
 
 @app.post("/api/v1/orders/{client_order_id}/cancel", dependencies=[Depends(require_api_token)])

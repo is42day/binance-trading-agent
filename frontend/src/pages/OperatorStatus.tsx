@@ -1,4 +1,11 @@
-import { useOperatorStatus } from '../hooks/useApi';
+import { useState } from 'react';
+import {
+  useCancelStaleOrdersAction,
+  useEmergencyStopAction,
+  useOperatorStatus,
+  useReconcileOrdersAction,
+  useResumeTradingAction,
+} from '../hooks/useApi';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import type { RuntimeMode, StreamFreshnessItem, OpenOrderItem } from '../types';
@@ -28,6 +35,125 @@ function SectionCard({ title, children }: { title: string; children: React.React
     <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
       <h3 className="text-lg font-semibold text-white mb-4">{title}</h3>
       {children}
+    </div>
+  );
+}
+
+function ActionButton({
+  children,
+  onClick,
+  variant = 'default',
+  disabled = false,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  variant?: 'default' | 'danger' | 'warning' | 'success';
+  disabled?: boolean;
+}) {
+  const styles = {
+    default: 'bg-blue-600 hover:bg-blue-500 text-white',
+    danger: 'bg-red-700 hover:bg-red-600 text-white',
+    warning: 'bg-yellow-600 hover:bg-yellow-500 text-white',
+    success: 'bg-green-700 hover:bg-green-600 text-white',
+  };
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`rounded-md px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${styles[variant]}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function OperatorActions({
+  emergencyStopEnabled,
+  staleOrdersCount,
+}: {
+  emergencyStopEnabled: boolean;
+  staleOrdersCount: number;
+}) {
+  const [message, setMessage] = useState<string | null>(null);
+  const emergencyStop = useEmergencyStopAction();
+  const resumeTrading = useResumeTradingAction();
+  const reconcileOrders = useReconcileOrdersAction();
+  const cancelStale = useCancelStaleOrdersAction();
+  const busy =
+    emergencyStop.isPending ||
+    resumeTrading.isPending ||
+    reconcileOrders.isPending ||
+    cancelStale.isPending;
+
+  const showResult = (prefix: string, result: unknown) => {
+    if (typeof result === 'object' && result !== null && 'error' in result) {
+      setMessage(`${prefix}: ${(result as { error?: string }).error ?? 'failed'}`);
+      return;
+    }
+    setMessage(prefix);
+  };
+
+  const activateStop = () => {
+    const reason = window.prompt('Emergency stop reason');
+    if (!reason?.trim()) return;
+    emergencyStop.mutate(reason.trim(), {
+      onSuccess: () => showResult('Emergency stop activated', null),
+      onError: (err) => setMessage(`Emergency stop failed: ${String(err)}`),
+    });
+  };
+
+  const resume = () => {
+    const reason = window.prompt('Resume reason', 'operator_resume');
+    if (reason === null) return;
+    if (!window.confirm('Resume trading by clearing the emergency stop?')) return;
+    resumeTrading.mutate(reason.trim() || 'operator_resume', {
+      onSuccess: () => showResult('Trading resumed', null),
+      onError: (err) => setMessage(`Resume failed: ${String(err)}`),
+    });
+  };
+
+  const reconcile = () => {
+    reconcileOrders.mutate(undefined, {
+      onSuccess: (result) => showResult('Exchange reconciliation complete', result),
+      onError: (err) => setMessage(`Reconciliation failed: ${String(err)}`),
+    });
+  };
+
+  const cancelStaleOrders = () => {
+    if (staleOrdersCount <= 0) return;
+    if (!window.confirm(`Cancel ${staleOrdersCount} stale open order(s)?`)) return;
+    cancelStale.mutate(1.0, {
+      onSuccess: (result) => {
+        const cancelled = (result as { cancelled?: number }).cancelled ?? 0;
+        showResult(`Cancelled ${cancelled} stale order(s)`, result);
+      },
+      onError: (err) => setMessage(`Cancel stale orders failed: ${String(err)}`),
+    });
+  };
+
+  return (
+    <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-sm font-semibold text-white mr-1">Actions</span>
+        <ActionButton onClick={activateStop} variant="danger" disabled={busy || emergencyStopEnabled}>
+          Emergency Stop
+        </ActionButton>
+        <ActionButton onClick={resume} variant="success" disabled={busy || !emergencyStopEnabled}>
+          Resume Trading
+        </ActionButton>
+        <ActionButton onClick={reconcile} disabled={busy}>
+          Reconcile Orders
+        </ActionButton>
+        <ActionButton onClick={cancelStaleOrders} variant="warning" disabled={busy || staleOrdersCount === 0}>
+          Cancel Stale Orders
+        </ActionButton>
+      </div>
+      {message && (
+        <div className="mt-3 rounded border border-gray-600 bg-gray-900 px-3 py-2 text-sm text-gray-300">
+          {message}
+        </div>
+      )}
     </div>
   );
 }
@@ -247,6 +373,11 @@ export default function OperatorStatus() {
               </div>
             )}
           </div>
+
+          <OperatorActions
+            emergencyStopEnabled={data.emergency_stop.enabled}
+            staleOrdersCount={data.stale_orders_count}
+          />
 
           {/* Main grid */}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">

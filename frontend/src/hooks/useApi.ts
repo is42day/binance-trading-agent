@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { API_BASE_URL } from '../config/api';
 import type {
   PortfolioSummary,
@@ -33,6 +33,21 @@ const fetcher = async <T>(url: string): Promise<T> => {
   const { data } = await api.get<T>(url);
   return data;
 };
+
+const poster = async <T, P = unknown>(url: string, payload?: P): Promise<T> => {
+  const { data } = await api.post<T>(url, payload ?? {});
+  return data;
+};
+
+function useInvalidateOperatorData() {
+  const queryClient = useQueryClient();
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: ['operator'] });
+    void queryClient.invalidateQueries({ queryKey: ['risk'] });
+    void queryClient.invalidateQueries({ queryKey: ['paper-trading'] });
+    void queryClient.invalidateQueries({ queryKey: ['portfolio'] });
+  };
+}
 
 export function usePortfolioSummary() {
   return useQuery<PortfolioSummary>({
@@ -225,5 +240,49 @@ export function useOperatorStatus() {
     staleTime: 10_000,
     refetchInterval: 15_000,
     retry: 1,
+  });
+}
+
+export function useEmergencyStopAction() {
+  const invalidate = useInvalidateOperatorData();
+  return useMutation<unknown, Error, string>({
+    mutationFn: (reason: string) =>
+      poster('/api/v1/operator/emergency-stop', { reason }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useResumeTradingAction() {
+  const invalidate = useInvalidateOperatorData();
+  return useMutation<unknown, Error, string>({
+    mutationFn: (reason: string) =>
+      poster('/api/v1/operator/resume', { reason }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useReconcileOrdersAction() {
+  const invalidate = useInvalidateOperatorData();
+  return useMutation<unknown, Error, void>({
+    mutationFn: () => poster('/api/v1/system/reconcile'),
+    onSuccess: invalidate,
+  });
+}
+
+export function useCancelStaleOrdersAction() {
+  const invalidate = useInvalidateOperatorData();
+  return useMutation<unknown, Error, number | undefined>({
+    mutationFn: (pricePctThreshold = 1.0) =>
+      poster(`/api/v1/orders/stale/cancel?price_pct_threshold=${pricePctThreshold}`),
+    onSuccess: invalidate,
+  });
+}
+
+export function useResetPaperTradingAction() {
+  const invalidate = useInvalidateOperatorData();
+  return useMutation<unknown, Error, number | undefined>({
+    mutationFn: (initialBalance?: number) =>
+      poster('/api/v1/paper-trading/reset', { initial_balance: initialBalance }),
+    onSuccess: invalidate,
   });
 }

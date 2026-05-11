@@ -313,3 +313,86 @@ class TestOperatorStatusEndpoint:
             resp = tc.get("/api/v1/operator/status", headers={"X-API-Token": "test-token"})
             es = resp.json()["emergency_stop"]
             assert es["enabled"] is True
+
+
+class TestOperatorActionEndpoints:
+    def test_emergency_stop_requires_reason(self):
+        from binance_trade_agent.api.api import app
+
+        tc = TestClient(app)
+        resp = tc.post(
+            "/api/v1/operator/emergency-stop",
+            json={"reason": ""},
+            headers={"X-API-Token": "test-token"},
+        )
+        assert resp.status_code == 400
+
+    def test_emergency_stop_calls_risk_agent(self):
+        from binance_trade_agent.api.api import app, risk_agent
+
+        with patch.object(risk_agent, "set_emergency_stop") as set_stop:
+            tc = TestClient(app)
+            resp = tc.post(
+                "/api/v1/operator/emergency-stop",
+                json={"reason": "operator test"},
+                headers={"X-API-Token": "test-token"},
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["emergency_stop"]["enabled"] is True
+        set_stop.assert_called_once_with(True, "operator test")
+
+    def test_resume_calls_risk_agent(self):
+        from binance_trade_agent.api.api import app, risk_agent
+
+        with patch.object(risk_agent, "set_emergency_stop") as set_stop:
+            tc = TestClient(app)
+            resp = tc.post(
+                "/api/v1/operator/resume",
+                json={"reason": "checked dashboard"},
+                headers={"X-API-Token": "test-token"},
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["emergency_stop"]["enabled"] is False
+        set_stop.assert_called_once_with(False, "checked dashboard")
+
+    def test_cancel_stale_orders_endpoint(self):
+        from binance_trade_agent.api.api import app
+
+        svc = MagicMock()
+        svc.cancel_stale_orders.return_value = [
+            {"client_order_id": "bta_1", "success": True},
+            {"client_order_id": "bta_2", "success": False, "error": "already closed"},
+        ]
+
+        with patch("binance_trade_agent.core.order_lifecycle.get_order_lifecycle_service", return_value=svc):
+            tc = TestClient(app)
+            resp = tc.post(
+                "/api/v1/orders/stale/cancel",
+                headers={"X-API-Token": "test-token"},
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["attempted"] == 2
+        assert body["cancelled"] == 1
+        svc.cancel_stale_orders.assert_called_once()
+
+    def test_reset_paper_trading_endpoint(self):
+        from binance_trade_agent.api.api import app
+
+        engine = MagicMock()
+        engine.get_portfolio_summary.return_value = {"current_balance": 2500.0}
+
+        with patch("binance_trade_agent.core.paper_trading.get_paper_trading_engine", return_value=engine):
+            tc = TestClient(app)
+            resp = tc.post(
+                "/api/v1/paper-trading/reset",
+                json={"initial_balance": 2500.0},
+                headers={"X-API-Token": "test-token"},
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["portfolio"]["current_balance"] == 2500.0
+        engine.reset.assert_called_once_with(initial_balance=2500.0)
