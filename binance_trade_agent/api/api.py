@@ -7,7 +7,7 @@ import os
 import traceback
 from datetime import datetime
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Body, Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import inspect, text
@@ -291,6 +291,41 @@ async def reconcile_exchange_orders(symbol: str | None = None):
         return service.reconcile_open_orders(symbol=symbol)
     except Exception as e:
         logger.error(f"Error reconciling exchange orders: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/system/emergency-stop", dependencies=[Depends(require_api_token)])
+async def trigger_emergency_stop(reason: str = Body(default="Operator triggered", embed=True)):
+    """Activate emergency stop — halts all trading immediately."""
+    try:
+        risk_agent.set_emergency_stop(True, reason)
+        return {"success": True, "emergency_stop": True, "reason": reason}
+    except Exception as e:
+        logger.error(f"Error activating emergency stop: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/system/resume-trading", dependencies=[Depends(require_api_token)])
+async def resume_trading():
+    """Deactivate emergency stop and resume trading."""
+    try:
+        risk_agent.set_emergency_stop(False)
+        return {"success": True, "emergency_stop": False}
+    except Exception as e:
+        logger.error(f"Error resuming trading: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/system/cancel-stale-orders", dependencies=[Depends(require_api_token)])
+async def cancel_stale_orders_endpoint(symbol: str | None = None):
+    """Detect and cancel all stale limit orders."""
+    try:
+        from ..core.order_lifecycle import get_order_lifecycle_service
+        svc = get_order_lifecycle_service()
+        results = svc.cancel_stale_orders(symbol=symbol)
+        return {"success": True, "cancelled": len(results), "results": results}
+    except Exception as e:
+        logger.error(f"Error cancelling stale orders: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -651,6 +686,19 @@ async def get_paper_trading_trades(limit: int = 50):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/api/v1/paper-trading/reset", dependencies=[Depends(require_api_token)])
+async def reset_paper_portfolio(initial_balance: float = Body(default=10000.0, embed=True)):
+    """Reset the paper trading portfolio to a fresh state."""
+    try:
+        from ..core.paper_trading import get_paper_trading_engine
+        engine = get_paper_trading_engine(initial_balance=initial_balance)
+        engine.reset(initial_balance=initial_balance)
+        return {"success": True, "initial_balance": initial_balance}
+    except Exception as e:
+        logger.error(f"Error resetting paper portfolio: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # --- Decision Journal Endpoints ---

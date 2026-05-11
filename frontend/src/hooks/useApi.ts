@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { API_BASE_URL } from '../config/api';
 import type {
   PortfolioSummary,
@@ -31,6 +31,11 @@ const api = axios.create({
 
 const fetcher = async <T>(url: string): Promise<T> => {
   const { data } = await api.get<T>(url);
+  return data;
+};
+
+const poster = async <T>(url: string, body?: unknown): Promise<T> => {
+  const { data } = await api.post<T>(url, body ?? {});
   return data;
 };
 
@@ -215,6 +220,52 @@ export function useReadyCheck() {
     staleTime: 10_000,
     refetchInterval: 30_000,
     retry: 1,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Action mutations
+// ---------------------------------------------------------------------------
+
+export function useTriggerEmergencyStop() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (reason: string = 'Operator triggered') =>
+      poster('/api/v1/system/emergency-stop', { reason }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['operator'] }),
+  });
+}
+
+export function useResumeTrading() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => poster('/api/v1/system/resume-trading'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['operator'] }),
+  });
+}
+
+export function useReconcileOrders() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => poster('/api/v1/system/reconcile'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['operator'] }),
+  });
+}
+
+export function useCancelStaleOrders() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => poster('/api/v1/system/cancel-stale-orders'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['operator'] }),
+  });
+}
+
+export function useResetPaperPortfolio() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (initialBalance: number = 10000) =>
+      poster('/api/v1/paper-trading/reset', { initial_balance: initialBalance }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['paper-trading'] }),
   });
 }
 

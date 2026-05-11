@@ -1,4 +1,5 @@
-import { usePaperTradingStatus, usePaperTradingSignals, usePaperTradingTrades } from '../hooks/useApi';
+import { useState } from 'react';
+import { usePaperTradingStatus, usePaperTradingSignals, usePaperTradingTrades, useResetPaperPortfolio } from '../hooks/useApi';
 import type { PaperTradeRecord } from '../types';
 import MetricCard from '../components/MetricCard';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -10,15 +11,45 @@ function fmt(n: number | undefined, d = 2) {
 }
 
 export default function PaperTrading() {
-  const { data: status, isLoading: statusLoading, isError: statusError } = usePaperTradingStatus();
+  const { data: status, isLoading: statusLoading, isError: statusError, refetch } = usePaperTradingStatus();
   const { data: signals, isLoading: signalsLoading, isError: signalsError } = usePaperTradingSignals(20);
   const { data: trades, isLoading: tradesLoading, isError: tradesError } = usePaperTradingTrades(20);
+  const resetPortfolio = useResetPaperPortfolio();
+  const [resetMsg, setResetMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  const handleReset = async () => {
+    if (!window.confirm('Reset paper portfolio to $10,000? All history will be archived.')) return;
+    setResetMsg(null);
+    try {
+      await resetPortfolio.mutateAsync(10000);
+      setResetMsg({ text: 'Portfolio reset to $10,000.', ok: true });
+      refetch();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setResetMsg({ text: `Error: ${msg}`, ok: false });
+    }
+  };
 
   const portfolio = status?.portfolio;
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-white">Paper Trading</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-white">Paper Trading</h2>
+        <button
+          onClick={handleReset}
+          disabled={resetPortfolio.isPending}
+          className="px-4 py-2 rounded-lg text-sm font-semibold bg-orange-700 hover:bg-orange-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {resetPortfolio.isPending ? 'Resetting…' : '↺ Reset Paper Portfolio'}
+        </button>
+      </div>
+
+      {resetMsg && (
+        <div className={`text-sm px-3 py-2 rounded ${resetMsg.ok ? 'bg-green-900/40 text-green-300' : 'bg-red-900/40 text-red-300'}`}>
+          {resetMsg.text}
+        </div>
+      )}
 
       {statusLoading ? (
         <LoadingSpinner />

@@ -1,4 +1,5 @@
-import { useOperatorStatus } from '../hooks/useApi';
+import { useState } from 'react';
+import { useOperatorStatus, useTriggerEmergencyStop, useResumeTrading, useReconcileOrders, useCancelStaleOrders } from '../hooks/useApi';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import type { RuntimeMode, StreamFreshnessItem, OpenOrderItem } from '../types';
@@ -213,7 +214,30 @@ function EmergencyStopSection({ es }: { es: { enabled: boolean; reason: string |
 // ---------------------------------------------------------------------------
 
 export default function OperatorStatus() {
-  const { data, isLoading, isError, dataUpdatedAt } = useOperatorStatus();
+  const { data, isLoading, isError, dataUpdatedAt, refetch } = useOperatorStatus();
+  const emergencyStop = useTriggerEmergencyStop();
+  const resumeTrading = useResumeTrading();
+  const reconcile = useReconcileOrders();
+  const cancelStale = useCancelStaleOrders();
+
+  const [actionMsg, setActionMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  const runAction = async (
+    fn: () => Promise<unknown>,
+    successMsg: string,
+  ) => {
+    setActionMsg(null);
+    try {
+      await fn();
+      setActionMsg({ text: successMsg, ok: true });
+      refetch();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setActionMsg({ text: `Error: ${msg}`, ok: false });
+    }
+  };
+
+  const isEmergencyActive = data?.emergency_stop?.enabled ?? false;
 
   return (
     <div className="space-y-6">
@@ -223,6 +247,62 @@ export default function OperatorStatus() {
           <span className="text-xs text-gray-500">
             Updated {new Date(dataUpdatedAt).toLocaleTimeString()}
           </span>
+        )}
+      </div>
+
+      {/* Action buttons */}
+      <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Actions</h3>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => runAction(
+              () => emergencyStop.mutateAsync('Operator triggered from dashboard'),
+              'Emergency stop activated.',
+            )}
+            disabled={emergencyStop.isPending || isEmergencyActive}
+            className="px-4 py-2 rounded-lg text-sm font-semibold bg-red-700 hover:bg-red-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {emergencyStop.isPending ? 'Stopping…' : '🛑 Emergency Stop'}
+          </button>
+
+          <button
+            onClick={() => runAction(
+              () => resumeTrading.mutateAsync(),
+              'Trading resumed.',
+            )}
+            disabled={resumeTrading.isPending || !isEmergencyActive}
+            className="px-4 py-2 rounded-lg text-sm font-semibold bg-green-700 hover:bg-green-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {resumeTrading.isPending ? 'Resuming…' : '▶ Resume Trading'}
+          </button>
+
+          <button
+            onClick={() => runAction(
+              () => reconcile.mutateAsync(),
+              'Reconciliation complete.',
+            )}
+            disabled={reconcile.isPending}
+            className="px-4 py-2 rounded-lg text-sm font-semibold bg-blue-700 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {reconcile.isPending ? 'Reconciling…' : '🔄 Reconcile Orders'}
+          </button>
+
+          <button
+            onClick={() => runAction(
+              () => cancelStale.mutateAsync(),
+              'Stale orders cancelled.',
+            )}
+            disabled={cancelStale.isPending}
+            className="px-4 py-2 rounded-lg text-sm font-semibold bg-yellow-700 hover:bg-yellow-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {cancelStale.isPending ? 'Cancelling…' : '✂ Cancel Stale Orders'}
+          </button>
+        </div>
+
+        {actionMsg && (
+          <div className={`mt-3 text-sm px-3 py-2 rounded ${actionMsg.ok ? 'bg-green-900/40 text-green-300' : 'bg-red-900/40 text-red-300'}`}>
+            {actionMsg.text}
+          </div>
         )}
       </div>
 
