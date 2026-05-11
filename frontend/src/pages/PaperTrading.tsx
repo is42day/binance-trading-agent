@@ -1,5 +1,13 @@
 import { useState } from 'react';
-import { usePaperTradingStatus, usePaperTradingSignals, usePaperTradingTrades, useResetPaperPortfolio } from '../hooks/useApi';
+import {
+  usePaperTradingStatus,
+  usePaperTradingSignals,
+  usePaperTradingTrades,
+  useResetPaperPortfolio,
+  usePaperLoopStatus,
+  useStartPaperTrading,
+  useStopPaperTrading,
+} from '../hooks/useApi';
 import type { PaperTradeRecord } from '../types';
 import MetricCard from '../components/MetricCard';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -14,8 +22,14 @@ export default function PaperTrading() {
   const { data: status, isLoading: statusLoading, isError: statusError, refetch } = usePaperTradingStatus();
   const { data: signals, isLoading: signalsLoading, isError: signalsError } = usePaperTradingSignals(20);
   const { data: trades, isLoading: tradesLoading, isError: tradesError } = usePaperTradingTrades(20);
+  const { data: loopStatus, refetch: refetchLoop } = usePaperLoopStatus();
   const resetPortfolio = useResetPaperPortfolio();
+  const startLoop = useStartPaperTrading();
+  const stopLoop = useStopPaperTrading();
   const [resetMsg, setResetMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [loopMsg, setLoopMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  const isLoopRunning = loopStatus?.running ?? false;
 
   const handleReset = async () => {
     if (!window.confirm('Reset paper portfolio to $10,000? All history will be archived.')) return;
@@ -30,20 +44,68 @@ export default function PaperTrading() {
     }
   };
 
+  const handleStart = async () => {
+    setLoopMsg(null);
+    try {
+      await startLoop.mutateAsync({});
+      setLoopMsg({ text: 'Paper trading started.', ok: true });
+      refetchLoop();
+      refetch();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setLoopMsg({ text: `Error: ${msg}`, ok: false });
+    }
+  };
+
+  const handleStop = async () => {
+    setLoopMsg(null);
+    try {
+      await stopLoop.mutateAsync();
+      setLoopMsg({ text: 'Stop signal sent.', ok: true });
+      refetchLoop();
+      refetch();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setLoopMsg({ text: `Error: ${msg}`, ok: false });
+    }
+  };
+
   const portfolio = status?.portfolio;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-2xl font-bold text-white">Paper Trading</h2>
-        <button
-          onClick={handleReset}
-          disabled={resetPortfolio.isPending}
-          className="px-4 py-2 rounded-lg text-sm font-semibold bg-orange-700 hover:bg-orange-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {resetPortfolio.isPending ? 'Resetting…' : '↺ Reset Paper Portfolio'}
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={handleStart}
+            disabled={startLoop.isPending || isLoopRunning}
+            className="px-4 py-2 rounded-lg text-sm font-semibold bg-green-700 hover:bg-green-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {startLoop.isPending ? 'Starting…' : '▶ Start Trading'}
+          </button>
+          <button
+            onClick={handleStop}
+            disabled={stopLoop.isPending || !isLoopRunning}
+            className="px-4 py-2 rounded-lg text-sm font-semibold bg-red-700 hover:bg-red-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {stopLoop.isPending ? 'Stopping…' : '⏹ Stop Trading'}
+          </button>
+          <button
+            onClick={handleReset}
+            disabled={resetPortfolio.isPending}
+            className="px-4 py-2 rounded-lg text-sm font-semibold bg-orange-700 hover:bg-orange-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {resetPortfolio.isPending ? 'Resetting…' : '↺ Reset Portfolio'}
+          </button>
+        </div>
       </div>
+
+      {loopMsg && (
+        <div className={`text-sm px-3 py-2 rounded ${loopMsg.ok ? 'bg-green-900/40 text-green-300' : 'bg-red-900/40 text-red-300'}`}>
+          {loopMsg.text}
+        </div>
+      )}
 
       {resetMsg && (
         <div className={`text-sm px-3 py-2 rounded ${resetMsg.ok ? 'bg-green-900/40 text-green-300' : 'bg-red-900/40 text-red-300'}`}>

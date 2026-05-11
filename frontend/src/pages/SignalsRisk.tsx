@@ -1,4 +1,4 @@
-import { useRiskStatus, useTrailingStops, useSystemConfig } from '../hooks/useApi';
+import { useRiskStatus, useTrailingStops, useSystemConfig, usePaperTradingSignals } from '../hooks/useApi';
 import MetricCard from '../components/MetricCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
@@ -12,6 +12,7 @@ export default function SignalsRisk() {
   const { data: risk, isLoading: riskLoading, isError: riskError } = useRiskStatus();
   const { data: stops, isLoading: stopsLoading, isError: stopsError } = useTrailingStops();
   const { data: config } = useSystemConfig();
+  const { data: signals, isLoading: signalsLoading, isError: signalsError } = usePaperTradingSignals(30);
 
   const stopEntries = stops?.positions ? Object.entries(stops.positions) : [];
 
@@ -79,6 +80,61 @@ export default function SignalsRisk() {
           )}
         </>
       )}
+
+      <div className="bg-gray-800 rounded-lg border border-gray-700">
+        <div className="p-4 border-b border-gray-700">
+          <h3 className="text-lg font-semibold text-white">Recent Trading Signals</h3>
+        </div>
+        {signalsLoading ? (
+          <LoadingSpinner />
+        ) : signalsError ? (
+          <ErrorMessage />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-gray-400 border-b border-gray-700">
+                  <th className="px-4 py-3 text-left">Symbol</th>
+                  <th className="px-4 py-3 text-left">Action</th>
+                  <th className="px-4 py-3 text-left">Strategy</th>
+                  <th className="px-4 py-3 text-right">Confidence</th>
+                  <th className="px-4 py-3 text-left">Executed</th>
+                  <th className="px-4 py-3 text-left">Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {signals && signals.length > 0 ? (
+                  signals.map((s, i) => {
+                    const action = (s.action as string | undefined)?.toUpperCase();
+                    return (
+                      <tr key={i} className="border-b border-gray-700/50 hover:bg-gray-700/30">
+                        <td className="px-4 py-2 text-white font-medium">{s.symbol as string}</td>
+                        <td className={`px-4 py-2 font-medium ${action === 'BUY' ? 'text-green-400' : action === 'SELL' ? 'text-red-400' : 'text-yellow-400'}`}>
+                          {action ?? '—'}
+                        </td>
+                        <td className="px-4 py-2 text-gray-400 text-xs">{(s.strategy as string | undefined) ?? '—'}</td>
+                        <td className="px-4 py-2 text-right text-gray-300">
+                          {fmt((s.confidence as number | undefined) ? (s.confidence as number) * 100 : 0)}%
+                        </td>
+                        <td className="px-4 py-2">
+                          <span className={`text-xs px-2 py-0.5 rounded ${s.executed ? 'bg-green-900/40 text-green-400' : 'bg-gray-700 text-gray-400'}`}>
+                            {s.executed ? 'Yes' : 'No'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 text-gray-400 text-xs">
+                          {s.timestamp ? new Date(s.timestamp as string).toLocaleString() : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">No signals yet — start paper trading to generate signals</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       <div className="bg-gray-800 rounded-lg border border-gray-700">
         <div className="p-4 border-b border-gray-700">

@@ -269,6 +269,33 @@ export function useResetPaperPortfolio() {
   });
 }
 
+export function usePaperLoopStatus() {
+  return useQuery<{ running: boolean }>({
+    queryKey: ['paper-trading', 'loop-status'],
+    queryFn: () => fetcher('/api/v1/paper-trading/loop-status'),
+    staleTime: 5_000,
+    refetchInterval: 10_000,
+    retry: 1,
+  });
+}
+
+export function useStartPaperTrading() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (opts?: { symbols?: string[]; strategy?: string; initial_balance?: number; interval_seconds?: number }) =>
+      poster('/api/v1/paper-trading/start', opts ?? {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['paper-trading'] }),
+  });
+}
+
+export function useStopPaperTrading() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => poster('/api/v1/paper-trading/stop'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['paper-trading'] }),
+  });
+}
+
 export function useOperatorStatus() {
   return useQuery<OperatorStatus>({
     queryKey: ['operator', 'status'],

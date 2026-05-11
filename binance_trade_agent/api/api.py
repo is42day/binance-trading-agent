@@ -3,9 +3,12 @@ FastAPI Data Service for Binance Trading Agent
 Exposes portfolio, risk, and market data to the Dash UI
 """
 
+import asyncio
 import os
 import traceback
 from datetime import datetime
+from threading import Thread
+from typing import Optional
 
 from fastapi import Body, Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -686,6 +689,79 @@ async def get_paper_trading_trades(limit: int = 50):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# Module-level paper trading loop state
+_paper_loop_instance: Optional[object] = None
+_paper_loop_thread: Optional[Thread] = None
+
+
+@app.post("/api/v1/paper-trading/start", dependencies=[Depends(require_api_token)])
+async def start_paper_trading(
+    symbols: list[str] = Body(default=["BTCUSDT"], embed=False),
+    strategy: str = Body(default="combined_edge"),
+    initial_balance: float = Body(default=10000.0),
+    interval_seconds: int = Body(default=120),
+):
+    """Start the paper trading loop in a background thread."""
+    global _paper_loop_instance, _paper_loop_thread
+
+    if _paper_loop_thread is not None and _paper_loop_thread.is_alive():
+        return {"success": False, "message": "Paper trading loop is already running"}
+
+    try:
+        from ..core.paper_trading_loop import PaperTradingLoop
+
+        _paper_loop_instance = PaperTradingLoop(
+            symbols=symbols,
+            strategy_name=strategy,
+            initial_balance=initial_balance,
+            trade_interval_seconds=interval_seconds,
+        )
+
+        def _run():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(_paper_loop_instance.run())
+            finally:
+                loop.close()
+
+        _paper_loop_thread = Thread(target=_run, daemon=True, name="paper-trading-loop")
+        _paper_loop_thread.start()
+
+        return {"success": True, "message": "Paper trading started", "symbols": symbols, "strategy": strategy}
+    except Exception as e:
+        logger.error(f"Error starting paper trading loop: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/paper-trading/stop", dependencies=[Depends(require_api_token)])
+async def stop_paper_trading():
+    """Stop the paper trading loop."""
+    global _paper_loop_instance, _paper_loop_thread
+
+    if _paper_loop_instance is None or _paper_loop_thread is None or not _paper_loop_thread.is_alive():
+        return {"success": False, "message": "Paper trading loop is not running"}
+
+    try:
+        _paper_loop_instance.stop_flag = True
+        return {"success": True, "message": "Paper trading stop signal sent"}
+    except Exception as e:
+        logger.error(f"Error stopping paper trading loop: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/paper-trading/loop-status", dependencies=[Depends(require_api_token)])
+async def get_paper_loop_status():
+    """Check whether the paper trading loop thread is alive."""
+    running = (
+        _paper_loop_thread is not None
+        and _paper_loop_thread.is_alive()
+        and _paper_loop_instance is not None
+        and not getattr(_paper_loop_instance, 'stop_flag', True)
+    )
+    return {"running": running}
 
 
 @app.post("/api/v1/paper-trading/reset", dependencies=[Depends(require_api_token)])
