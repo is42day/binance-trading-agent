@@ -1,15 +1,15 @@
 """Add last_booked_quantity and cancel_reason to exchange_orders.
 
-Revision ID: 006
-Revises: 005
+Revision ID: 006_add_order_lifecycle_fields
+Revises: 005_add_decision_journal
 Create Date: 2026-05-11
 """
 
 from alembic import op
 import sqlalchemy as sa
 
-revision = "006"
-down_revision = "005"
+revision = "006_add_order_lifecycle_fields"
+down_revision = "005_add_decision_journal"
 branch_labels = None
 depends_on = None
 
