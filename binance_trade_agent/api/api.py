@@ -603,10 +603,12 @@ async def get_paper_trading_status():
             pass
 
     # Determine activity from signal log freshness (most reliable indicator)
-    signal_age_seconds: float = float('inf')
+    signal_age_seconds: float = float("inf")
     if last_signal_time:
         try:
-            signal_age_seconds = (datetime.now() - datetime.fromisoformat(last_signal_time)).total_seconds()
+            signal_age_seconds = (
+                datetime.now() - datetime.fromisoformat(last_signal_time)
+            ).total_seconds()
         except Exception:
             pass
 
@@ -623,7 +625,7 @@ async def get_paper_trading_status():
                 last_update = datetime.fromisoformat(saved_at)
                 age_seconds = (datetime.now() - last_update).total_seconds()
             except Exception:
-                age_seconds = float('inf')
+                age_seconds = float("inf")
 
             # Active if either portfolio state OR signal log is fresh
             active = age_seconds < 180 or loop_active
@@ -732,13 +734,17 @@ _paper_loop_thread: Optional[Thread] = None
 
 
 @app.post("/api/v1/paper-trading/start", dependencies=[Depends(require_api_token)])
-async def start_paper_trading(request: StartPaperTradingRequest):
+async def start_paper_trading(request: StartPaperTradingRequest | None = None):
     """Start the paper trading loop in a background thread."""
     global _paper_loop_instance, _paper_loop_thread
 
     if _paper_loop_thread is not None and _paper_loop_thread.is_alive():
         return {"success": False, "message": "Paper trading loop is already running"}
 
+    # A body-less POST previously started the loop with the documented
+    # defaults (every Body() parameter had one) — preserve that instead of
+    # making the request body a hard requirement.
+    request = request or StartPaperTradingRequest()
     symbols = request.symbols or ["BTCUSDT"]
 
     try:
@@ -778,7 +784,11 @@ async def stop_paper_trading():
     """Stop the paper trading loop."""
     global _paper_loop_instance, _paper_loop_thread
 
-    if _paper_loop_instance is None or _paper_loop_thread is None or not _paper_loop_thread.is_alive():
+    if (
+        _paper_loop_instance is None
+        or _paper_loop_thread is None
+        or not _paper_loop_thread.is_alive()
+    ):
         return {"success": False, "message": "Paper trading loop is not running"}
 
     try:
@@ -796,7 +806,7 @@ async def get_paper_loop_status():
         _paper_loop_thread is not None
         and _paper_loop_thread.is_alive()
         and _paper_loop_instance is not None
-        and not getattr(_paper_loop_instance, 'stop_flag', True)
+        and not getattr(_paper_loop_instance, "stop_flag", True)
     )
     return {"running": running}
 
@@ -904,7 +914,11 @@ async def list_stale_orders(symbol: str | None = None, price_pct_threshold: floa
     from ..core.order_lifecycle import get_order_lifecycle_service
 
     svc = get_order_lifecycle_service()
-    return {"orders": svc.detect_stale_limit_orders(symbol=symbol, price_pct_threshold=price_pct_threshold)}
+    return {
+        "orders": svc.detect_stale_limit_orders(
+            symbol=symbol, price_pct_threshold=price_pct_threshold
+        )
+    }
 
 
 @app.post("/api/v1/orders/stale/cancel", dependencies=[Depends(require_api_token)])
@@ -1076,6 +1090,7 @@ async def get_operator_status():
     # --- Execution policy (from config) ---
     try:
         from ..core.execution_policy import ExecutionPolicy
+
         policy = ExecutionPolicy(
             execution_mode=config.get_risk_config().get("execution_mode", "maker_first"),
         )
@@ -1089,8 +1104,7 @@ async def get_operator_status():
         open_orders = svc.get_open_orders()
         stale_ids = {o["client_order_id"] for o in svc.detect_stale_limit_orders()}
         result["open_orders"] = [
-            {**o, "stale": o.get("client_order_id") in stale_ids}
-            for o in open_orders
+            {**o, "stale": o.get("client_order_id") in stale_ids} for o in open_orders
         ]
         result["open_orders_count"] = len(open_orders)
         result["stale_orders_count"] = len(stale_ids)
@@ -1104,9 +1118,7 @@ async def get_operator_status():
         journal = get_decision_journal()
         # Find most recent decision with a blocked_reason
         recent = journal.get_history(limit=50)
-        last_blocked = next(
-            (d for d in recent if d.get("blocked_reason")), None
-        )
+        last_blocked = next((d for d in recent if d.get("blocked_reason")), None)
         result["last_blocked_trade"] = last_blocked
     except Exception as exc:
         result["last_blocked_trade"] = {"error": str(exc)}
@@ -1118,6 +1130,7 @@ async def get_operator_status():
         if risk_agent.state_store is not None:
             try:
                 import json as _json
+
                 raw = risk_agent.state_store.get_system_state("emergency_stop")
                 if raw:
                     parsed = _json.loads(raw)
