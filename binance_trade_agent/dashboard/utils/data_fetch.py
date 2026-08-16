@@ -95,6 +95,14 @@ def stop_agent():
         # Set stop flag on trading loop
         if _agent_state["trading_loop"]:
             _agent_state["trading_loop"].stop_flag = True
+            # Release the heartbeat lease synchronously rather than relying
+            # on run() reaching its own "final summary" section — cancel()
+            # below delivers CancelledError at whatever await point the loop
+            # happens to be at, which can skip past that section entirely.
+            # Without this, restarting a running agent from the dashboard
+            # would spuriously fail with DuplicateTradingLoopError until the
+            # stale heartbeat expired on its own.
+            _agent_state["trading_loop"].release_heartbeat()
 
         # Cancel the task
         if _agent_state["task"]:
