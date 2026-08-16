@@ -3,12 +3,15 @@ TradeExecutionAgent: Handles order placement, status, and cancellation via Binan
 """
 
 import hashlib
+import logging
 import uuid
 
 from binance.exceptions import BinanceAPIException
 
 from ..clients.binance_client import BinanceAPIClient
 from ..core.portfolio_manager import PortfolioManager
+
+logger = logging.getLogger(__name__)
 
 
 class TradeExecutionAgent:
@@ -50,14 +53,42 @@ class TradeExecutionAgent:
         Returns:
             dict: Structured response with order_id and price.
         """
+        client_order_id = client_order_id or self._build_client_order_id(
+            symbol=symbol,
+            side=side,
+            order_type=order_type,
+            quantity=quantity,
+            correlation_id=correlation_id,
+        )
+
+        # Persist intent *before* calling the exchange. If the request reaches
+        # Binance but the response is lost (timeout, connection reset, process
+        # crash), this PENDING_NEW row lets reconciliation discover the order
+        # by client_order_id instead of it silently vanishing from our view of
+        # exposure. get_open_exchange_orders() already treats PENDING_NEW as
+        # reconcilable.
         try:
-            client_order_id = client_order_id or self._build_client_order_id(
-                symbol=symbol,
-                side=side,
-                order_type=order_type,
-                quantity=quantity,
-                correlation_id=correlation_id,
+            self.portfolio.upsert_exchange_order(
+                {
+                    "client_order_id": client_order_id,
+                    "symbol": symbol,
+                    "side": side,
+                    "order_type": order_type,
+                    "status": "PENDING_NEW",
+                    "quantity": quantity,
+                    "price": price,
+                    "correlation_id": correlation_id,
+                }
             )
+        except Exception as exc:
+            # Don't block order placement on a local bookkeeping failure, but
+            # surface it loudly — without this row, reconciliation can't
+            # recover the order if the response below is lost.
+            logger.error(
+                "Failed to persist pre-submit order intent for %s: %s", client_order_id, exc
+            )
+
+        try:
             order = self.client.create_order(
                 symbol,
                 side,
