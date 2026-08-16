@@ -3,7 +3,7 @@ import {
   usePaperTradingStatus,
   usePaperTradingSignals,
   usePaperTradingTrades,
-  useResetPaperPortfolio,
+  useResetPaperTradingAction,
   usePaperLoopStatus,
   useStartPaperTrading,
   useStopPaperTrading,
@@ -23,26 +23,13 @@ export default function PaperTrading() {
   const { data: signals, isLoading: signalsLoading, isError: signalsError } = usePaperTradingSignals(20);
   const { data: trades, isLoading: tradesLoading, isError: tradesError } = usePaperTradingTrades(20);
   const { data: loopStatus, refetch: refetchLoop } = usePaperLoopStatus();
-  const resetPortfolio = useResetPaperPortfolio();
+  const resetPaper = useResetPaperTradingAction();
   const startLoop = useStartPaperTrading();
   const stopLoop = useStopPaperTrading();
-  const [resetMsg, setResetMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
   const [loopMsg, setLoopMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   const isLoopRunning = loopStatus?.running ?? false;
-
-  const handleReset = async () => {
-    if (!window.confirm('Reset paper portfolio to $10,000? All history will be archived.')) return;
-    setResetMsg(null);
-    try {
-      await resetPortfolio.mutateAsync(10000);
-      setResetMsg({ text: 'Portfolio reset to $10,000.', ok: true });
-      refetch();
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setResetMsg({ text: `Error: ${msg}`, ok: false });
-    }
-  };
 
   const handleStart = async () => {
     setLoopMsg(null);
@@ -72,6 +59,26 @@ export default function PaperTrading() {
 
   const portfolio = status?.portfolio;
 
+  const handleResetPaper = () => {
+    const balanceInput = window.prompt('Paper starting balance', String(portfolio?.current_balance ?? 5000));
+    if (balanceInput === null) return;
+    const initialBalance = Number(balanceInput);
+    if (!Number.isFinite(initialBalance) || initialBalance <= 0) {
+      setResetMessage('Enter a positive starting balance.');
+      return;
+    }
+    if (!window.confirm(`Reset paper portfolio to $${initialBalance.toLocaleString()}? Existing paper logs will be archived.`)) {
+      return;
+    }
+    resetPaper.mutate(initialBalance, {
+      onSuccess: () => {
+        setResetMessage(`Paper portfolio reset to $${initialBalance.toLocaleString()}.`);
+        refetch();
+      },
+      onError: (err) => setResetMessage(`Paper reset failed: ${String(err)}`),
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -92,11 +99,12 @@ export default function PaperTrading() {
             {stopLoop.isPending ? 'Stopping…' : '⏹ Stop Trading'}
           </button>
           <button
-            onClick={handleReset}
-            disabled={resetPortfolio.isPending}
+            type="button"
+            onClick={handleResetPaper}
+            disabled={resetPaper.isPending}
             className="px-4 py-2 rounded-lg text-sm font-semibold bg-orange-700 hover:bg-orange-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {resetPortfolio.isPending ? 'Resetting…' : '↺ Reset Portfolio'}
+            {resetPaper.isPending ? 'Resetting…' : '↺ Reset Portfolio'}
           </button>
         </div>
       </div>
@@ -107,9 +115,9 @@ export default function PaperTrading() {
         </div>
       )}
 
-      {resetMsg && (
-        <div className={`text-sm px-3 py-2 rounded ${resetMsg.ok ? 'bg-green-900/40 text-green-300' : 'bg-red-900/40 text-red-300'}`}>
-          {resetMsg.text}
+      {resetMessage && (
+        <div className="rounded border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-gray-300">
+          {resetMessage}
         </div>
       )}
 

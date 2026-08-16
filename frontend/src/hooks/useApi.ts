@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { API_BASE_URL } from '../config/api';
 import type {
   PortfolioSummary,
@@ -34,10 +34,20 @@ const fetcher = async <T>(url: string): Promise<T> => {
   return data;
 };
 
-const poster = async <T>(url: string, body?: unknown): Promise<T> => {
-  const { data } = await api.post<T>(url, body ?? {});
+const poster = async <T, P = unknown>(url: string, payload?: P): Promise<T> => {
+  const { data } = await api.post<T>(url, payload ?? {});
   return data;
 };
+
+function useInvalidateOperatorData() {
+  const queryClient = useQueryClient();
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: ['operator'] });
+    void queryClient.invalidateQueries({ queryKey: ['risk'] });
+    void queryClient.invalidateQueries({ queryKey: ['paper-trading'] });
+    void queryClient.invalidateQueries({ queryKey: ['portfolio'] });
+  };
+}
 
 export function usePortfolioSummary() {
   return useQuery<PortfolioSummary>({
@@ -227,48 +237,6 @@ export function useReadyCheck() {
 // Action mutations
 // ---------------------------------------------------------------------------
 
-export function useTriggerEmergencyStop() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (reason: string = 'Operator triggered') =>
-      poster('/api/v1/system/emergency-stop', { reason }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['operator'] }),
-  });
-}
-
-export function useResumeTrading() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: () => poster('/api/v1/system/resume-trading'),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['operator'] }),
-  });
-}
-
-export function useReconcileOrders() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: () => poster('/api/v1/system/reconcile'),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['operator'] }),
-  });
-}
-
-export function useCancelStaleOrders() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: () => poster('/api/v1/system/cancel-stale-orders'),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['operator'] }),
-  });
-}
-
-export function useResetPaperPortfolio() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (initialBalance: number = 10000) =>
-      poster('/api/v1/paper-trading/reset', { initial_balance: initialBalance }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['paper-trading'] }),
-  });
-}
-
 export function usePaperLoopStatus() {
   return useQuery<{ running: boolean }>({
     queryKey: ['paper-trading', 'loop-status'],
@@ -303,5 +271,49 @@ export function useOperatorStatus() {
     staleTime: 10_000,
     refetchInterval: 15_000,
     retry: 1,
+  });
+}
+
+export function useEmergencyStopAction() {
+  const invalidate = useInvalidateOperatorData();
+  return useMutation<unknown, Error, string>({
+    mutationFn: (reason: string) =>
+      poster('/api/v1/operator/emergency-stop', { reason }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useResumeTradingAction() {
+  const invalidate = useInvalidateOperatorData();
+  return useMutation<unknown, Error, string>({
+    mutationFn: (reason: string) =>
+      poster('/api/v1/operator/resume', { reason }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useReconcileOrdersAction() {
+  const invalidate = useInvalidateOperatorData();
+  return useMutation<unknown, Error, void>({
+    mutationFn: () => poster('/api/v1/system/reconcile'),
+    onSuccess: invalidate,
+  });
+}
+
+export function useCancelStaleOrdersAction() {
+  const invalidate = useInvalidateOperatorData();
+  return useMutation<unknown, Error, number | undefined>({
+    mutationFn: (pricePctThreshold = 1.0) =>
+      poster(`/api/v1/orders/stale/cancel?price_pct_threshold=${pricePctThreshold}`),
+    onSuccess: invalidate,
+  });
+}
+
+export function useResetPaperTradingAction() {
+  const invalidate = useInvalidateOperatorData();
+  return useMutation<unknown, Error, number | undefined>({
+    mutationFn: (initialBalance?: number) =>
+      poster('/api/v1/paper-trading/reset', { initial_balance: initialBalance }),
+    onSuccess: invalidate,
   });
 }
