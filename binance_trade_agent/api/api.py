@@ -734,13 +734,17 @@ _paper_loop_thread: Optional[Thread] = None
 
 
 @app.post("/api/v1/paper-trading/start", dependencies=[Depends(require_api_token)])
-async def start_paper_trading(request: StartPaperTradingRequest):
+async def start_paper_trading(request: StartPaperTradingRequest | None = None):
     """Start the paper trading loop in a background thread."""
     global _paper_loop_instance, _paper_loop_thread
 
     if _paper_loop_thread is not None and _paper_loop_thread.is_alive():
         return {"success": False, "message": "Paper trading loop is already running"}
 
+    # A body-less POST previously started the loop with the documented
+    # defaults (every Body() parameter had one) — preserve that instead of
+    # making the request body a hard requirement.
+    request = request or StartPaperTradingRequest()
     symbols = request.symbols or ["BTCUSDT"]
 
     try:
