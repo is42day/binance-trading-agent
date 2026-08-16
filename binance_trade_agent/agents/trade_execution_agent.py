@@ -81,12 +81,18 @@ class TradeExecutionAgent:
                 }
             )
         except Exception as exc:
-            # Don't block order placement on a local bookkeeping failure, but
-            # surface it loudly — without this row, reconciliation can't
-            # recover the order if the response below is lost.
+            # Refuse to submit rather than proceed blind: if the DB is down
+            # here, it's still down after create_order returns, so the final
+            # upsert below would also fail — leaving a real exchange order
+            # with zero durable local record, the exact exposure gap this
+            # pre-submit row exists to close.
             logger.error(
                 "Failed to persist pre-submit order intent for %s: %s", client_order_id, exc
             )
+            return {
+                "success": False,
+                "error": f"Failed to persist order intent, refusing to submit: {exc}",
+            }
 
         try:
             order = self.client.create_order(
@@ -99,9 +105,21 @@ class TradeExecutionAgent:
             )
 
             if not isinstance(order, dict):
-                return {"success": False, "error": "Invalid order response", "original_response": order}
+                return {
+                    "success": False,
+                    "error": "Invalid order response",
+                    "original_response": order,
+                }
 
             if order.get("error"):
+                # Rejected locally (e.g. validate_order_params) before ever
+                # contacting Binance — the pre-submit PENDING_NEW row above
+                # doesn't correspond to a real exchange order, so clear it.
+                # Left as PENDING_NEW, every future reconciliation pass would
+                # call get_order() for an order that never existed, and
+                # repeated rejections (e.g. a persistently below-minimum
+                # quantity) would accumulate permanent phantom entries.
+                self._mark_intent_rejected(client_order_id, reason=str(order["error"]))
                 return {"success": False, "error": order["error"], "original_response": order}
 
             status = str(order.get("status", "UNKNOWN")).upper()
@@ -183,6 +201,20 @@ class TradeExecutionAgent:
             return {"success": False, "error": str(ex)}
         except Exception as ex:
             return {"success": False, "error": str(ex)}
+
+    def _mark_intent_rejected(self, client_order_id: str, reason: str) -> None:
+        """Mark a pre-submit intent as terminally rejected so it stops being
+        treated as an open order needing reconciliation."""
+        try:
+            self.portfolio.upsert_exchange_order(
+                {
+                    "client_order_id": client_order_id,
+                    "status": "REJECTED",
+                    "cancel_reason": reason,
+                }
+            )
+        except Exception as exc:
+            logger.error("Failed to mark rejected order intent %s: %s", client_order_id, exc)
 
     def _extract_fee(self, order) -> float:
         """Extract executed commission from Binance fills when present."""

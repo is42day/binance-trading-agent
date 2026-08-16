@@ -11,6 +11,7 @@ even if the create_order call never returns locally.
 
 import tempfile
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -139,3 +140,48 @@ def test_orphaned_intent_is_recovered_by_reconciliation(agent_with_temp_portfoli
     trade = agent.portfolio.get_trade_by_client_order_id("bta_intent_recover")
     assert trade is not None
     assert trade["order_id"] == "7001"
+
+
+def test_intent_persistence_failure_aborts_submission():
+    """
+    If the pre-submit intent write fails (e.g. DB unreachable), the failure
+    is still there when the post-submission upsert would run — proceeding
+    anyway risks placing a real exchange order with zero durable local
+    record, which is the exact exposure gap this fix exists to close.
+    """
+    agent = TradeExecutionAgent.__new__(TradeExecutionAgent)
+    agent.portfolio = MagicMock()
+    agent.portfolio.upsert_exchange_order.side_effect = Exception("db unreachable")
+    agent.client = MagicMock()
+
+    result = agent.place_order(
+        "BTCUSDT", "BUY", "MARKET", 0.001, client_order_id="bta_intent_db_down"
+    )
+
+    assert result["success"] is False
+    agent.client.create_order.assert_not_called()
+
+
+def test_locally_rejected_order_clears_the_intent(agent_with_temp_portfolio):
+    """
+    A local validation rejection (e.g. below-minimum quantity) never reaches
+    Binance — create_order returns an error without contacting the exchange.
+    The pre-submit PENDING_NEW row must not be left behind as a phantom open
+    order that reconciliation retries forever.
+    """
+    agent = agent_with_temp_portfolio
+    agent.client = StubClient(
+        create_order_result={"error": "Order failed validation", "validation": {"valid": False}}
+    )
+
+    result = agent.place_order(
+        "BTCUSDT", "BUY", "MARKET", 0.00001, client_order_id="bta_intent_rejected"
+    )
+
+    assert result["success"] is False
+
+    order = agent.portfolio.get_exchange_order("bta_intent_rejected")
+    assert order["status"] == "REJECTED"
+
+    open_orders = agent.portfolio.get_open_exchange_orders(symbol="BTCUSDT")
+    assert not any(o["client_order_id"] == "bta_intent_rejected" for o in open_orders)
