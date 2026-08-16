@@ -154,6 +154,17 @@ class AutonomousTradingLoop:
         # Handle triggered stops
         for symbol, result in results.items():
             if result.get("stop_triggered"):
+                # Emergency stop is cross-process shared state — it can be
+                # activated by another process between the check at the top
+                # of this method and this specific order placement, so
+                # re-check immediately before each order rather than relying
+                # on the once-per-call check above.
+                if risk_agent._shared_emergency_stop_enabled():
+                    self.logger.warning(
+                        f"   🛑 Emergency stop activated mid-cycle — skipping {symbol} stop order."
+                    )
+                    continue
+
                 self.logger.warning(f"   ⚠️ {symbol} trailing stop TRIGGERED!")
                 self.logger.info(
                     f"      Entry: ${result['entry_price']:,.2f}, "

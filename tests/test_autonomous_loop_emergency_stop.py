@@ -93,6 +93,41 @@ class TestTrailingStopsRespectEmergencyStop:
 
         loop.orchestrator.execution_agent.place_sell_order.assert_called_once()
 
+    @pytest.mark.asyncio
+    async def test_emergency_stop_activated_mid_call_still_blocks_the_order(self):
+        """
+        Emergency stop is cross-process shared state — it can be activated by
+        another process after the once-per-call check at the top of
+        _update_trailing_stops but before a specific triggered stop's order
+        is placed. The per-order recheck must catch this.
+        """
+        loop = _build_loop()
+        risk_agent = loop.orchestrator.risk_agent
+
+        # False for the top-of-method check, True for the per-order recheck.
+        risk_agent._shared_emergency_stop_enabled = MagicMock(side_effect=[False, True])
+
+        risk_agent.get_trailing_stop_info = MagicMock(
+            return_value={"positions": {"BTCUSDT": {}}, "active_stops": 1}
+        )
+        loop.orchestrator.market_agent.get_latest_price = MagicMock(return_value=94.0)
+        risk_agent.update_all_trailing_stops = MagicMock(
+            return_value={
+                "BTCUSDT": {
+                    "stop_triggered": True,
+                    "side": "buy",
+                    "entry_price": 100.0,
+                    "current_stop": 95.0,
+                    "current_price": 94.0,
+                }
+            }
+        )
+
+        await loop._update_trailing_stops()
+
+        loop.orchestrator.execution_agent.place_sell_order.assert_not_called()
+        loop.orchestrator.execution_agent.place_buy_order.assert_not_called()
+
 
 class TestRunLoopRespectsEmergencyStop:
     @pytest.mark.asyncio
