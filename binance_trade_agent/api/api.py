@@ -10,7 +10,7 @@ from datetime import datetime
 from threading import Thread
 from typing import Optional
 
-from fastapi import Body, Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -103,6 +103,16 @@ class PaperResetRequest(BaseModel):
     """Operator request to reset the paper-trading portfolio."""
 
     initial_balance: float | None = Field(default=None, gt=0, le=10_000_000)
+
+
+class StartPaperTradingRequest(BaseModel):
+    """Operator request to start the paper-trading loop."""
+
+    symbols: list[str] = Field(default_factory=lambda: ["BTCUSDT"])
+    strategy: str = "combined_edge"
+    initial_balance: float = 10000.0
+    interval_seconds: int = 60
+
 
 # --- Lifecycle Events ---
 
@@ -293,7 +303,7 @@ async def get_open_exchange_orders(symbol: str | None = None):
         return {"orders": portfolio_manager.get_open_exchange_orders(symbol=symbol)}
     except Exception as e:
         logger.error(f"Error fetching open exchange orders: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/v1/system/reconcile", dependencies=[Depends(require_api_token)])
@@ -307,7 +317,7 @@ async def reconcile_exchange_orders(symbol: str | None = None):
         return service.reconcile_open_orders(symbol=symbol)
     except Exception as e:
         logger.error(f"Error reconciling exchange orders: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/v1/operator/emergency-stop", dependencies=[Depends(require_api_token)])
@@ -326,7 +336,7 @@ async def activate_emergency_stop(request: EmergencyStopRequest):
         }
     except Exception as e:
         logger.error(f"Error activating emergency stop: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/v1/operator/resume", dependencies=[Depends(require_api_token)])
@@ -343,7 +353,7 @@ async def resume_trading(request: EmergencyStopRequest):
         }
     except Exception as e:
         logger.error(f"Error clearing emergency stop: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/api/v1/portfolio/summary", dependencies=[Depends(require_api_token)])
@@ -722,26 +732,23 @@ _paper_loop_thread: Optional[Thread] = None
 
 
 @app.post("/api/v1/paper-trading/start", dependencies=[Depends(require_api_token)])
-async def start_paper_trading(
-    symbols: list[str] = Body(default=["BTCUSDT"], embed=False),
-    strategy: str = Body(default="combined_edge"),
-    initial_balance: float = Body(default=10000.0),
-    interval_seconds: int = Body(default=60),
-):
+async def start_paper_trading(request: StartPaperTradingRequest):
     """Start the paper trading loop in a background thread."""
     global _paper_loop_instance, _paper_loop_thread
 
     if _paper_loop_thread is not None and _paper_loop_thread.is_alive():
         return {"success": False, "message": "Paper trading loop is already running"}
 
+    symbols = request.symbols or ["BTCUSDT"]
+
     try:
         from ..core.paper_trading_loop import PaperTradingLoop
 
         _paper_loop_instance = PaperTradingLoop(
             symbols=symbols,
-            strategy_name=strategy,
-            initial_balance=initial_balance,
-            trade_interval_seconds=interval_seconds,
+            strategy_name=request.strategy,
+            initial_balance=request.initial_balance,
+            trade_interval_seconds=request.interval_seconds,
         )
 
         def _run():
@@ -755,10 +762,15 @@ async def start_paper_trading(
         _paper_loop_thread = Thread(target=_run, daemon=True, name="paper-trading-loop")
         _paper_loop_thread.start()
 
-        return {"success": True, "message": "Paper trading started", "symbols": symbols, "strategy": strategy}
+        return {
+            "success": True,
+            "message": "Paper trading started",
+            "symbols": symbols,
+            "strategy": request.strategy,
+        }
     except Exception as e:
         logger.error(f"Error starting paper trading loop: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/v1/paper-trading/stop", dependencies=[Depends(require_api_token)])
@@ -774,7 +786,7 @@ async def stop_paper_trading():
         return {"success": True, "message": "Paper trading stop signal sent"}
     except Exception as e:
         logger.error(f"Error stopping paper trading loop: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/api/v1/paper-trading/loop-status", dependencies=[Depends(require_api_token)])
@@ -935,8 +947,7 @@ async def cancel_order_endpoint(
         order = svc.cancel_order(client_order_id, symbol, reason)
         return {"success": True, "order": order}
     except ValueError as exc:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 # --- Stream Status Endpoints ---
