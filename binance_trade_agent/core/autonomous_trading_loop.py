@@ -119,8 +119,19 @@ class AutonomousTradingLoop:
         """
         Update trailing stops for all active positions.
         If a stop is triggered, close the position.
+
+        Skips entirely while emergency stop is active — a triggered trailing
+        stop otherwise places a real order directly via the execution agent,
+        bypassing risk_agent.validate_trade.
         """
         risk_agent = self.orchestrator.risk_agent
+
+        if risk_agent._shared_emergency_stop_enabled():
+            self.logger.warning(
+                "🛑 Emergency stop is ACTIVE — skipping trailing stop updates/closes this cycle."
+            )
+            return
+
         trailing_info = risk_agent.get_trailing_stop_info()
 
         if not trailing_info.get("positions"):
@@ -228,9 +239,16 @@ class AutonomousTradingLoop:
             self.logger.info(f"Trading Cycle #{cycle} - {datetime.now().strftime('%H:%M:%S')}")
             self.logger.info(f"{'='*70}")
 
+            emergency_stop_active = self.orchestrator.risk_agent._shared_emergency_stop_enabled()
+            if emergency_stop_active:
+                self.logger.warning(
+                    "🛑 Emergency stop is ACTIVE — skipping trade execution this cycle. "
+                    "Resume trading to continue."
+                )
+
             # Execute trades for each symbol
             for symbol in self.symbols:
-                if self.stop_flag:
+                if self.stop_flag or emergency_stop_active:
                     break
 
                 try:
