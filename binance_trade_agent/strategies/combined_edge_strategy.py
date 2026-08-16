@@ -55,16 +55,22 @@ class CombinedEdgeStrategy(BaseStrategy):
 
         # Thresholds - relatively low to capture more opportunities
         # but still require confluence of signals
-        self.edge_min_confidence = self._config.get("edge_min_confidence", 0.35)  # Edge confidence needed
-        self.entry_min_score = self._config.get("entry_min_score", -0.1)  # Allow slightly negative entry
-        self.ta_confirmation_required = self._config.get("ta_confirmation_required", 1)  # Need 1 TA confirm
+        self.edge_min_confidence = self._config.get(
+            "edge_min_confidence", 0.35
+        )  # Edge confidence needed
+        self.entry_min_score = self._config.get(
+            "entry_min_score", -0.1
+        )  # Allow slightly negative entry
+        self.ta_confirmation_required = self._config.get(
+            "ta_confirmation_required", 1
+        )  # Need 1 TA confirm
 
         # Position sizing based on conviction
         self.max_position_pct = self._config.get("max_position_pct", 0.10)  # 10% max per trade
         self.conviction_multipliers = {
-            "high": 1.0,    # Full size
+            "high": 1.0,  # Full size
             "medium": 0.5,  # Half size
-            "low": 0.0,     # No trade
+            "low": 0.0,  # No trade
         }
 
     def _get_edge_signal(self, symbol: str, ohlcv_data: list) -> dict:
@@ -85,16 +91,12 @@ class CombinedEdgeStrategy(BaseStrategy):
 
     def _get_ta_confirmations(self, symbol: str, ohlcv_data: list) -> dict:
         """Get confirmations from traditional TA strategies"""
-        confirmations = {
-            "bullish": 0,
-            "bearish": 0,
-            "details": {}
-        }
+        confirmations = {"bullish": 0, "bearish": 0, "details": {}}
 
         # RSI
         try:
             rsi_result = self.rsi_strategy.analyze(ohlcv_data, symbol)
-            rsi_action = rsi_result.signal.value if hasattr(rsi_result, 'signal') else "HOLD"
+            rsi_action = rsi_result.signal.value if hasattr(rsi_result, "signal") else "HOLD"
             if rsi_action == "BUY":
                 confirmations["bullish"] += 1
                 confirmations["details"]["rsi"] = "bullish"
@@ -110,7 +112,7 @@ class CombinedEdgeStrategy(BaseStrategy):
         # MACD
         try:
             macd_result = self.macd_strategy.analyze(ohlcv_data, symbol)
-            macd_action = macd_result.signal.value if hasattr(macd_result, 'signal') else "HOLD"
+            macd_action = macd_result.signal.value if hasattr(macd_result, "signal") else "HOLD"
             if macd_action == "BUY":
                 confirmations["bullish"] += 1
                 confirmations["details"]["macd"] = "bullish"
@@ -126,7 +128,7 @@ class CombinedEdgeStrategy(BaseStrategy):
         # Bollinger
         try:
             bb_result = self.bollinger_strategy.analyze(ohlcv_data, symbol)
-            bb_action = bb_result.signal.value if hasattr(bb_result, 'signal') else "HOLD"
+            bb_action = bb_result.signal.value if hasattr(bb_result, "signal") else "HOLD"
             if bb_action == "BUY":
                 confirmations["bullish"] += 1
                 confirmations["details"]["bollinger"] = "bullish"
@@ -142,11 +144,7 @@ class CombinedEdgeStrategy(BaseStrategy):
         return confirmations
 
     def _calculate_conviction(
-        self,
-        edge_confidence: float,
-        entry_score: float,
-        ta_confirmations: int,
-        ta_conflicts: int
+        self, edge_confidence: float, entry_score: float, ta_confirmations: int, ta_conflicts: int
     ) -> str:
         """
         Calculate overall conviction level.
@@ -210,16 +208,18 @@ class CombinedEdgeStrategy(BaseStrategy):
 
         # Check edge signal first
         if edge_action == "HOLD" or edge_confidence < self.edge_min_confidence:
-            rejection_reason = f"Edge signal weak (action={edge_action}, confidence={edge_confidence:.2f})"
+            rejection_reason = (
+                f"Edge signal weak (action={edge_action}, confidence={edge_confidence:.2f})"
+            )
 
         # Check entry conditions
         elif entry_score < self.entry_min_score:
             rejection_reason = f"Entry conditions unfavorable (score={entry_score:.2f})"
 
         # Check for conflicting signals - only reject if strongly opposite
-        elif (edge_action == "BUY" and entry_direction < -0.4):
+        elif edge_action == "BUY" and entry_direction < -0.4:
             rejection_reason = "Edge says BUY but entry timing strongly bearish"
-        elif (edge_action == "SELL" and entry_direction > 0.4):
+        elif edge_action == "SELL" and entry_direction > 0.4:
             rejection_reason = "Edge says SELL but entry timing strongly bullish"
 
         else:
@@ -271,15 +271,16 @@ class CombinedEdgeStrategy(BaseStrategy):
                     "score": entry_score,
                     "direction_bias": entry_direction,
                     "zone": entry_signal.get("support_resistance", {}).get("current_zone"),
-                    "volatility_compressed": entry_signal.get("volatility", {}).get("compressed", False),
+                    "volatility_compressed": entry_signal.get("volatility", {}).get(
+                        "compressed", False
+                    ),
                 },
                 "ta_confirmations": ta_confirmations,
                 "conviction": conviction if final_action != "HOLD" else "none",
                 "position_size_multiplier": (
-                    self.conviction_multipliers.get(conviction, 0)
-                    if final_action != "HOLD" else 0
+                    self.conviction_multipliers.get(conviction, 0) if final_action != "HOLD" else 0
                 ),
-            }
+            },
         )
 
     def _create_signal(self, action: str, confidence: float, metadata: dict) -> dict:
@@ -288,7 +289,7 @@ class CombinedEdgeStrategy(BaseStrategy):
             "action": action,
             "confidence": confidence,
             "timestamp": datetime.now().isoformat(),
-            **metadata
+            **metadata,
         }
 
     def get_name(self) -> str:
@@ -339,7 +340,7 @@ def create_conservative_edge_strategy(market_data_agent=None):
             "entry_min_score": -0.1,  # Allow trades even with slightly unfavorable entry
             "ta_confirmation_required": 2,
             "max_position_pct": 0.05,
-        }
+        },
     )
 
 
@@ -352,5 +353,5 @@ def create_balanced_edge_strategy(market_data_agent=None):
             "entry_min_score": -0.15,  # Allow trades with slightly negative entry score
             "ta_confirmation_required": 1,
             "max_position_pct": 0.10,
-        }
+        },
     )

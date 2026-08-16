@@ -14,26 +14,25 @@ Scenarios:
 """
 
 import time
-from unittest.mock import MagicMock, patch
 
 import pytest
 
 from binance_trade_agent.clients.rate_limit_tracker import (
-    RateLimitTracker,
-    RateLimitExceeded,
     ENDPOINT_WEIGHTS,
+    RateLimitExceeded,
+    RateLimitTracker,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _tracker(**kwargs) -> RateLimitTracker:
     """Create a fresh tracker with defaults overrideable via kwargs."""
     defaults = {
         "weight_budget": 100,
-        "safety_margin": 0.80,   # threshold = 80
+        "safety_margin": 0.80,  # threshold = 80
         "order_budget_per_sec": 5,
         "window_seconds": 60.0,
     }
@@ -44,6 +43,7 @@ def _tracker(**kwargs) -> RateLimitTracker:
 # ---------------------------------------------------------------------------
 # Weight accumulation
 # ---------------------------------------------------------------------------
+
 
 class TestWeightAccumulation:
     def test_single_call_consumes_weight(self):
@@ -79,6 +79,7 @@ class TestWeightAccumulation:
 # Budget exhaustion
 # ---------------------------------------------------------------------------
 
+
 class TestBudgetExhaustion:
     def test_near_threshold_raises_rate_limit_exceeded(self):
         # budget=10, margin=0.8 → threshold=8; ticker_price weight=1
@@ -110,6 +111,7 @@ class TestBudgetExhaustion:
 # Order rate limiting
 # ---------------------------------------------------------------------------
 
+
 class TestOrderRateLimit:
     def test_order_calls_count_against_order_budget(self):
         t = _tracker(order_budget_per_sec=2)
@@ -130,6 +132,7 @@ class TestOrderRateLimit:
 # Window reset
 # ---------------------------------------------------------------------------
 
+
 class TestWindowReset:
     def test_weight_resets_after_window(self):
         t = RateLimitTracker(weight_budget=10, safety_margin=0.8, window_seconds=0.05)
@@ -144,6 +147,7 @@ class TestWindowReset:
 # ---------------------------------------------------------------------------
 # 429 / Retry-After handling
 # ---------------------------------------------------------------------------
+
 
 class Test429Handling:
     def test_record_429_activates_holdoff(self):
@@ -170,7 +174,7 @@ class Test429Handling:
 
     def test_default_holdoff_60s_when_no_retry_after(self):
         t = _tracker()
-        t.record_429()   # No retry_after argument
+        t.record_429()  # No retry_after argument
         status = t.get_status()
         assert status["in_holdoff"] is True
         assert status["retry_after_remaining"] > 55  # 60s minus tiny elapsed
@@ -180,22 +184,31 @@ class Test429Handling:
 # get_status()
 # ---------------------------------------------------------------------------
 
+
 class TestGetStatus:
     def test_status_fields_present(self):
         t = _tracker()
         status = t.get_status()
         required = {
-            "weight_used", "weight_budget", "weight_utilization_pct",
-            "safety_threshold", "window_seconds", "window_age_seconds",
-            "orders_this_second", "order_budget_per_sec",
-            "retry_after_remaining", "in_holdoff",
-            "total_calls", "total_weight", "total_blocked",
+            "weight_used",
+            "weight_budget",
+            "weight_utilization_pct",
+            "safety_threshold",
+            "window_seconds",
+            "window_age_seconds",
+            "orders_this_second",
+            "order_budget_per_sec",
+            "retry_after_remaining",
+            "in_holdoff",
+            "total_calls",
+            "total_weight",
+            "total_blocked",
         }
         assert required.issubset(set(status.keys()))
 
     def test_utilization_pct_updates(self):
         t = RateLimitTracker(weight_budget=100, safety_margin=1.0)
-        t.check_and_consume("account_balance")   # weight=10
+        t.check_and_consume("account_balance")  # weight=10
         status = t.get_status()
         assert status["weight_utilization_pct"] == 10.0
 
@@ -204,9 +217,11 @@ class TestGetStatus:
 # BinanceAPIClient integration (demo mode — no real network)
 # ---------------------------------------------------------------------------
 
+
 class TestBinanceClientIntegration:
     def test_get_rate_limit_status_available(self):
         from binance_trade_agent.clients.binance_client import BinanceAPIClient
+
         client = BinanceAPIClient()
         status = client.get_rate_limit_status()
         assert "weight_used" in status
@@ -215,6 +230,7 @@ class TestBinanceClientIntegration:
     def test_demo_mode_does_not_consume_weight(self):
         """Demo mode short-circuits before _api_call_with_retry — weight stays 0."""
         from binance_trade_agent.clients.binance_client import BinanceAPIClient
+
         client = BinanceAPIClient()
         assert client.config.demo_mode is True
         client.get_latest_price("BTCUSDT")
@@ -226,9 +242,11 @@ class TestBinanceClientIntegration:
 # API endpoint test
 # ---------------------------------------------------------------------------
 
+
 class TestRateLimitEndpoint:
     def test_endpoint_returns_rate_limit_status(self):
         from fastapi.testclient import TestClient
+
         from binance_trade_agent.api.api import app
 
         client = TestClient(app)

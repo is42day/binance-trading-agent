@@ -23,12 +23,11 @@ for its testnet/paper-only designation.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from .base_strategy import BaseStrategy, SignalType, StrategyResult
-from ..core.strategy_validation_gate import ValidationGate, get_validation_gate
 from ..core.decision_journal import DecisionJournal, get_decision_journal
+from ..core.strategy_validation_gate import ValidationGate, get_validation_gate
+from .base_strategy import BaseStrategy, SignalType, StrategyResult
 
 logger = logging.getLogger(__name__)
 
@@ -195,9 +194,7 @@ class AdaptiveCoreMicroStrategy(BaseStrategy):
     # ------------------------------------------------------------------
 
     def _check_micro_gate(self, symbol: str) -> Dict[str, Any]:
-        gate = self._gate or get_validation_gate(
-            self.parameters.get("gate_path")
-        )
+        gate = self._gate or get_validation_gate(self.parameters.get("gate_path"))
         gate_result = gate.check(symbol)
         return {
             "cleared": gate_result.cleared,

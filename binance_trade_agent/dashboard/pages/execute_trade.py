@@ -29,11 +29,41 @@ def get_symbol_info(symbol):
     # Mock data - in production, fetch from Binance exchangeInfo endpoint
     # TODO: Implement dynamic fetching from Binance API with TTL cache (1h)
     known_symbols = {
-        "BTCUSDT": {"tick_size": 0.01, "step_size": 0.00001, "min_notional": 10.0, "min_qty": 0.00001, "available": True},
-        "ETHUSDT": {"tick_size": 0.01, "step_size": 0.0001, "min_notional": 10.0, "min_qty": 0.0001, "available": True},
-        "BNBUSDT": {"tick_size": 0.01, "step_size": 0.001, "min_notional": 10.0, "min_qty": 0.001, "available": True},
-        "SOLUSDT": {"tick_size": 0.01, "step_size": 0.01, "min_notional": 10.0, "min_qty": 0.01, "available": True},
-        "ADAUSDT": {"tick_size": 0.0001, "step_size": 1.0, "min_notional": 10.0, "min_qty": 1.0, "available": True},
+        "BTCUSDT": {
+            "tick_size": 0.01,
+            "step_size": 0.00001,
+            "min_notional": 10.0,
+            "min_qty": 0.00001,
+            "available": True,
+        },
+        "ETHUSDT": {
+            "tick_size": 0.01,
+            "step_size": 0.0001,
+            "min_notional": 10.0,
+            "min_qty": 0.0001,
+            "available": True,
+        },
+        "BNBUSDT": {
+            "tick_size": 0.01,
+            "step_size": 0.001,
+            "min_notional": 10.0,
+            "min_qty": 0.001,
+            "available": True,
+        },
+        "SOLUSDT": {
+            "tick_size": 0.01,
+            "step_size": 0.01,
+            "min_notional": 10.0,
+            "min_qty": 0.01,
+            "available": True,
+        },
+        "ADAUSDT": {
+            "tick_size": 0.0001,
+            "step_size": 1.0,
+            "min_notional": 10.0,
+            "min_qty": 1.0,
+            "available": True,
+        },
     }
 
     if symbol in known_symbols:
@@ -45,7 +75,7 @@ def get_symbol_info(symbol):
             "step_size": 0.001,
             "min_notional": 10.0,
             "min_qty": 0.001,
-            "available": False  # Flag: constraints are not verified
+            "available": False,  # Flag: constraints are not verified
         }
 
     return SYMBOL_INFO_CACHE[symbol]
@@ -60,7 +90,7 @@ def format_quantity(qty, step_size):
         return qty, False
 
     original_qty = qty
-    precision = len(str(step_size).split('.')[-1]) if '.' in str(step_size) else 0
+    precision = len(str(step_size).split(".")[-1]) if "." in str(step_size) else 0
     adjusted_qty = float(Decimal(str(qty)).quantize(Decimal(str(step_size)), rounding=ROUND_DOWN))
 
     was_adjusted = abs(original_qty - adjusted_qty) > 1e-10
@@ -76,8 +106,10 @@ def format_price(price, tick_size):
         return price, False
 
     original_price = price
-    precision = len(str(tick_size).split('.')[-1]) if '.' in str(tick_size) else 0
-    adjusted_price = float(Decimal(str(price)).quantize(Decimal(str(tick_size)), rounding=ROUND_DOWN))
+    precision = len(str(tick_size).split(".")[-1]) if "." in str(tick_size) else 0
+    adjusted_price = float(
+        Decimal(str(price)).quantize(Decimal(str(tick_size)), rounding=ROUND_DOWN)
+    )
 
     was_adjusted = abs(original_price - adjusted_price) > 1e-10
     return adjusted_price, was_adjusted
@@ -99,11 +131,11 @@ layout = dbc.Container(
                                 html.I(className="bi bi-shield-check me-2"),
                                 "You're trading on ",
                                 html.Strong("Binance Testnet"),
-                                " - No real money at risk"
+                                " - No real money at risk",
                             ],
                             color="info",
-                            className="mb-3"
-                        )
+                            className="mb-3",
+                        ),
                     ]
                 )
             ]
@@ -143,8 +175,8 @@ layout = dbc.Container(
                                                         html.Small(
                                                             id="symbol-hint",
                                                             className="text-muted",
-                                                            children="Select trading pair"
-                                                        )
+                                                            children="Select trading pair",
+                                                        ),
                                                     ],
                                                     md=6,
                                                 ),
@@ -158,7 +190,11 @@ layout = dbc.Container(
                                                             id="trade-side-selector",
                                                             options=[
                                                                 {
-                                                                    "label": f"🟢 {side}" if side == "BUY" else f"🔴 {side}",
+                                                                    "label": (
+                                                                        f"🟢 {side}"
+                                                                        if side == "BUY"
+                                                                        else f"🔴 {side}"
+                                                                    ),
                                                                     "value": side,
                                                                 }
                                                                 for side in SIDES
@@ -169,8 +205,8 @@ layout = dbc.Container(
                                                         ),
                                                         html.Small(
                                                             "Buy or sell position",
-                                                            className="text-muted"
-                                                        )
+                                                            className="text-muted",
+                                                        ),
                                                     ],
                                                     md=6,
                                                 ),
@@ -202,8 +238,8 @@ layout = dbc.Container(
                                                         html.Small(
                                                             id="order-type-hint",
                                                             className="text-muted",
-                                                            children="LIMIT: set price | MARKET: instant at best price"
-                                                        )
+                                                            children="LIMIT: set price | MARKET: instant at best price",
+                                                        ),
                                                     ],
                                                     md=12,
                                                 ),
@@ -245,15 +281,15 @@ layout = dbc.Container(
                                                                 html.Small(
                                                                     id="price-hint",
                                                                     className="text-muted",
-                                                                    children="Click 'Use Market' to auto-fill current price"
-                                                                )
+                                                                    children="Click 'Use Market' to auto-fill current price",
+                                                                ),
                                                             ],
                                                             md=12,
                                                         ),
                                                     ],
                                                     className="mb-3",
                                                 )
-                                            ]
+                                            ],
                                         ),
                                         # Market order note (shown only for MARKET orders)
                                         html.Div(
@@ -264,12 +300,12 @@ layout = dbc.Container(
                                                     [
                                                         html.I(className="bi bi-info-circle me-2"),
                                                         html.Strong("Market Order: "),
-                                                        "Will execute immediately at best available price"
+                                                        "Will execute immediately at best available price",
                                                     ],
                                                     color="info",
-                                                    className="mb-3"
+                                                    className="mb-3",
                                                 )
-                                            ]
+                                            ],
                                         ),
                                         # Quantity Input Section
                                         dbc.Row(
@@ -293,9 +329,12 @@ layout = dbc.Container(
                                                                                 step=0.001,
                                                                                 min=0,
                                                                             ),
-                                                                            dbc.InputGroupText(id="quantity-unit-label", children="BTC"),
+                                                                            dbc.InputGroupText(
+                                                                                id="quantity-unit-label",
+                                                                                children="BTC",
+                                                                            ),
                                                                         ],
-                                                                        className="mt-2"
+                                                                        className="mt-2",
                                                                     ),
                                                                     label="By Quantity",
                                                                     tab_id="qty-tab",
@@ -312,9 +351,11 @@ layout = dbc.Container(
                                                                                 step=1,
                                                                                 min=0,
                                                                             ),
-                                                                            dbc.InputGroupText("USDT"),
+                                                                            dbc.InputGroupText(
+                                                                                "USDT"
+                                                                            ),
                                                                         ],
-                                                                        className="mt-2"
+                                                                        className="mt-2",
                                                                     ),
                                                                     label="By USD Amount",
                                                                     tab_id="usd-tab",
@@ -326,8 +367,8 @@ layout = dbc.Container(
                                                         html.Small(
                                                             id="quantity-hint",
                                                             className="text-muted mt-1",
-                                                            children="Enter USD amount or switch to quantity mode"
-                                                        )
+                                                            children="Enter USD amount or switch to quantity mode",
+                                                        ),
                                                     ],
                                                     md=12,
                                                 )
@@ -339,16 +380,43 @@ layout = dbc.Container(
                                             [
                                                 dbc.Col(
                                                     [
-                                                        html.Small("Quick amounts:", className="text-muted me-2"),
+                                                        html.Small(
+                                                            "Quick amounts:",
+                                                            className="text-muted me-2",
+                                                        ),
                                                         dbc.ButtonGroup(
                                                             [
-                                                                dbc.Button("25%", id="qty-25", size="sm", outline=True, color="secondary"),
-                                                                dbc.Button("50%", id="qty-50", size="sm", outline=True, color="secondary"),
-                                                                dbc.Button("75%", id="qty-75", size="sm", outline=True, color="secondary"),
-                                                                dbc.Button("100%", id="qty-100", size="sm", outline=True, color="secondary"),
+                                                                dbc.Button(
+                                                                    "25%",
+                                                                    id="qty-25",
+                                                                    size="sm",
+                                                                    outline=True,
+                                                                    color="secondary",
+                                                                ),
+                                                                dbc.Button(
+                                                                    "50%",
+                                                                    id="qty-50",
+                                                                    size="sm",
+                                                                    outline=True,
+                                                                    color="secondary",
+                                                                ),
+                                                                dbc.Button(
+                                                                    "75%",
+                                                                    id="qty-75",
+                                                                    size="sm",
+                                                                    outline=True,
+                                                                    color="secondary",
+                                                                ),
+                                                                dbc.Button(
+                                                                    "100%",
+                                                                    id="qty-100",
+                                                                    size="sm",
+                                                                    outline=True,
+                                                                    color="secondary",
+                                                                ),
                                                             ],
-                                                            size="sm"
-                                                        )
+                                                            size="sm",
+                                                        ),
                                                     ],
                                                     md=12,
                                                 )
@@ -356,15 +424,9 @@ layout = dbc.Container(
                                             className="mb-3",
                                         ),
                                         # Validation feedback
-                                        html.Div(
-                                            id="validation-feedback",
-                                            className="mb-3"
-                                        ),
+                                        html.Div(id="validation-feedback", className="mb-3"),
                                         # Trade Preview Card
-                                        html.Div(
-                                            id="trade-preview",
-                                            className="mb-3"
-                                        ),
+                                        html.Div(id="trade-preview", className="mb-3"),
                                         # Buttons
                                         dbc.Row(
                                             [
@@ -539,7 +601,9 @@ layout = dbc.Container(
                 ),
                 dbc.ModalFooter(
                     [
-                        dbc.Button("Cancel", id="modal-cancel-btn", className="me-2", color="secondary"),
+                        dbc.Button(
+                            "Cancel", id="modal-cancel-btn", className="me-2", color="secondary"
+                        ),
                         dbc.Button("Place Order", id="modal-confirm-btn", color="success"),
                     ]
                 ),
@@ -651,7 +715,7 @@ def update_market_info(symbol, n_intervals):
     Output("price-input-container", "style"),
     Output("market-note-container", "style"),
     Output("order-type-hint", "children"),
-    Input("trade-order-type", "value")
+    Input("trade-order-type", "value"),
 )
 def toggle_price_visibility(order_type):
     """Show/hide price input based on order type"""
@@ -747,6 +811,7 @@ def autofill_price_on_symbol_change(symbol, current_price_value):
 
     try:
         from binance_trade_agent.dashboard.utils.data_fetch import get_market_data
+
         market_data = get_market_data(symbol)
         if "error" not in market_data:
             market_price = market_data.get("price", 0)
@@ -858,7 +923,7 @@ def validate_and_preview(symbol, side, order_type, quantity, price, market_price
             dbc.Alert(
                 [
                     html.Div([html.Strong("🔧 Auto-adjustments applied:")]),
-                    *[html.Div(adj, className="mt-1") for adj in adjustments]
+                    *[html.Div(adj, className="mt-1") for adj in adjustments],
                 ],
                 color="info",
             )
@@ -876,56 +941,112 @@ def validate_and_preview(symbol, side, order_type, quantity, price, market_price
         preview_children = [
             dbc.Card(
                 [
-                    dbc.CardHeader([
-                        html.I(className="bi bi-eye me-2"),
-                        "Order Preview"
-                    ], className="bg-secondary text-white"),
+                    dbc.CardHeader(
+                        [html.I(className="bi bi-eye me-2"), "Order Preview"],
+                        className="bg-secondary text-white",
+                    ),
                     dbc.CardBody(
                         [
-                            dbc.Row([
-                                dbc.Col([
-                                    html.Strong("Symbol:"),
-                                    html.Div(symbol, className="text-primary fs-5")
-                                ], width=3),
-                                dbc.Col([
-                                    html.Strong("Side:"),
-                                    html.Div([side_icon, f" {side}"], className=f"text-{side_color} fs-5")
-                                ], width=3),
-                                dbc.Col([
-                                    html.Strong("Type:"),
-                                    html.Div(order_type, className="fs-5")
-                                ], width=3),
-                                dbc.Col([
-                                    html.Strong("Quantity:"),
-                                    html.Div(f"{adjusted_quantity:.8f}", className="fs-5"),
-                                    html.Small("(adjusted)" if qty_was_adjusted else "", className="text-muted")
-                                ], width=3),
-                            ], className="mb-3"),
-                            dbc.Row([
-                                dbc.Col([
-                                    html.Strong("Price:"),
-                                    html.Div(
+                            dbc.Row(
+                                [
+                                    dbc.Col(
                                         [
-                                            f"${adjusted_price:.8f}" if order_type == "LIMIT" else f"~${market_price:.2f} (Market)",
-                                            html.Br() if price_was_adjusted and order_type == "LIMIT" else "",
-                                            html.Small("(adjusted)" if price_was_adjusted and order_type == "LIMIT" else "", className="text-muted")
+                                            html.Strong("Symbol:"),
+                                            html.Div(symbol, className="text-primary fs-5"),
                                         ],
-                                        className="text-info fs-5"
-                                    )
-                                ], width=4),
-                                dbc.Col([
-                                    html.Strong("Est. Total:"),
-                                    html.Div(f"${notional:.2f}", className="text-warning fs-5")
-                                ], width=4),
-                                dbc.Col([
-                                    html.Strong("Est. Fee:"),
-                                    html.Div([
-                                        f"${estimated_fee:.4f}",
-                                        html.Br(),
-                                        html.Small("(assumes 0.1%)", className="text-muted")
-                                    ], className="text-muted fs-6")
-                                ], width=4),
-                            ]),
+                                        width=3,
+                                    ),
+                                    dbc.Col(
+                                        [
+                                            html.Strong("Side:"),
+                                            html.Div(
+                                                [side_icon, f" {side}"],
+                                                className=f"text-{side_color} fs-5",
+                                            ),
+                                        ],
+                                        width=3,
+                                    ),
+                                    dbc.Col(
+                                        [
+                                            html.Strong("Type:"),
+                                            html.Div(order_type, className="fs-5"),
+                                        ],
+                                        width=3,
+                                    ),
+                                    dbc.Col(
+                                        [
+                                            html.Strong("Quantity:"),
+                                            html.Div(f"{adjusted_quantity:.8f}", className="fs-5"),
+                                            html.Small(
+                                                "(adjusted)" if qty_was_adjusted else "",
+                                                className="text-muted",
+                                            ),
+                                        ],
+                                        width=3,
+                                    ),
+                                ],
+                                className="mb-3",
+                            ),
+                            dbc.Row(
+                                [
+                                    dbc.Col(
+                                        [
+                                            html.Strong("Price:"),
+                                            html.Div(
+                                                [
+                                                    (
+                                                        f"${adjusted_price:.8f}"
+                                                        if order_type == "LIMIT"
+                                                        else f"~${market_price:.2f} (Market)"
+                                                    ),
+                                                    (
+                                                        html.Br()
+                                                        if price_was_adjusted
+                                                        and order_type == "LIMIT"
+                                                        else ""
+                                                    ),
+                                                    html.Small(
+                                                        (
+                                                            "(adjusted)"
+                                                            if price_was_adjusted
+                                                            and order_type == "LIMIT"
+                                                            else ""
+                                                        ),
+                                                        className="text-muted",
+                                                    ),
+                                                ],
+                                                className="text-info fs-5",
+                                            ),
+                                        ],
+                                        width=4,
+                                    ),
+                                    dbc.Col(
+                                        [
+                                            html.Strong("Est. Total:"),
+                                            html.Div(
+                                                f"${notional:.2f}", className="text-warning fs-5"
+                                            ),
+                                        ],
+                                        width=4,
+                                    ),
+                                    dbc.Col(
+                                        [
+                                            html.Strong("Est. Fee:"),
+                                            html.Div(
+                                                [
+                                                    f"${estimated_fee:.4f}",
+                                                    html.Br(),
+                                                    html.Small(
+                                                        "(assumes 0.1%)", className="text-muted"
+                                                    ),
+                                                ],
+                                                className="text-muted fs-6",
+                                            ),
+                                        ],
+                                        width=4,
+                                    ),
+                                ]
+                            ),
                         ]
                     ),
                 ],
@@ -957,8 +1078,18 @@ def validate_and_preview(symbol, side, order_type, quantity, price, market_price
     State("confirmation-modal", "is_open"),
     prevent_initial_call=True,
 )
-def toggle_confirmation_modal(review_clicks, cancel_clicks, confirm_clicks,
-                               symbol, side, order_type, quantity, price, market_price, is_open):
+def toggle_confirmation_modal(
+    review_clicks,
+    cancel_clicks,
+    confirm_clicks,
+    symbol,
+    side,
+    order_type,
+    quantity,
+    price,
+    market_price,
+    is_open,
+):
     """Toggle confirmation modal and show order summary with ADJUSTED values"""
     from dash import ctx
 
@@ -985,7 +1116,9 @@ def toggle_confirmation_modal(review_clicks, cancel_clicks, confirm_clicks,
             adjusted_price, price_adjusted = format_price(price, tick_size)
 
         effective_price = adjusted_price if order_type == "LIMIT" else market_price
-        notional = adjusted_quantity * effective_price if adjusted_quantity and effective_price else 0
+        notional = (
+            adjusted_quantity * effective_price if adjusted_quantity and effective_price else 0
+        )
         estimated_fee = notional * 0.001
 
         side_color = "success" if side == "BUY" else "danger"
@@ -993,93 +1126,159 @@ def toggle_confirmation_modal(review_clicks, cancel_clicks, confirm_clicks,
         action_verb = "BUY" if side == "BUY" else "SELL"
 
         # SAFETY BANNER - Big, bold warning
-        safety_banner = dbc.Alert([
-            html.H4([
-                html.I(className="bi bi-exclamation-triangle-fill me-2"),
-                "CONFIRM ACTION"
-            ], className="mb-3"),
-            html.Div([
-                "You are about to ",
-                html.Strong(f"{action_verb} {adjusted_quantity:.8f} {symbol}", className=f"text-{side_color}"),
-                " for approximately ",
-                html.Strong(f"${notional:.2f}", className="text-warning"),
-            ], className="fs-5 mb-2"),
-            html.Hr(),
-            html.Div([
-                html.I(className="bi bi-shield-check me-2"),
-                "This will place a ",
-                html.Strong("real order on Binance TESTNET"),
-                " (no real money at risk)"
-            ], className="text-muted")
-        ], color="warning", className="mb-3")
+        safety_banner = dbc.Alert(
+            [
+                html.H4(
+                    [html.I(className="bi bi-exclamation-triangle-fill me-2"), "CONFIRM ACTION"],
+                    className="mb-3",
+                ),
+                html.Div(
+                    [
+                        "You are about to ",
+                        html.Strong(
+                            f"{action_verb} {adjusted_quantity:.8f} {symbol}",
+                            className=f"text-{side_color}",
+                        ),
+                        " for approximately ",
+                        html.Strong(f"${notional:.2f}", className="text-warning"),
+                    ],
+                    className="fs-5 mb-2",
+                ),
+                html.Hr(),
+                html.Div(
+                    [
+                        html.I(className="bi bi-shield-check me-2"),
+                        "This will place a ",
+                        html.Strong("real order on Binance TESTNET"),
+                        " (no real money at risk)",
+                    ],
+                    className="text-muted",
+                ),
+            ],
+            color="warning",
+            className="mb-3",
+        )
 
         # Order summary table
         summary_rows = [
             html.Tr([html.Td(html.Strong("Symbol")), html.Td(symbol, className="text-primary")]),
-            html.Tr([html.Td(html.Strong("Side")), html.Td([side_icon, f" {side}"], className=f"text-{side_color}")]),
+            html.Tr(
+                [
+                    html.Td(html.Strong("Side")),
+                    html.Td([side_icon, f" {side}"], className=f"text-{side_color}"),
+                ]
+            ),
             html.Tr([html.Td(html.Strong("Order Type")), html.Td(order_type)]),
-            html.Tr([
-                html.Td(html.Strong("Quantity")),
-                html.Td([
-                    f"{adjusted_quantity:.8f}",
-                    html.Br() if qty_adjusted else "",
-                    html.Small(f" (adjusted from {quantity:.8f})", className="text-info") if qty_adjusted else ""
-                ])
-            ]),
+            html.Tr(
+                [
+                    html.Td(html.Strong("Quantity")),
+                    html.Td(
+                        [
+                            f"{adjusted_quantity:.8f}",
+                            html.Br() if qty_adjusted else "",
+                            (
+                                html.Small(
+                                    f" (adjusted from {quantity:.8f})", className="text-info"
+                                )
+                                if qty_adjusted
+                                else ""
+                            ),
+                        ]
+                    ),
+                ]
+            ),
         ]
 
         if order_type == "LIMIT":
             summary_rows.append(
-                html.Tr([
-                    html.Td(html.Strong("Price")),
-                    html.Td([
-                        f"${adjusted_price:.8f}",
-                        html.Br() if price_adjusted else "",
-                        html.Small(f" (adjusted from ${price:.8f})", className="text-info") if price_adjusted else ""
-                    ], className="text-info")
-                ])
+                html.Tr(
+                    [
+                        html.Td(html.Strong("Price")),
+                        html.Td(
+                            [
+                                f"${adjusted_price:.8f}",
+                                html.Br() if price_adjusted else "",
+                                (
+                                    html.Small(
+                                        f" (adjusted from ${price:.8f})", className="text-info"
+                                    )
+                                    if price_adjusted
+                                    else ""
+                                ),
+                            ],
+                            className="text-info",
+                        ),
+                    ]
+                )
             )
         else:
             summary_rows.append(
-                html.Tr([
-                    html.Td(html.Strong("Price")),
-                    html.Td(f"~${market_price:.2f} (Market - best available)", className="text-info")
-                ])
+                html.Tr(
+                    [
+                        html.Td(html.Strong("Price")),
+                        html.Td(
+                            f"~${market_price:.2f} (Market - best available)", className="text-info"
+                        ),
+                    ]
+                )
             )
 
-        summary_rows.extend([
-            html.Tr([html.Td(html.Strong("Estimated Total")), html.Td(f"${notional:.2f}", className="text-warning")]),
-            html.Tr([
-                html.Td(html.Strong("Estimated Fee")),
-                html.Td([f"${estimated_fee:.4f} ", html.Small("(assumes 0.1%)", className="text-muted")])
-            ]),
-        ])
+        summary_rows.extend(
+            [
+                html.Tr(
+                    [
+                        html.Td(html.Strong("Estimated Total")),
+                        html.Td(f"${notional:.2f}", className="text-warning"),
+                    ]
+                ),
+                html.Tr(
+                    [
+                        html.Td(html.Strong("Estimated Fee")),
+                        html.Td(
+                            [
+                                f"${estimated_fee:.4f} ",
+                                html.Small("(assumes 0.1%)", className="text-muted"),
+                            ]
+                        ),
+                    ]
+                ),
+            ]
+        )
 
-        summary = html.Div([
-            safety_banner,
-            dbc.Table(summary_rows, bordered=True, hover=True, dark=True)
-        ])
+        summary = html.Div(
+            [safety_banner, dbc.Table(summary_rows, bordered=True, hover=True, dark=True)]
+        )
 
         # Perform risk check with ADJUSTED values
         try:
             components = get_trading_components()
             risk_agent = components["risk_agent"]
-            risk_check = risk_agent.validate_trade(symbol, side, adjusted_quantity, effective_price or 0)
+            risk_check = risk_agent.validate_trade(
+                symbol, side, adjusted_quantity, effective_price or 0
+            )
 
             if risk_check.get("approved", False):
-                risk_status = dbc.Alert([
-                    html.I(className="bi bi-shield-check me-2"),
-                    html.Strong("✅ Risk Check: PASSED"),
-                    html.Div("Order meets all risk management criteria", className="mt-2 text-muted")
-                ], color="success")
+                risk_status = dbc.Alert(
+                    [
+                        html.I(className="bi bi-shield-check me-2"),
+                        html.Strong("✅ Risk Check: PASSED"),
+                        html.Div(
+                            "Order meets all risk management criteria", className="mt-2 text-muted"
+                        ),
+                    ],
+                    color="success",
+                )
             else:
                 reason = risk_check.get("reason", "Unknown reason")
-                risk_status = dbc.Alert([
-                    html.I(className="bi bi-exclamation-triangle me-2"),
-                    html.Strong("⚠️ Risk Check: BLOCKED"),
-                    html.Br(),
-                    html.Div(f"Reason: {reason}", className="mt-2")
-                ], color="danger")
+                risk_status = dbc.Alert(
+                    [
+                        html.I(className="bi bi-exclamation-triangle me-2"),
+                        html.Strong("⚠️ Risk Check: BLOCKED"),
+                        html.Br(),
+                        html.Div(f"Reason: {reason}", className="mt-2"),
+                    ],
+                    color="danger",
+                )
         except Exception as e:
             risk_status = dbc.Alert(f"Error checking risk: {str(e)}", color="warning")
 
@@ -1135,13 +1334,15 @@ def place_order_confirmed(n_clicks, symbol, side, order_type, quantity, price):
             side=side,
             order_type=order_type,
             quantity=adjusted_quantity,  # Use adjusted
-            price=adjusted_price,         # Use adjusted
+            price=adjusted_price,  # Use adjusted
         )
 
         if order_result.get("success"):
             alert = dbc.Alert(
                 [
-                    html.H5([html.I(className="bi bi-check-circle me-2"), "Order Placed Successfully!"]),
+                    html.H5(
+                        [html.I(className="bi bi-check-circle me-2"), "Order Placed Successfully!"]
+                    ),
                     html.Div(f"Order ID: {order_result.get('order_id', 'N/A')}"),
                     html.Div(f"Symbol: {symbol} | Side: {side} | Qty: {adjusted_quantity:.8f}"),
                     html.Div(f"Price: ${adjusted_price or 'Market'}"),

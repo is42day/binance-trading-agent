@@ -17,23 +17,20 @@ Scenarios:
 import asyncio
 import time
 from typing import AsyncIterator, List
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
-import pytest_asyncio
 
 from binance_trade_agent.core.market_streams import (
     KlineStreamManager,
-    OHLCVCandle,
     StreamStatus,
     _parse_kline_message,
-    get_stream_manager,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fake stream factories
 # ---------------------------------------------------------------------------
+
 
 def _kline_msg(t: int, close: float, closed: bool = True) -> dict:
     """Build a minimal Binance kline WebSocket message."""
@@ -62,25 +59,30 @@ def _factory_from_messages(messages: List[dict]):
     Return a stream_factory callable that yields the given messages once, then
     sleeps forever (so the reconnect loop blocks until the task is cancelled).
     """
+
     async def _factory(symbol, interval) -> AsyncIterator[dict]:
         for msg in messages:
             yield msg
         # Block reconnect loop until the task is cancelled by unsubscribe()
         await asyncio.sleep(3600)
+
     return _factory
 
 
 def _factory_raises(exc: Exception):
     """Return a stream_factory that raises exc immediately."""
+
     async def _factory(symbol, interval) -> AsyncIterator[dict]:
         raise exc
         yield  # make it a generator
+
     return _factory
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 async def _subscribe_and_drain(
     manager: KlineStreamManager,
@@ -109,12 +111,13 @@ async def _subscribe_and_drain(
 # parse_message tests (sync)
 # ---------------------------------------------------------------------------
 
+
 class TestParseKlineMessage:
     def test_closed_candle_is_parsed(self):
         msg = _kline_msg(1_000_000, 50000.0, closed=True)
         candle = _parse_kline_message(msg)
         assert candle is not None
-        assert candle[4] == 50000.0    # close
+        assert candle[4] == 50000.0  # close
 
     def test_open_candle_returns_none(self):
         msg = _kline_msg(1_000_000, 50000.0, closed=False)
@@ -130,6 +133,7 @@ class TestParseKlineMessage:
 # KlineStreamManager async tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 class TestBufferAccumulation:
     async def test_candles_added_to_buffer(self):
@@ -142,11 +146,10 @@ class TestBufferAccumulation:
         ohlcv = manager.get_ohlcv("BTCUSDT", "1m")
         assert ohlcv is not None
         assert len(ohlcv) == 5
-        assert ohlcv[-1][4] == 104.0   # last close
+        assert ohlcv[-1][4] == 104.0  # last close
 
     async def test_open_candles_not_buffered(self):
-        msgs = [_kline_msg(0, 100.0, closed=False),
-                _kline_msg(1, 101.0, closed=True)]
+        msgs = [_kline_msg(0, 100.0, closed=False), _kline_msg(1, 101.0, closed=True)]
         manager = KlineStreamManager(stream_factory=_factory_from_messages(msgs))
         await _subscribe_and_drain(manager, "ETHUSDT", "1m", expected_candles=1)
         ohlcv = manager.get_ohlcv("ETHUSDT", "1m")
@@ -163,7 +166,7 @@ class TestBufferAccumulation:
         ohlcv = manager.get_ohlcv("BTCUSDT", "1m")
         assert ohlcv is not None
         assert len(ohlcv) == 5
-        assert ohlcv[0][4] == 5.0      # oldest evicted
+        assert ohlcv[0][4] == 5.0  # oldest evicted
 
 
 @pytest.mark.asyncio
@@ -172,10 +175,10 @@ class TestStaleDetection:
         msgs = [_kline_msg(0, 100.0)]
         manager = KlineStreamManager(
             stream_factory=_factory_from_messages(msgs),
-            stale_seconds=0.001,   # almost instant stale
+            stale_seconds=0.001,  # almost instant stale
         )
         await _subscribe_and_drain(manager, "BTCUSDT", "1m", expected_candles=1)
-        await asyncio.sleep(0.05)   # let it go stale
+        await asyncio.sleep(0.05)  # let it go stale
         assert manager.get_ohlcv("BTCUSDT", "1m") is None
         await manager.unsubscribe("BTCUSDT", "1m")
 
@@ -223,7 +226,7 @@ class TestReconnect:
 
         manager = KlineStreamManager(
             stream_factory=failing_then_empty,
-            min_backoff=0.01,   # tiny backoff for test speed
+            min_backoff=0.01,  # tiny backoff for test speed
             max_backoff=0.05,
         )
         await manager.subscribe("BTCUSDT", "1m")
@@ -259,7 +262,7 @@ class TestSubscribeUnsubscribe:
         manager = KlineStreamManager(stream_factory=_factory_from_messages([]))
         await manager.subscribe("BTCUSDT", "1m")
         count_before = len(manager._subscriptions)
-        await manager.subscribe("BTCUSDT", "1m")   # second call should be no-op
+        await manager.subscribe("BTCUSDT", "1m")  # second call should be no-op
         assert len(manager._subscriptions) == count_before == 1
         await manager.unsubscribe("BTCUSDT", "1m")
 
@@ -327,22 +330,31 @@ class TestGetStatus:
 # API endpoint test
 # ---------------------------------------------------------------------------
 
+
 class TestStreamStatusEndpoint:
     def test_endpoint_returns_all_streams(self):
         from fastapi.testclient import TestClient
+
         from binance_trade_agent.api.api import app
 
         mock_manager = MagicMock()
         mock_manager.get_all_statuses.return_value = [
             StreamStatus(
-                symbol="BTCUSDT", interval="1m",
-                connected=True, last_update=time.time(),
-                age_seconds=2.5, is_stale=False,
-                candle_count=100, reconnect_attempts=0, last_error=None,
+                symbol="BTCUSDT",
+                interval="1m",
+                connected=True,
+                last_update=time.time(),
+                age_seconds=2.5,
+                is_stale=False,
+                candle_count=100,
+                reconnect_attempts=0,
+                last_error=None,
             )
         ]
 
-        with patch("binance_trade_agent.core.market_streams.get_stream_manager", return_value=mock_manager):
+        with patch(
+            "binance_trade_agent.core.market_streams.get_stream_manager", return_value=mock_manager
+        ):
             client = TestClient(app)
             resp = client.get(
                 "/api/v1/market/streams/status",
@@ -356,12 +368,15 @@ class TestStreamStatusEndpoint:
 
     def test_endpoint_404_for_unknown_subscription(self):
         from fastapi.testclient import TestClient
+
         from binance_trade_agent.api.api import app
 
         mock_manager = MagicMock()
         mock_manager.get_status.return_value = None
 
-        with patch("binance_trade_agent.core.market_streams.get_stream_manager", return_value=mock_manager):
+        with patch(
+            "binance_trade_agent.core.market_streams.get_stream_manager", return_value=mock_manager
+        ):
             client = TestClient(app)
             resp = client.get(
                 "/api/v1/market/streams/status?symbol=BTCUSDT&interval=1m",

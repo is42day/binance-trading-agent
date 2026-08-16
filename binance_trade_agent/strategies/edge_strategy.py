@@ -36,15 +36,15 @@ class EdgeStrategy(BaseStrategy):
         super().__init__(parameters)
 
         # Thresholds calibrated from historical data
-        self.fear_greed_buy_threshold = 25    # Extreme fear = buy
-        self.fear_greed_sell_threshold = 75   # Extreme greed = sell
+        self.fear_greed_buy_threshold = 25  # Extreme fear = buy
+        self.fear_greed_sell_threshold = 75  # Extreme greed = sell
 
         # Funding rate thresholds (annualized)
-        self.funding_extreme_high = 0.1       # 0.1% per 8h = very high
-        self.funding_extreme_low = -0.05      # Negative funding = shorts paying
+        self.funding_extreme_high = 0.1  # 0.1% per 8h = very high
+        self.funding_extreme_low = -0.05  # Negative funding = shorts paying
 
         # Volume anomaly detection
-        self.volume_spike_multiplier = 2.5    # Volume > 2.5x average
+        self.volume_spike_multiplier = 2.5  # Volume > 2.5x average
 
         # Cache for API calls (avoid rate limits)
         self._fear_greed_cache = {"value": None, "timestamp": None}
@@ -68,17 +68,11 @@ class EdgeStrategy(BaseStrategy):
                 return self._fear_greed_cache["value"]
 
         try:
-            response = requests.get(
-                "https://api.alternative.me/fng/",
-                timeout=5
-            )
+            response = requests.get("https://api.alternative.me/fng/", timeout=5)
             data = response.json()
             value = int(data["data"][0]["value"])
 
-            self._fear_greed_cache = {
-                "value": value,
-                "timestamp": datetime.now()
-            }
+            self._fear_greed_cache = {"value": value, "timestamp": datetime.now()}
 
             logger.info(f"Fear & Greed Index: {value}")
             return value
@@ -110,7 +104,7 @@ class EdgeStrategy(BaseStrategy):
             response = requests.get(
                 "https://fapi.binance.com/fapi/v1/fundingRate",
                 params={"symbol": futures_symbol, "limit": 1},
-                timeout=5
+                timeout=5,
             )
             data = response.json()
 
@@ -119,7 +113,7 @@ class EdgeStrategy(BaseStrategy):
 
                 self._funding_cache[cache_key] = {
                     "value": funding_rate,
-                    "timestamp": datetime.now()
+                    "timestamp": datetime.now(),
                 }
 
                 logger.info(f"Funding rate {symbol}: {funding_rate:.4%}")
@@ -147,9 +141,7 @@ class EdgeStrategy(BaseStrategy):
         current_volume = recent["volume"]
 
         # Calculate price move
-        price_change_pct = abs(
-            (recent["close"] - recent["open"]) / recent["open"] * 100
-        )
+        price_change_pct = abs((recent["close"] - recent["open"]) / recent["open"] * 100)
 
         volume_ratio = current_volume / avg_volume if avg_volume > 0 else 1
 
@@ -168,7 +160,7 @@ class EdgeStrategy(BaseStrategy):
                 "detected": True,
                 "volume_ratio": volume_ratio,
                 "type": "accumulation" if close_position > 0.6 else "distribution",
-                "signal": "bullish" if close_position > 0.6 else "bearish"
+                "signal": "bullish" if close_position > 0.6 else "bearish",
             }
 
         return {"detected": False, "volume_ratio": volume_ratio}
@@ -255,7 +247,7 @@ class EdgeStrategy(BaseStrategy):
                     "signal": "bullish",
                     "strength": strength,
                     "value": fear_greed,
-                    "interpretation": f"Fear Index {fear_greed} - Contrarian Buy"
+                    "interpretation": f"Fear Index {fear_greed} - Contrarian Buy",
                 }
             elif fear_greed >= self.fear_greed_sell_threshold:
                 # Extreme greed - contrarian SELL
@@ -271,7 +263,7 @@ class EdgeStrategy(BaseStrategy):
                     "signal": "bearish",
                     "strength": strength,
                     "value": fear_greed,
-                    "interpretation": f"Greed Index {fear_greed} - Contrarian Sell"
+                    "interpretation": f"Greed Index {fear_greed} - Contrarian Sell",
                 }
             else:
                 signals["fear_greed"]["value"] = fear_greed
@@ -286,7 +278,7 @@ class EdgeStrategy(BaseStrategy):
                     "signal": "bearish",
                     "strength": strength,
                     "value": funding,
-                    "interpretation": f"High funding ({funding:.4%}) - Longs crowded"
+                    "interpretation": f"High funding ({funding:.4%}) - Longs crowded",
                 }
             elif funding <= self.funding_extreme_low:
                 # Negative funding - shorts are crowded, expect reversal UP
@@ -295,7 +287,7 @@ class EdgeStrategy(BaseStrategy):
                     "signal": "bullish",
                     "strength": strength,
                     "value": funding,
-                    "interpretation": f"Negative funding ({funding:.4%}) - Shorts crowded"
+                    "interpretation": f"Negative funding ({funding:.4%}) - Shorts crowded",
                 }
             else:
                 signals["funding"]["value"] = funding
@@ -308,7 +300,7 @@ class EdgeStrategy(BaseStrategy):
                 "strength": min((volume_analysis["volume_ratio"] - 2) / 3, 1.0),
                 "type": volume_analysis["type"],
                 "volume_ratio": volume_analysis["volume_ratio"],
-                "interpretation": f"{volume_analysis['type'].title()} detected (volume {volume_analysis['volume_ratio']:.1f}x avg)"
+                "interpretation": f"{volume_analysis['type'].title()} detected (volume {volume_analysis['volume_ratio']:.1f}x avg)",
             }
 
         # 4. Liquidation Levels (weight: 15%)
@@ -317,13 +309,13 @@ class EdgeStrategy(BaseStrategy):
             signals["liquidation"] = {
                 "signal": "bullish",
                 "strength": 0.6,
-                "interpretation": "Near short liquidation zone - potential squeeze"
+                "interpretation": "Near short liquidation zone - potential squeeze",
             }
         elif liq_analysis.get("near_long_liquidations"):
             signals["liquidation"] = {
                 "signal": "bearish",
                 "strength": 0.6,
-                "interpretation": "Near long liquidation zone - potential cascade"
+                "interpretation": "Near long liquidation zone - potential cascade",
             }
 
         # Calculate weighted signal
@@ -373,11 +365,8 @@ class EdgeStrategy(BaseStrategy):
                 "bearish_score": round(bearish_score, 3),
                 "net_score": round(net_score, 3),
                 "factors": signals,
-                "edge_factors_active": sum(
-                    1 for s in signals.values()
-                    if s.get("strength", 0) > 0
-                ),
-            }
+                "edge_factors_active": sum(1 for s in signals.values() if s.get("strength", 0) > 0),
+            },
         )
 
     def _create_signal(self, action: str, confidence: float, metadata: dict) -> dict:
@@ -386,7 +375,7 @@ class EdgeStrategy(BaseStrategy):
             "action": action,
             "confidence": confidence,
             "timestamp": datetime.now().isoformat(),
-            **metadata
+            **metadata,
         }
 
     def get_name(self) -> str:
@@ -430,7 +419,9 @@ class EdgeStrategy(BaseStrategy):
         except KeyError:
             signal_type = SignalType.HOLD
 
-        metadata = {key: value for key, value in signal.items() if key not in {"action", "confidence"}}
+        metadata = {
+            key: value for key, value in signal.items() if key not in {"action", "confidence"}
+        }
         return StrategyResult(
             signal=signal_type,
             confidence=float(signal.get("confidence", 0.0)),

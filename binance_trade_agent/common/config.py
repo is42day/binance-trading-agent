@@ -123,7 +123,9 @@ class Config:
             },
             "DOGEUSDT": {
                 "max_position": float(os.getenv("DOGE_MAX_POSITION", "0.03")),
-                "volatility_multiplier": float(os.getenv("DOGE_VOLATILITY_MULTIPLIER", "2.0")),  # Very volatile
+                "volatility_multiplier": float(
+                    os.getenv("DOGE_VOLATILITY_MULTIPLIER", "2.0")
+                ),  # Very volatile
             },
             "AVAXUSDT": {
                 "max_position": float(os.getenv("AVAX_MAX_POSITION", "0.04")),
@@ -155,10 +157,7 @@ class Config:
         if self.binance_testnet:
             return "testnet"
         # Non-demo, non-testnet — check full arming conditions
-        if (
-            self.live_trading_enabled
-            and self._live_trading_ack == self._live_trading_ack_phrase
-        ):
+        if self.live_trading_enabled and self._live_trading_ack == self._live_trading_ack_phrase:
             return "live_armed"
         return "live_blocked"
 
@@ -168,6 +167,7 @@ class Config:
         Raises SystemExit with error if invalid.
         """
         import logging as _logging
+
         _log = _logging.getLogger(__name__)
         _log.info("Runtime mode: %s", self.runtime_mode)
 

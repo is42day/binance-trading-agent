@@ -13,10 +13,7 @@ from datetime import datetime, timedelta
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from binance_trade_agent.common.config import config
-from binance_trade_agent.common.logging_config import (
-    get_logger,
-    setup_logging,
-)
+from binance_trade_agent.common.logging_config import get_logger, setup_logging
 from binance_trade_agent.core.exchange_reconciliation import ExchangeReconciliationService
 from binance_trade_agent.core.orchestrator import TradingOrchestrator
 from binance_trade_agent.core.performance_analytics import get_performance_analytics
@@ -171,8 +168,7 @@ class AutonomousTradingLoop:
 
                     # Close the trailing stop tracking
                     close_result = risk_agent.close_trailing_stop(
-                        symbol,
-                        close_price=result["current_price"]
+                        symbol, close_price=result["current_price"]
                     )
                     pnl_pct = close_result.get("pnl_pct", 0) * 100
                     self.logger.info(f"      PnL: {pnl_pct:+.2f}%")

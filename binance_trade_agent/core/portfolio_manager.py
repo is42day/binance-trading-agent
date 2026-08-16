@@ -267,9 +267,9 @@ class TradingDecisionORM(Base):
 
     __tablename__ = "trading_decisions"
 
-    id = Column(String, primary_key=True)          # UUID
+    id = Column(String, primary_key=True)  # UUID
     symbol = Column(String, nullable=False)
-    signal = Column(String, nullable=False)         # BUY | SELL | HOLD
+    signal = Column(String, nullable=False)  # BUY | SELL | HOLD
     strategy = Column(String, nullable=True)
     confidence = Column(Float, nullable=True)
     blocked_reason = Column(String, nullable=True)  # None when not blocked

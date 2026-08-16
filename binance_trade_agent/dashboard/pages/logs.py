@@ -43,7 +43,6 @@ def read_log_files(limit: int = 200) -> list:
                 logger.debug(f"Log file not found: {path}")
                 continue
 
-
             try:
                 with open(path, "r", encoding="utf-8", errors="ignore") as f:
                     lines = f.readlines()[-limit:]
@@ -79,13 +78,15 @@ def read_log_files(limit: int = 200) -> list:
                             level = "INFO"
                             message = " - ".join(parts[1:])
 
-                    results.append({
-                        "timestamp": timestamp,
-                        "level": level.strip().upper(),
-                        "message": message.strip(),
-                        "correlation_id": "N/A",
-                        "module": module
-                    })
+                    results.append(
+                        {
+                            "timestamp": timestamp,
+                            "level": level.strip().upper(),
+                            "message": message.strip(),
+                            "correlation_id": "N/A",
+                            "module": module,
+                        }
+                    )
             except Exception as e:
                 logger.warning(f"Error reading {path}: {e}")
                 continue
@@ -106,19 +107,21 @@ def read_monitoring_events(limit: int = 100) -> list:
             return results
 
         # Try to get logs from monitoring loggers
-        if hasattr(monitoring, 'loggers') and monitoring.loggers:
+        if hasattr(monitoring, "loggers") and monitoring.loggers:
             for logger_name, monitor_logger in monitoring.loggers.items():
                 try:
                     # Try to get recent logs from the monitoring logger
-                    if hasattr(monitor_logger, 'get_recent_logs'):
+                    if hasattr(monitor_logger, "get_recent_logs"):
                         events = monitor_logger.get_recent_logs(limit=limit)
                         for event in events:
-                            results.append({
-                                "timestamp": event.get("timestamp", "N/A"),
-                                "level": event.get("level", "INFO"),
-                                "message": event.get("message", ""),
-                                "correlation_id": event.get("correlation_id", "N/A")
-                            })
+                            results.append(
+                                {
+                                    "timestamp": event.get("timestamp", "N/A"),
+                                    "level": event.get("level", "INFO"),
+                                    "message": event.get("message", ""),
+                                    "correlation_id": event.get("correlation_id", "N/A"),
+                                }
+                            )
                 except Exception as e:
                     logger.debug(f"Error reading from monitoring logger {logger_name}: {e}")
                     continue
@@ -165,7 +168,6 @@ def _log_in_date_range(timestamp: str, start_date: str, end_date: str) -> bool:
     except Exception as e:
         logger.debug(f"Error in date range check: {e}")
         return True
-
 
 
 LOGS_PER_PAGE = 50
@@ -358,9 +360,7 @@ layout = dbc.Container(
         dbc.Row(
             [
                 dbc.Col(
-                    [
-                        html.Div(id="log-action-alert")
-                    ],
+                    [html.Div(id="log-action-alert")],
                     width=12,
                 )
             ],
@@ -584,7 +584,8 @@ def update_logs(
         # Filter by date range
         if start_date or end_date:
             filtered_logs = [
-                log for log in filtered_logs
+                log
+                for log in filtered_logs
                 if _log_in_date_range(log.get("timestamp"), start_date, end_date)
             ]
 
@@ -743,14 +744,16 @@ def export_logs(n_clicks, level, search, start_date, end_date):
         if search:
             search_lower = search.lower()
             filtered_logs = [
-                log for log in filtered_logs
+                log
+                for log in filtered_logs
                 if search_lower in log.get("message", "").lower()
                 or search_lower in log.get("correlation_id", "").lower()
             ]
 
         if start_date or end_date:
             filtered_logs = [
-                log for log in filtered_logs
+                log
+                for log in filtered_logs
                 if _log_in_date_range(log.get("timestamp"), start_date, end_date)
             ]
 
@@ -775,13 +778,15 @@ def _logs_to_csv(logs: list) -> str:
 
     # Write log rows
     for log in logs:
-        writer.writerow([
-            log.get("timestamp", ""),
-            log.get("level", ""),
-            log.get("module", ""),
-            log.get("message", ""),
-            log.get("correlation_id", ""),
-        ])
+        writer.writerow(
+            [
+                log.get("timestamp", ""),
+                log.get("level", ""),
+                log.get("module", ""),
+                log.get("message", ""),
+                log.get("correlation_id", ""),
+            ]
+        )
 
     return output.getvalue()
 
@@ -810,7 +815,9 @@ def clear_logs(n_clicks):
                         f.writelines(recent_lines)
 
                     cleared_files.append(path.name)
-                    logger.info(f"Cleared {path.name}: removed {len(lines) - len(recent_lines)} lines")
+                    logger.info(
+                        f"Cleared {path.name}: removed {len(lines) - len(recent_lines)} lines"
+                    )
                 except Exception as e:
                     logger.warning(f"Error clearing {path.name}: {e}")
 

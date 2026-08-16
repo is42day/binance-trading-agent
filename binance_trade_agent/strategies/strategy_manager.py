@@ -113,12 +113,14 @@ class StrategyManager:
         except Exception as e:
             self.logger.error(f"Failed to register bollinger: {str(e)}")
         try:
-            bollinger_conservative = BollingerBandsStrategy({
-                "num_std": 2.5,  # Wider bands = fewer signals
-                "rsi_overbought": 75,
-                "rsi_oversold": 25,
-                "require_rsi_confirmation": True,
-            })
+            bollinger_conservative = BollingerBandsStrategy(
+                {
+                    "num_std": 2.5,  # Wider bands = fewer signals
+                    "rsi_overbought": 75,
+                    "rsi_oversold": 25,
+                    "require_rsi_confirmation": True,
+                }
+            )
             self.register_strategy("bollinger_conservative", bollinger_conservative)
         except Exception as e:
             self.logger.error(f"Failed to register bollinger_conservative: {str(e)}")
@@ -161,13 +163,15 @@ class StrategyManager:
 
         # Micro Trading Aggressive - For high-volatility altcoins
         try:
-            micro_trading_aggressive = MicroTradingStrategy({
-                "rsi_overbought": 60,
-                "rsi_oversold": 40,
-                "quick_profit_target_pct": 0.03,  # 3%
-                "tight_stop_loss_pct": 0.01,  # 1%
-                "min_momentum_strength": 0.4,  # More aggressive entry
-            })
+            micro_trading_aggressive = MicroTradingStrategy(
+                {
+                    "rsi_overbought": 60,
+                    "rsi_oversold": 40,
+                    "quick_profit_target_pct": 0.03,  # 3%
+                    "tight_stop_loss_pct": 0.01,  # 1%
+                    "min_momentum_strength": 0.4,  # More aggressive entry
+                }
+            )
             self.register_strategy("micro_trading_aggressive", micro_trading_aggressive)
         except Exception as e:
             self.logger.error(f"Failed to register micro_trading_aggressive strategy: {str(e)}")

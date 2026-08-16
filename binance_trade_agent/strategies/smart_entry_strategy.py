@@ -62,8 +62,8 @@ class SmartEntryStrategy(BaseStrategy):
                 continue
             tr = max(
                 ohlcv_data[i]["high"] - ohlcv_data[i]["low"],
-                abs(ohlcv_data[i]["high"] - ohlcv_data[i-1]["close"]),
-                abs(ohlcv_data[i]["low"] - ohlcv_data[i-1]["close"])
+                abs(ohlcv_data[i]["high"] - ohlcv_data[i - 1]["close"]),
+                abs(ohlcv_data[i]["low"] - ohlcv_data[i - 1]["close"]),
             )
             atrs.append(tr)
 
@@ -71,7 +71,7 @@ class SmartEntryStrategy(BaseStrategy):
             return {"compressed": False}
 
         current_atr = np.mean(atrs[-5:])  # Recent 5 periods
-        historical_atr = np.mean(atrs)     # Full lookback
+        historical_atr = np.mean(atrs)  # Full lookback
 
         compression_ratio = current_atr / historical_atr if historical_atr > 0 else 1
 
@@ -88,7 +88,9 @@ class SmartEntryStrategy(BaseStrategy):
             "compression_ratio": round(compression_ratio, 3),
             "current_atr": round(current_atr, 2),
             "bb_width_pct": round(bb_width, 2),
-            "interpretation": "Volatility squeeze - expecting breakout" if is_compressed else "Normal volatility"
+            "interpretation": (
+                "Volatility squeeze - expecting breakout" if is_compressed else "Normal volatility"
+            ),
         }
 
     def _find_support_resistance(self, ohlcv_data: list) -> dict:
@@ -100,7 +102,7 @@ class SmartEntryStrategy(BaseStrategy):
         if len(ohlcv_data) < self.sr_lookback:
             return {"levels": [], "current_zone": "unknown"}
 
-        data = ohlcv_data[-self.sr_lookback:]
+        data = ohlcv_data[-self.sr_lookback :]
         current_price = data[-1]["close"]
 
         # Find swing highs and lows
@@ -109,17 +111,21 @@ class SmartEntryStrategy(BaseStrategy):
 
         for i in range(2, len(data) - 2):
             # Swing high: higher than 2 candles before and after
-            if (data[i]["high"] > data[i-1]["high"] and
-                data[i]["high"] > data[i-2]["high"] and
-                data[i]["high"] > data[i+1]["high"] and
-                data[i]["high"] > data[i+2]["high"]):
+            if (
+                data[i]["high"] > data[i - 1]["high"]
+                and data[i]["high"] > data[i - 2]["high"]
+                and data[i]["high"] > data[i + 1]["high"]
+                and data[i]["high"] > data[i + 2]["high"]
+            ):
                 swing_highs.append(data[i]["high"])
 
             # Swing low: lower than 2 candles before and after
-            if (data[i]["low"] < data[i-1]["low"] and
-                data[i]["low"] < data[i-2]["low"] and
-                data[i]["low"] < data[i+1]["low"] and
-                data[i]["low"] < data[i+2]["low"]):
+            if (
+                data[i]["low"] < data[i - 1]["low"]
+                and data[i]["low"] < data[i - 2]["low"]
+                and data[i]["low"] < data[i + 1]["low"]
+                and data[i]["low"] < data[i + 2]["low"]
+            ):
                 swing_lows.append(data[i]["low"])
 
         # Cluster nearby levels
@@ -175,11 +181,15 @@ class SmartEntryStrategy(BaseStrategy):
         return {
             "nearest_resistance": nearest_resistance,
             "nearest_support": nearest_support,
-            "resistance_proximity_pct": round(resistance_proximity * 100, 2) if resistance_proximity else None,
-            "support_proximity_pct": round(support_proximity * 100, 2) if support_proximity else None,
+            "resistance_proximity_pct": (
+                round(resistance_proximity * 100, 2) if resistance_proximity else None
+            ),
+            "support_proximity_pct": (
+                round(support_proximity * 100, 2) if support_proximity else None
+            ),
             "current_zone": zone,
             "zone_signal": zone_signal,
-            "interpretation": f"Price in {zone} - {zone_signal} bias"
+            "interpretation": f"Price in {zone} - {zone_signal} bias",
         }
 
     def _analyze_order_flow(self, ohlcv_data: list) -> dict:
@@ -237,7 +247,7 @@ class SmartEntryStrategy(BaseStrategy):
             "imbalance": round(imbalance, 3),
             "direction": direction,
             "buy_ratio": round(buy_ratio, 3),
-            "interpretation": f"Order flow {direction} (buy ratio: {buy_ratio:.1%})"
+            "interpretation": f"Order flow {direction} (buy ratio: {buy_ratio:.1%})",
         }
 
     def _check_time_factors(self) -> dict:
@@ -258,9 +268,9 @@ class SmartEntryStrategy(BaseStrategy):
         # Asian open: 00:00-02:00 UTC
 
         is_high_volatility_window = (
-            (13 <= hour <= 15) or  # US open
-            (20 <= hour <= 21) or  # US close
-            (0 <= hour <= 2)       # Asian open
+            (13 <= hour <= 15)  # US open
+            or (20 <= hour <= 21)  # US close
+            or (0 <= hour <= 2)  # Asian open
         )
 
         # Weekend effect - often lower liquidity
@@ -270,10 +280,9 @@ class SmartEntryStrategy(BaseStrategy):
         is_monday_open = weekday == 0 and hour < 6
 
         # Avoid trading right before major time windows
-        is_pre_volatility = (
-            (12 <= hour <= 13) or   # Before US open
-            (19 <= hour <= 20)      # Before US close
-        )
+        is_pre_volatility = (12 <= hour <= 13) or (  # Before US open
+            19 <= hour <= 20
+        )  # Before US close
 
         timing_score = 1.0
         if is_weekend:
@@ -290,10 +299,14 @@ class SmartEntryStrategy(BaseStrategy):
             "is_high_volatility_window": is_high_volatility_window,
             "timing_score": round(timing_score, 2),
             "interpretation": (
-                "High volatility window - good for momentum" if is_high_volatility_window
-                else "Low volatility period - wait or reduce size" if is_weekend
-                else "Normal trading hours"
-            )
+                "High volatility window - good for momentum"
+                if is_high_volatility_window
+                else (
+                    "Low volatility period - wait or reduce size"
+                    if is_weekend
+                    else "Normal trading hours"
+                )
+            ),
         }
 
     def generate_signal(self, symbol: str, ohlcv_data: list = None) -> dict:
@@ -376,7 +389,7 @@ class SmartEntryStrategy(BaseStrategy):
                 "support_resistance": sr_levels,
                 "order_flow": order_flow,
                 "timing": timing,
-            }
+            },
         )
 
     def _create_signal(self, action: str, confidence: float, metadata: dict) -> dict:
@@ -385,7 +398,7 @@ class SmartEntryStrategy(BaseStrategy):
             "action": action,
             "confidence": confidence,
             "timestamp": datetime.now().isoformat(),
-            **metadata
+            **metadata,
         }
 
     def get_name(self) -> str:

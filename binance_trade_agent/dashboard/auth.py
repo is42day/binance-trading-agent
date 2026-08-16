@@ -148,6 +148,7 @@ def protect_route(func):
         def my_callback(...):
             ...
     """
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         if is_auth_enabled():
@@ -155,4 +156,5 @@ def protect_route(func):
             if not check_auth(auth_header):
                 return unauthorized_response()
         return func(*args, **kwargs)
+
     return wrapper

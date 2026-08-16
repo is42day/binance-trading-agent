@@ -101,9 +101,7 @@ class SQLiteToPostgresMigrator:
             tables = [row[0] for row in result]
 
             if "trades" not in tables and "positions" not in tables:
-                logger.error(
-                    "PostgreSQL schema not initialized. Run 'alembic upgrade head' first."
-                )
+                logger.error("PostgreSQL schema not initialized. Run 'alembic upgrade head' first.")
                 return False
 
             logger.info(f"Found tables in PostgreSQL: {tables}")
@@ -181,18 +179,20 @@ class SQLiteToPostgresMigrator:
             # Prepare trade data for bulk insert
             trade_data = []
             for trade in sqlite_trades:
-                trade_data.append({
-                    "trade_id": trade.trade_id,
-                    "symbol": trade.symbol,
-                    "side": trade.side,
-                    "quantity": trade.quantity,
-                    "price": trade.price,
-                    "fee": trade.fee,
-                    "timestamp": trade.timestamp,
-                    "order_id": trade.order_id,
-                    "correlation_id": trade.correlation_id,
-                    "pnl": trade.pnl,
-                })
+                trade_data.append(
+                    {
+                        "trade_id": trade.trade_id,
+                        "symbol": trade.symbol,
+                        "side": trade.side,
+                        "quantity": trade.quantity,
+                        "price": trade.price,
+                        "fee": trade.fee,
+                        "timestamp": trade.timestamp,
+                        "order_id": trade.order_id,
+                        "correlation_id": trade.correlation_id,
+                        "pnl": trade.pnl,
+                    }
+                )
 
             # Process in batches for memory efficiency
             for i in range(0, total, batch_size):
@@ -203,13 +203,15 @@ class SQLiteToPostgresMigrator:
                         # Use bulk insert with ON CONFLICT DO NOTHING
                         # This handles idempotency: if trade_id exists, skip it
                         postgres_session.execute(
-                            text("""
+                            text(
+                                """
                                 INSERT INTO trades
                                 (trade_id, symbol, side, quantity, price, fee, timestamp, order_id, correlation_id, pnl)
                                 VALUES (:trade_id, :symbol, :side, :quantity, :price, :fee, :timestamp, :order_id, :correlation_id, :pnl)
                                 ON CONFLICT (trade_id) DO NOTHING
-                            """),
-                            batch
+                            """
+                            ),
+                            batch,
                         )
                         migrated_count += len(batch)
 
@@ -219,7 +221,9 @@ class SQLiteToPostgresMigrator:
                     logger.error(f"Error in batch {i}-{i+len(batch)}: {batch_error}")
                     raise
 
-            logger.info(f"✅ Trades migration complete: {migrated_count} inserted (duplicates skipped via ON CONFLICT)")
+            logger.info(
+                f"✅ Trades migration complete: {migrated_count} inserted (duplicates skipped via ON CONFLICT)"
+            )
             return migrated_count
 
         except Exception as e:
@@ -262,16 +266,18 @@ class SQLiteToPostgresMigrator:
             # Prepare position data for bulk upsert
             position_data = []
             for position in sqlite_positions:
-                position_data.append({
-                    "symbol": position.symbol,
-                    "side": position.side,
-                    "quantity": position.quantity,
-                    "average_price": position.average_price,
-                    "current_price": position.current_price,
-                    "unrealized_pnl": position.unrealized_pnl,
-                    "realized_pnl": position.realized_pnl,
-                    "timestamp": position.timestamp,
-                })
+                position_data.append(
+                    {
+                        "symbol": position.symbol,
+                        "side": position.side,
+                        "quantity": position.quantity,
+                        "average_price": position.average_price,
+                        "current_price": position.current_price,
+                        "unrealized_pnl": position.unrealized_pnl,
+                        "realized_pnl": position.realized_pnl,
+                        "timestamp": position.timestamp,
+                    }
+                )
 
             # Process in batches
             for i in range(0, total, batch_size):
@@ -282,7 +288,8 @@ class SQLiteToPostgresMigrator:
                         # Use upsert: ON CONFLICT DO UPDATE
                         # If position with same symbol exists, replace entire row
                         postgres_session.execute(
-                            text("""
+                            text(
+                                """
                                 INSERT INTO positions
                                 (symbol, side, quantity, average_price, current_price, unrealized_pnl, realized_pnl, timestamp)
                                 VALUES (:symbol, :side, :quantity, :average_price, :current_price, :unrealized_pnl, :realized_pnl, :timestamp)
@@ -294,8 +301,9 @@ class SQLiteToPostgresMigrator:
                                     unrealized_pnl = EXCLUDED.unrealized_pnl,
                                     realized_pnl = EXCLUDED.realized_pnl,
                                     timestamp = EXCLUDED.timestamp
-                            """),
-                            batch
+                            """
+                            ),
+                            batch,
                         )
                         migrated_count += len(batch)
 
@@ -331,12 +339,8 @@ class SQLiteToPostgresMigrator:
         sqlite_positions = counts["sqlite"]["positions"]
         postgres_positions = counts["postgres"]["positions"]
 
-        logger.info(
-            f"SQLite:     {sqlite_trades} trades, {sqlite_positions} positions"
-        )
-        logger.info(
-            f"PostgreSQL: {postgres_trades} trades, {postgres_positions} positions"
-        )
+        logger.info(f"SQLite:     {sqlite_trades} trades, {sqlite_positions} positions")
+        logger.info(f"PostgreSQL: {postgres_trades} trades, {postgres_positions} positions")
 
         # Allow postgres to have more or equal rows (idempotent runs)
         trades_valid = postgres_trades >= sqlite_trades
@@ -361,16 +365,18 @@ class SQLiteToPostgresMigrator:
 
         # Verify target schema exists
         if not self.verify_postgres_schema():
-            logger.error(
-                "Run 'alembic upgrade head' first to create PostgreSQL schema"
-            )
+            logger.error("Run 'alembic upgrade head' first to create PostgreSQL schema")
             return False
 
         # Show initial counts
         logger.info("\n📊 Initial counts:")
         initial_counts = self.get_counts()
-        logger.info(f"  SQLite:     {initial_counts['sqlite']['trades']} trades, {initial_counts['sqlite']['positions']} positions")
-        logger.info(f"  PostgreSQL: {initial_counts['postgres']['trades']} trades, {initial_counts['postgres']['positions']} positions")
+        logger.info(
+            f"  SQLite:     {initial_counts['sqlite']['trades']} trades, {initial_counts['sqlite']['positions']} positions"
+        )
+        logger.info(
+            f"  PostgreSQL: {initial_counts['postgres']['trades']} trades, {initial_counts['postgres']['positions']} positions"
+        )
 
         # Clear target tables if requested
         if self.delete_target_tables:
@@ -404,9 +410,7 @@ class SQLiteToPostgresMigrator:
 
 def main():
     """Main entry point"""
-    parser = argparse.ArgumentParser(
-        description="Migrate trading data from SQLite to PostgreSQL"
-    )
+    parser = argparse.ArgumentParser(description="Migrate trading data from SQLite to PostgreSQL")
     parser.add_argument(
         "--sqlite-path",
         default=os.getenv("SQLITE_DB_PATH", "/app/data/portfolio.db"),

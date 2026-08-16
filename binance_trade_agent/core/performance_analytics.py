@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TradeRecord:
     """Record of a single trade"""
+
     symbol: str
     side: str  # 'buy' or 'sell'
     entry_price: float
@@ -106,7 +107,9 @@ class PerformanceAnalytics:
         self.trades.append(trade)
         self.open_positions[symbol] = trade
 
-        logger.info(f"Trade entry recorded: {side.upper()} {quantity} {symbol} @ ${entry_price:,.2f}")
+        logger.info(
+            f"Trade entry recorded: {side.upper()} {quantity} {symbol} @ ${entry_price:,.2f}"
+        )
 
         return trade
 
@@ -168,7 +171,9 @@ class PerformanceAnalytics:
 
         # Calculate current drawdown
         self.current_drawdown = self.peak_capital - self.current_capital
-        self.current_drawdown_pct = (self.current_drawdown / self.peak_capital) * 100 if self.peak_capital > 0 else 0
+        self.current_drawdown_pct = (
+            (self.current_drawdown / self.peak_capital) * 100 if self.peak_capital > 0 else 0
+        )
 
         # Update max drawdown
         if self.current_drawdown > self.max_drawdown:
@@ -234,7 +239,7 @@ class PerformanceAnalytics:
         gross_loss = abs(sum(t.pnl for t in losing if t.pnl))
 
         if gross_loss == 0:
-            return float('inf') if gross_profit > 0 else 0.0
+            return float("inf") if gross_profit > 0 else 0.0
 
         return gross_profit / gross_loss
 
@@ -263,7 +268,7 @@ class PerformanceAnalytics:
         avg_loss = self.calculate_average_loss()
 
         if avg_loss == 0:
-            return float('inf') if avg_win > 0 else 0.0
+            return float("inf") if avg_win > 0 else 0.0
 
         return avg_win / avg_loss
 
@@ -314,7 +319,7 @@ class PerformanceAnalytics:
         # Calculate downside deviation (only negative returns)
         negative_returns = returns[returns < 0]
         if len(negative_returns) == 0:
-            return float('inf') if mean_return > 0 else 0.0
+            return float("inf") if mean_return > 0 else 0.0
 
         downside_std = np.std(negative_returns, ddof=1)
 
@@ -349,21 +354,18 @@ class PerformanceAnalytics:
             "current_capital": self.current_capital,
             "total_pnl": total_pnl,
             "total_return_pct": self.calculate_total_return(),
-
             # Trade statistics
             "total_trades": len(self.trades),
             "closed_trades": len(closed_trades),
             "open_positions": len(self.open_positions),
             "winning_trades": len(self.get_winning_trades()),
             "losing_trades": len(self.get_losing_trades()),
-
             # Performance ratios
             "win_rate": self.calculate_win_rate(),
             "profit_factor": self.calculate_profit_factor(),
             "risk_reward_ratio": self.calculate_risk_reward_ratio(),
             "average_win": self.calculate_average_win(),
             "average_loss": self.calculate_average_loss(),
-
             # Risk metrics
             "sharpe_ratio": self.calculate_sharpe_ratio(),
             "sortino_ratio": self.calculate_sortino_ratio(),
@@ -371,7 +373,6 @@ class PerformanceAnalytics:
             "max_drawdown_pct": self.max_drawdown_pct,
             "current_drawdown": self.current_drawdown,
             "current_drawdown_pct": self.current_drawdown_pct,
-
             # Session info
             "session_start": self.session_start.isoformat(),
             "session_duration": str(datetime.now() - self.session_start),
