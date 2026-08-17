@@ -762,6 +762,14 @@ async def get_paper_trading_trades(limit: int = 50):
 # Module-level paper trading loop state
 _paper_loop_instance: Optional[object] = None
 _paper_loop_thread: Optional[Thread] = None
+# Serializes the check-then-start sequence below across concurrent requests.
+# The PaperTradingLoop construction awaits a threadpool call, which yields
+# the event loop — without this lock, two /start requests arriving before
+# either one finishes constructing can both pass the "already running" check
+# and each spin up their own loop/thread, silently overwriting the module
+# globals so /stop can only ever signal the more recent one while the first
+# keeps running orphaned, placing duplicate paper trades.
+_paper_loop_start_lock = asyncio.Lock()
 
 
 @app.post("/api/v1/paper-trading/start", dependencies=[Depends(require_api_token)])
@@ -769,46 +777,47 @@ async def start_paper_trading(request: StartPaperTradingRequest | None = None):
     """Start the paper trading loop in a background thread."""
     global _paper_loop_instance, _paper_loop_thread
 
-    if _paper_loop_thread is not None and _paper_loop_thread.is_alive():
-        return {"success": False, "message": "Paper trading loop is already running"}
+    async with _paper_loop_start_lock:
+        if _paper_loop_thread is not None and _paper_loop_thread.is_alive():
+            return {"success": False, "message": "Paper trading loop is already running"}
 
-    # A body-less POST previously started the loop with the documented
-    # defaults (every Body() parameter had one) — preserve that instead of
-    # making the request body a hard requirement.
-    request = request or StartPaperTradingRequest()
-    symbols = request.symbols or ["BTCUSDT"]
+        # A body-less POST previously started the loop with the documented
+        # defaults (every Body() parameter had one) — preserve that instead
+        # of making the request body a hard requirement.
+        request = request or StartPaperTradingRequest()
+        symbols = request.symbols or ["BTCUSDT"]
 
-    try:
-        from ..core.paper_trading_loop import PaperTradingLoop
+        try:
+            from ..core.paper_trading_loop import PaperTradingLoop
 
-        _paper_loop_instance = await run_in_threadpool(
-            PaperTradingLoop,
-            symbols=symbols,
-            strategy_name=request.strategy,
-            initial_balance=request.initial_balance,
-            trade_interval_seconds=request.interval_seconds,
-        )
+            _paper_loop_instance = await run_in_threadpool(
+                PaperTradingLoop,
+                symbols=symbols,
+                strategy_name=request.strategy,
+                initial_balance=request.initial_balance,
+                trade_interval_seconds=request.interval_seconds,
+            )
 
-        def _run():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                loop.run_until_complete(_paper_loop_instance.run())
-            finally:
-                loop.close()
+            def _run():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(_paper_loop_instance.run())
+                finally:
+                    loop.close()
 
-        _paper_loop_thread = Thread(target=_run, daemon=True, name="paper-trading-loop")
-        _paper_loop_thread.start()
+            _paper_loop_thread = Thread(target=_run, daemon=True, name="paper-trading-loop")
+            _paper_loop_thread.start()
 
-        return {
-            "success": True,
-            "message": "Paper trading started",
-            "symbols": symbols,
-            "strategy": request.strategy,
-        }
-    except Exception as e:
-        logger.error(f"Error starting paper trading loop: {e}")
-        raise HTTPException(status_code=500, detail=str(e)) from e
+            return {
+                "success": True,
+                "message": "Paper trading started",
+                "symbols": symbols,
+                "strategy": request.strategy,
+            }
+        except Exception as e:
+            logger.error(f"Error starting paper trading loop: {e}")
+            raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/v1/paper-trading/stop", dependencies=[Depends(require_api_token)])
