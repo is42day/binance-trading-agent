@@ -6,12 +6,14 @@ import json
 import logging
 import os
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from ..common.config import config
 from ..core.portfolio_manager import PortfolioManager
+
+RISK_STATE_KEY = "risk_counters"
 
 
 class RiskLevel(Enum):
@@ -127,6 +129,7 @@ class EnhancedRiskManagementAgent:
         self.state_store = (
             PortfolioManager("/app/data/web_portfolio.db") if self.shared_state_enabled else None
         )
+        self._load_shared_risk_state()
 
         self.logger.info("Enhanced Risk Management Agent initialized")
 
@@ -146,6 +149,88 @@ class EnhancedRiskManagementAgent:
         except Exception as e:
             self.logger.warning(f"Failed to read shared emergency stop state: {e}")
             return bool(self.config["emergency_stop"])
+
+    def _load_shared_risk_state(self):
+        """
+        Rehydrate mutable risk counters (consecutive_losses, daily_trades,
+        peak_portfolio_value, recent_trades, ...) from shared DB state.
+
+        Without this, these counters live only as in-memory instance
+        attributes — a process restart, or a second process (e.g. the API
+        container instantiating its own EnhancedRiskManagementAgent)
+        silently resets them to zero, undercounting drawdown/loss-streak/
+        frequency limits relative to what actually happened. emergency_stop
+        already gets this treatment via _shared_emergency_stop_enabled; this
+        extends the same pattern to the rest of the mutable risk state.
+        """
+        if not self.shared_state_enabled or self.state_store is None:
+            return
+
+        try:
+            state = self.state_store.get_system_state(RISK_STATE_KEY)
+            if not state:
+                return
+            payload = json.loads(state["value"])
+
+            self.consecutive_losses = payload.get("consecutive_losses", self.consecutive_losses)
+            self.daily_trades = payload.get("daily_trades", self.daily_trades)
+            self.peak_portfolio_value = payload.get(
+                "peak_portfolio_value", self.peak_portfolio_value
+            )
+            self.current_drawdown = payload.get("current_drawdown", self.current_drawdown)
+            self.daily_start_value = payload.get("daily_start_value", self.daily_start_value)
+
+            last_trade_time = payload.get("last_trade_time")
+            if last_trade_time:
+                self.last_trade_time = datetime.fromisoformat(last_trade_time)
+
+            drawdown_pause_until = payload.get("drawdown_pause_until")
+            self.drawdown_pause_until = (
+                datetime.fromisoformat(drawdown_pause_until) if drawdown_pause_until else None
+            )
+
+            last_daily_reset = payload.get("last_daily_reset")
+            if last_daily_reset:
+                self.last_daily_reset = date.fromisoformat(last_daily_reset)
+
+            recent_trades = payload.get("recent_trades")
+            if recent_trades is not None:
+                self.recent_trades = [
+                    {**trade, "timestamp": datetime.fromisoformat(trade["timestamp"])}
+                    for trade in recent_trades
+                ]
+        except Exception as e:
+            self.logger.warning(f"Failed to load shared risk state: {e}")
+
+    def _persist_risk_state(self):
+        """Persist mutable risk counters to shared DB state (see _load_shared_risk_state)."""
+        if not self.shared_state_enabled or self.state_store is None:
+            return
+
+        try:
+            payload = {
+                "consecutive_losses": self.consecutive_losses,
+                "daily_trades": self.daily_trades,
+                "peak_portfolio_value": self.peak_portfolio_value,
+                "current_drawdown": self.current_drawdown,
+                "daily_start_value": self.daily_start_value,
+                "last_trade_time": (
+                    self.last_trade_time.isoformat() if self.last_trade_time else None
+                ),
+                "drawdown_pause_until": (
+                    self.drawdown_pause_until.isoformat() if self.drawdown_pause_until else None
+                ),
+                "last_daily_reset": self.last_daily_reset.isoformat(),
+                "recent_trades": [
+                    {**trade, "timestamp": trade["timestamp"].isoformat()}
+                    for trade in self.recent_trades
+                ],
+            }
+            self.state_store.set_system_state(
+                RISK_STATE_KEY, json.dumps(payload), updated_by="risk_management_agent"
+            )
+        except Exception as e:
+            self.logger.error(f"Failed to persist risk state: {e}")
 
     def _initialize_risk_rules(self) -> List[RiskRule]:
         """Initialize all risk management rules"""
@@ -236,6 +321,11 @@ class EnhancedRiskManagementAgent:
         """
         self.logger.info(f"Validating trade: {side} {quantity} {symbol} @ ${price}")
 
+        # Sync counters from shared state before checking anything that
+        # depends on them (drawdown_pause_until, consecutive_losses, etc.) —
+        # another process may have updated them since our last call.
+        self._load_shared_risk_state()
+
         # Initialize assessment
         assessment = RiskAssessment(
             approved=True, risk_level=RiskLevel.LOW, reasons=[], warnings=[]
@@ -284,6 +374,10 @@ class EnhancedRiskManagementAgent:
 
         # Record trade attempt for frequency tracking
         self._record_trade_attempt(symbol, side, quantity, price, assessment.approved)
+
+        # Persist updated counters so other processes (and this process, on
+        # restart) see this call's effect on frequency/drawdown tracking.
+        self._persist_risk_state()
 
         # Final risk level determination
         if not assessment.approved:
@@ -573,10 +667,14 @@ class EnhancedRiskManagementAgent:
 
     def record_trade_result(self, trade_id: str, pnl: float):
         """Record trade result for consecutive loss tracking"""
+        self._load_shared_risk_state()
+
         if pnl < 0:
             self.consecutive_losses += 1
         else:
             self.consecutive_losses = 0
+
+        self._persist_risk_state()
 
         self.logger.info(
             f"Trade {trade_id} result: ${pnl:.2f}, consecutive losses: {self.consecutive_losses}"
