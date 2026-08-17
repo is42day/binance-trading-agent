@@ -11,17 +11,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 from typing import Any, Callable, Dict, List, Optional
 
-from sqlalchemy import (
-    Column,
-    DateTime,
-    Float,
-    String,
-    Text,
-    UniqueConstraint,
-    inspect,
-    or_,
-    text,
-)
+from sqlalchemy import Column, DateTime, Float, String, Text, UniqueConstraint, inspect, or_, text
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.orm import declarative_base
