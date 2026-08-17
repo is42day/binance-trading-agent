@@ -383,3 +383,84 @@ class TestStreamStatusEndpoint:
                 headers={"X-API-Token": "test-token"},
             )
         assert resp.status_code == 404
+
+
+class TestBinanceWsStreamUrl:
+    """
+    The real Binance WS stream must honor BINANCE_TESTNET the same way the
+    REST client does (clients/binance_client.py switches its API_URL to
+    testnet.binance.vision) — otherwise a testnet trailing stop could be
+    driven by live-market kline data.
+    """
+
+    @pytest.mark.asyncio
+    async def test_uses_testnet_url_when_binance_testnet_true(self, monkeypatch):
+        from binance_trade_agent.core.market_streams import _binance_ws_stream
+
+        monkeypatch.setattr(
+            "binance_trade_agent.common.config.config.binance_testnet", True
+        )
+        captured = {}
+
+        class _FakeWs:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc):
+                return False
+
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                raise StopAsyncIteration
+
+        def _fake_connect(url):
+            captured["url"] = url
+            return _FakeWs()
+
+        fake_websockets = MagicMock()
+        fake_websockets.connect = _fake_connect
+        monkeypatch.setitem(__import__("sys").modules, "websockets", fake_websockets)
+
+        async for _ in _binance_ws_stream("BTCUSDT", "1m"):
+            pass
+
+        assert captured["url"].startswith("wss://stream.testnet.binance.vision/ws")
+        assert "btcusdt@kline_1m" in captured["url"]
+
+    @pytest.mark.asyncio
+    async def test_uses_mainnet_url_when_binance_testnet_false(self, monkeypatch):
+        from binance_trade_agent.core.market_streams import _binance_ws_stream
+
+        monkeypatch.setattr(
+            "binance_trade_agent.common.config.config.binance_testnet", False
+        )
+        captured = {}
+
+        class _FakeWs:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc):
+                return False
+
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                raise StopAsyncIteration
+
+        def _fake_connect(url):
+            captured["url"] = url
+            return _FakeWs()
+
+        fake_websockets = MagicMock()
+        fake_websockets.connect = _fake_connect
+        monkeypatch.setitem(__import__("sys").modules, "websockets", fake_websockets)
+
+        async for _ in _binance_ws_stream("BTCUSDT", "1m"):
+            pass
+
+        assert captured["url"].startswith("wss://stream.binance.com:9443/ws")
+        assert "stream.testnet.binance.vision" not in captured["url"]

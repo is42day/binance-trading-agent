@@ -11,6 +11,7 @@ from threading import Thread
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -286,7 +287,7 @@ async def get_circuit_breaker_status():
 
         client = BinanceAPIClient()
         return {
-            "binance_api": client.get_circuit_breaker_status(),
+            "binance_api": await run_in_threadpool(client.get_circuit_breaker_status),
             "timestamp": datetime.now().isoformat(),
         }
     except Exception as e:
@@ -300,7 +301,8 @@ async def get_circuit_breaker_status():
 async def get_open_exchange_orders(symbol: str | None = None):
     """Get locally tracked exchange orders that still need reconciliation."""
     try:
-        return {"orders": portfolio_manager.get_open_exchange_orders(symbol=symbol)}
+        orders = await run_in_threadpool(portfolio_manager.get_open_exchange_orders, symbol=symbol)
+        return {"orders": orders}
     except Exception as e:
         logger.error(f"Error fetching open exchange orders: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -314,7 +316,7 @@ async def reconcile_exchange_orders(symbol: str | None = None):
             client=market_agent.client,
             portfolio=portfolio_manager,
         )
-        return service.reconcile_open_orders(symbol=symbol)
+        return await run_in_threadpool(service.reconcile_open_orders, symbol=symbol)
     except Exception as e:
         logger.error(f"Error reconciling exchange orders: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -328,7 +330,7 @@ async def activate_emergency_stop(request: EmergencyStopRequest):
         raise HTTPException(status_code=400, detail="Emergency stop requires a reason")
 
     try:
-        risk_agent.set_emergency_stop(True, reason)
+        await run_in_threadpool(risk_agent.set_emergency_stop, True, reason)
         return {
             "success": True,
             "emergency_stop": {"enabled": True, "reason": reason},
@@ -345,7 +347,7 @@ async def resume_trading(request: EmergencyStopRequest):
     reason = request.reason.strip() or "operator_resume"
 
     try:
-        risk_agent.set_emergency_stop(False, reason)
+        await run_in_threadpool(risk_agent.set_emergency_stop, False, reason)
         return {
             "success": True,
             "emergency_stop": {"enabled": False, "reason": reason},
@@ -371,7 +373,7 @@ async def get_portfolio_summary():
 
         logger.info(f"Cache miss for {cache_key}. Fetching from portfolio manager...")
         # 2. If cache miss, fetch from portfolio manager
-        stats = portfolio_manager.get_portfolio_stats()
+        stats = await run_in_threadpool(portfolio_manager.get_portfolio_stats)
         logger.info(f"Got stats from portfolio manager: {stats}")
 
         # 3. Store in cache (TTL is 2s by default)
@@ -388,7 +390,7 @@ async def get_portfolio_summary():
 async def get_all_positions():
     """Get all open positions."""
     try:
-        positions = portfolio_manager.get_all_positions()
+        positions = await run_in_threadpool(portfolio_manager.get_all_positions)
         return {"positions": positions}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -398,7 +400,7 @@ async def get_all_positions():
 async def get_trade_history(limit: int = 50):
     """Get recent trade history."""
     try:
-        trades = portfolio_manager.get_trade_history(limit=limit)
+        trades = await run_in_threadpool(portfolio_manager.get_trade_history, limit=limit)
         return {"trades": trades}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -415,7 +417,7 @@ async def get_risk_status():
             return {**cached_status, "source": "cache"}
 
         # 2. If cache miss, fetch from agent
-        status = risk_agent.get_risk_status()
+        status = await run_in_threadpool(risk_agent.get_risk_status)
 
         # 3. Store in cache
         await cache.set(cache_key, status)
@@ -429,7 +431,7 @@ async def get_risk_status():
 async def get_trailing_stops():
     """Get all active trailing stops."""
     try:
-        return risk_agent.get_trailing_stop_info()
+        return await run_in_threadpool(risk_agent.get_trailing_stop_info)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -438,7 +440,7 @@ async def get_trailing_stops():
 async def get_trailing_stop_for_symbol(symbol: str):
     """Get trailing stop info for a specific symbol."""
     try:
-        result = risk_agent.get_trailing_stop_info(symbol.upper())
+        result = await run_in_threadpool(risk_agent.get_trailing_stop_info, symbol.upper())
         if "error" in result:
             raise HTTPException(status_code=404, detail=result["error"])
         return result
@@ -461,7 +463,7 @@ async def get_market_price(symbol: str):
             return {"symbol": symbol_upper, "price": cached_price, "source": "cache"}
 
         # 2. If cache miss, fetch from market agent
-        price = market_agent.get_latest_price(symbol_upper)
+        price = await run_in_threadpool(market_agent.get_latest_price, symbol_upper)
         if price is None:
             raise HTTPException(status_code=404, detail="Symbol not found")
 
@@ -479,7 +481,7 @@ async def get_market_price(symbol: str):
 async def get_market_symbol_rules(symbol: str):
     """Get Binance exchange filters used for order validation."""
     try:
-        return market_agent.client.get_symbol_rules(symbol.upper())
+        return await run_in_threadpool(market_agent.client.get_symbol_rules, symbol.upper())
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"API error: {e}") from e
 
@@ -494,7 +496,8 @@ async def validate_market_order(
 ):
     """Validate order parameters against Binance symbol filters before placement."""
     try:
-        return market_agent.client.validate_order_params(
+        return await run_in_threadpool(
+            market_agent.client.validate_order_params,
             symbol=symbol.upper(),
             side=side.upper(),
             order_type=order_type.upper(),
@@ -514,7 +517,8 @@ async def estimate_market_slippage(
 ):
     """Estimate market-order effective price and slippage from current order book depth."""
     try:
-        return market_agent.client.estimate_market_order_slippage(
+        return await run_in_threadpool(
+            market_agent.client.estimate_market_order_slippage,
             symbol=symbol.upper(),
             side=side.upper(),
             quantity=quantity,
@@ -541,35 +545,47 @@ async def get_system_config():
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+def _get_performance_summary_sync():
+    analytics = get_performance_analytics(config.portfolio_initial_value)
+    return analytics.get_performance_summary()
+
+
 @app.get("/api/v1/performance/summary", dependencies=[Depends(require_api_token)])
 async def get_performance_summary():
     """Get comprehensive performance analytics summary."""
     try:
-        analytics = get_performance_analytics(config.portfolio_initial_value)
-        return analytics.get_performance_summary()
+        return await run_in_threadpool(_get_performance_summary_sync)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+def _get_performance_trade_history_sync(limit: int):
+    analytics = get_performance_analytics(config.portfolio_initial_value)
+    return {
+        "trades": analytics.get_trade_history(limit),
+        "total_trades": len(analytics.trades),
+    }
 
 
 @app.get("/api/v1/performance/trades", dependencies=[Depends(require_api_token)])
 async def get_performance_trade_history(limit: int = 50):
     """Get recent trade history."""
     try:
-        analytics = get_performance_analytics(config.portfolio_initial_value)
-        return {
-            "trades": analytics.get_trade_history(limit),
-            "total_trades": len(analytics.trades),
-        }
+        return await run_in_threadpool(_get_performance_trade_history_sync, limit)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+def _get_performance_by_symbol_sync():
+    analytics = get_performance_analytics(config.portfolio_initial_value)
+    return analytics.get_symbol_performance()
 
 
 @app.get("/api/v1/performance/by-symbol", dependencies=[Depends(require_api_token)])
 async def get_performance_by_symbol():
     """Get performance breakdown by trading symbol."""
     try:
-        analytics = get_performance_analytics(config.portfolio_initial_value)
-        return analytics.get_symbol_performance()
+        return await run_in_threadpool(_get_performance_by_symbol_sync)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -577,8 +593,7 @@ async def get_performance_by_symbol():
 # --- Paper Trading Endpoints ---
 
 
-@app.get("/api/v1/paper-trading/status", dependencies=[Depends(require_api_token)])
-async def get_paper_trading_status():
+def _get_paper_trading_status_sync():
     """Get paper trading portfolio state and statistics."""
     import json
     from pathlib import Path
@@ -674,8 +689,13 @@ async def get_paper_trading_status():
     }
 
 
-@app.get("/api/v1/paper-trading/signals", dependencies=[Depends(require_api_token)])
-async def get_paper_trading_signals(limit: int = 50):
+@app.get("/api/v1/paper-trading/status", dependencies=[Depends(require_api_token)])
+async def get_paper_trading_status():
+    """Get paper trading portfolio state and statistics."""
+    return await run_in_threadpool(_get_paper_trading_status_sync)
+
+
+def _get_paper_trading_signals_sync(limit: int):
     """Get recent paper trading signals."""
     import json
     from pathlib import Path
@@ -685,24 +705,29 @@ async def get_paper_trading_signals(limit: int = 50):
     if not signal_file.exists():
         return {"signals": [], "total": 0}
 
-    try:
-        signals = []
-        with open(signal_file) as f:
-            for line in f:
-                if line.strip():
-                    signals.append(json.loads(line))
+    signals = []
+    with open(signal_file) as f:
+        for line in f:
+            if line.strip():
+                signals.append(json.loads(line))
 
-        # Return most recent
-        return {
-            "signals": signals[-limit:][::-1],  # Reverse for newest first
-            "total": len(signals),
-        }
+    # Return most recent
+    return {
+        "signals": signals[-limit:][::-1],  # Reverse for newest first
+        "total": len(signals),
+    }
+
+
+@app.get("/api/v1/paper-trading/signals", dependencies=[Depends(require_api_token)])
+async def get_paper_trading_signals(limit: int = 50):
+    """Get recent paper trading signals."""
+    try:
+        return await run_in_threadpool(_get_paper_trading_signals_sync, limit)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.get("/api/v1/paper-trading/trades", dependencies=[Depends(require_api_token)])
-async def get_paper_trading_trades(limit: int = 50):
+def _get_paper_trading_trades_sync(limit: int):
     """Get paper trading trade history."""
     import json
     from pathlib import Path
@@ -712,18 +737,24 @@ async def get_paper_trading_trades(limit: int = 50):
     if not trade_file.exists():
         return {"trades": [], "total": 0}
 
-    try:
-        trades = []
-        with open(trade_file) as f:
-            for line in f:
-                if line.strip():
-                    trades.append(json.loads(line))
+    trades = []
+    with open(trade_file) as f:
+        for line in f:
+            if line.strip():
+                trades.append(json.loads(line))
 
-        # Return most recent
-        return {
-            "trades": trades[-limit:][::-1],  # Reverse for newest first
-            "total": len(trades),
-        }
+    # Return most recent
+    return {
+        "trades": trades[-limit:][::-1],  # Reverse for newest first
+        "total": len(trades),
+    }
+
+
+@app.get("/api/v1/paper-trading/trades", dependencies=[Depends(require_api_token)])
+async def get_paper_trading_trades(limit: int = 50):
+    """Get paper trading trade history."""
+    try:
+        return await run_in_threadpool(_get_paper_trading_trades_sync, limit)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -731,6 +762,14 @@ async def get_paper_trading_trades(limit: int = 50):
 # Module-level paper trading loop state
 _paper_loop_instance: Optional[object] = None
 _paper_loop_thread: Optional[Thread] = None
+# Serializes the check-then-start sequence below across concurrent requests.
+# The PaperTradingLoop construction awaits a threadpool call, which yields
+# the event loop — without this lock, two /start requests arriving before
+# either one finishes constructing can both pass the "already running" check
+# and each spin up their own loop/thread, silently overwriting the module
+# globals so /stop can only ever signal the more recent one while the first
+# keeps running orphaned, placing duplicate paper trades.
+_paper_loop_start_lock = asyncio.Lock()
 
 
 @app.post("/api/v1/paper-trading/start", dependencies=[Depends(require_api_token)])
@@ -738,45 +777,47 @@ async def start_paper_trading(request: StartPaperTradingRequest | None = None):
     """Start the paper trading loop in a background thread."""
     global _paper_loop_instance, _paper_loop_thread
 
-    if _paper_loop_thread is not None and _paper_loop_thread.is_alive():
-        return {"success": False, "message": "Paper trading loop is already running"}
+    async with _paper_loop_start_lock:
+        if _paper_loop_thread is not None and _paper_loop_thread.is_alive():
+            return {"success": False, "message": "Paper trading loop is already running"}
 
-    # A body-less POST previously started the loop with the documented
-    # defaults (every Body() parameter had one) — preserve that instead of
-    # making the request body a hard requirement.
-    request = request or StartPaperTradingRequest()
-    symbols = request.symbols or ["BTCUSDT"]
+        # A body-less POST previously started the loop with the documented
+        # defaults (every Body() parameter had one) — preserve that instead
+        # of making the request body a hard requirement.
+        request = request or StartPaperTradingRequest()
+        symbols = request.symbols or ["BTCUSDT"]
 
-    try:
-        from ..core.paper_trading_loop import PaperTradingLoop
+        try:
+            from ..core.paper_trading_loop import PaperTradingLoop
 
-        _paper_loop_instance = PaperTradingLoop(
-            symbols=symbols,
-            strategy_name=request.strategy,
-            initial_balance=request.initial_balance,
-            trade_interval_seconds=request.interval_seconds,
-        )
+            _paper_loop_instance = await run_in_threadpool(
+                PaperTradingLoop,
+                symbols=symbols,
+                strategy_name=request.strategy,
+                initial_balance=request.initial_balance,
+                trade_interval_seconds=request.interval_seconds,
+            )
 
-        def _run():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                loop.run_until_complete(_paper_loop_instance.run())
-            finally:
-                loop.close()
+            def _run():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(_paper_loop_instance.run())
+                finally:
+                    loop.close()
 
-        _paper_loop_thread = Thread(target=_run, daemon=True, name="paper-trading-loop")
-        _paper_loop_thread.start()
+            _paper_loop_thread = Thread(target=_run, daemon=True, name="paper-trading-loop")
+            _paper_loop_thread.start()
 
-        return {
-            "success": True,
-            "message": "Paper trading started",
-            "symbols": symbols,
-            "strategy": request.strategy,
-        }
-    except Exception as e:
-        logger.error(f"Error starting paper trading loop: {e}")
-        raise HTTPException(status_code=500, detail=str(e)) from e
+            return {
+                "success": True,
+                "message": "Paper trading started",
+                "symbols": symbols,
+                "strategy": request.strategy,
+            }
+        except Exception as e:
+            logger.error(f"Error starting paper trading loop: {e}")
+            raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/v1/paper-trading/stop", dependencies=[Depends(require_api_token)])
@@ -811,19 +852,26 @@ async def get_paper_loop_status():
     return {"running": running}
 
 
+def _reset_paper_trading_sync(initial_balance: float | None):
+    from ..core.paper_trading import get_paper_trading_engine
+
+    engine = get_paper_trading_engine(
+        initial_balance=initial_balance or config.portfolio_initial_value
+    )
+    engine.reset(initial_balance=initial_balance)
+    return engine.get_portfolio_summary()
+
+
 @app.post("/api/v1/paper-trading/reset", dependencies=[Depends(require_api_token)])
 async def reset_paper_trading(request: PaperResetRequest):
     """Reset the paper-trading portfolio and archive existing paper logs."""
     try:
-        from ..core.paper_trading import get_paper_trading_engine
-
-        engine = get_paper_trading_engine(
-            initial_balance=request.initial_balance or config.portfolio_initial_value
+        portfolio_summary = await run_in_threadpool(
+            _reset_paper_trading_sync, request.initial_balance
         )
-        engine.reset(initial_balance=request.initial_balance)
         return {
             "success": True,
-            "portfolio": engine.get_portfolio_summary(),
+            "portfolio": portfolio_summary,
             "timestamp": datetime.now().isoformat(),
         }
     except Exception as e:
@@ -846,7 +894,7 @@ async def get_latest_decision(symbol: str | None = None):
         from ..core.decision_journal import get_decision_journal
 
         journal = get_decision_journal()
-        decision = journal.get_latest(symbol=symbol)
+        decision = await run_in_threadpool(journal.get_latest, symbol=symbol)
         if decision is None:
             return {"decision": None, "message": "No decisions recorded yet"}
         return {"decision": decision}
@@ -869,7 +917,7 @@ async def get_decision_history(symbol: str | None = None, limit: int = 50):
         from ..core.decision_journal import get_decision_journal
 
         journal = get_decision_journal()
-        decisions = journal.get_history(symbol=symbol, limit=limit)
+        decisions = await run_in_threadpool(journal.get_history, symbol=symbol, limit=limit)
         return {"decisions": decisions, "total": len(decisions)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -884,7 +932,7 @@ async def get_rate_limits():
     from ..clients.binance_client import BinanceAPIClient
 
     client = BinanceAPIClient()
-    return client.get_rate_limit_status()
+    return await run_in_threadpool(client.get_rate_limit_status)
 
 
 # --- Order Lifecycle Endpoints ---
@@ -896,7 +944,8 @@ async def list_open_orders(symbol: str | None = None):
     from ..core.order_lifecycle import get_order_lifecycle_service
 
     svc = get_order_lifecycle_service()
-    return {"orders": svc.get_open_orders(symbol=symbol)}
+    orders = await run_in_threadpool(svc.get_open_orders, symbol=symbol)
+    return {"orders": orders}
 
 
 @app.get("/api/v1/orders/terminal", dependencies=[Depends(require_api_token)])
@@ -905,7 +954,8 @@ async def list_terminal_orders(symbol: str | None = None, limit: int = 100):
     from ..core.order_lifecycle import get_order_lifecycle_service
 
     svc = get_order_lifecycle_service()
-    return {"orders": svc.get_terminal_orders(symbol=symbol, limit=limit)}
+    orders = await run_in_threadpool(svc.get_terminal_orders, symbol=symbol, limit=limit)
+    return {"orders": orders}
 
 
 @app.get("/api/v1/orders/stale", dependencies=[Depends(require_api_token)])
@@ -914,11 +964,10 @@ async def list_stale_orders(symbol: str | None = None, price_pct_threshold: floa
     from ..core.order_lifecycle import get_order_lifecycle_service
 
     svc = get_order_lifecycle_service()
-    return {
-        "orders": svc.detect_stale_limit_orders(
-            symbol=symbol, price_pct_threshold=price_pct_threshold
-        )
-    }
+    orders = await run_in_threadpool(
+        svc.detect_stale_limit_orders, symbol=symbol, price_pct_threshold=price_pct_threshold
+    )
+    return {"orders": orders}
 
 
 @app.post("/api/v1/orders/stale/cancel", dependencies=[Depends(require_api_token)])
@@ -933,7 +982,8 @@ async def cancel_stale_orders_endpoint(
     from ..core.order_lifecycle import get_order_lifecycle_service
 
     svc = get_order_lifecycle_service()
-    results = svc.cancel_stale_orders(
+    results = await run_in_threadpool(
+        svc.cancel_stale_orders,
         symbol=symbol.upper() if symbol else None,
         price_pct_threshold=price_pct_threshold,
     )
@@ -958,7 +1008,7 @@ async def cancel_order_endpoint(
 
     svc = get_order_lifecycle_service()
     try:
-        order = svc.cancel_order(client_order_id, symbol, reason)
+        order = await run_in_threadpool(svc.cancel_order, client_order_id, symbol, reason)
         return {"success": True, "order": order}
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -1015,8 +1065,7 @@ def _stream_status_to_dict(status) -> dict:
 # --- Operator Status Endpoint ---
 
 
-@app.get("/api/v1/operator/status", dependencies=[Depends(require_api_token)])
-async def get_operator_status():
+def _get_operator_status_sync() -> dict:
     """
     Consolidated operator supervision endpoint.
 
@@ -1145,6 +1194,12 @@ async def get_operator_status():
         result["emergency_stop"] = {"error": str(exc)}
 
     return result
+
+
+@app.get("/api/v1/operator/status", dependencies=[Depends(require_api_token)])
+async def get_operator_status():
+    """Consolidated operator supervision endpoint (see _get_operator_status_sync)."""
+    return await run_in_threadpool(_get_operator_status_sync)
 
 
 if __name__ == "__main__":

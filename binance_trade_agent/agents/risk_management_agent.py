@@ -5,13 +5,17 @@ Enhanced Risk Management Agent with comprehensive risk controls
 import json
 import logging
 import os
+import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from ..common.config import config
 from ..core.portfolio_manager import PortfolioManager
+
+RISK_STATE_KEY = "risk_counters"
+RISK_STATE_LOCK_NAME = "risk-state-lock"
 
 
 class RiskLevel(Enum):
@@ -127,6 +131,7 @@ class EnhancedRiskManagementAgent:
         self.state_store = (
             PortfolioManager("/app/data/web_portfolio.db") if self.shared_state_enabled else None
         )
+        self._load_shared_risk_state()
 
         self.logger.info("Enhanced Risk Management Agent initialized")
 
@@ -146,6 +151,129 @@ class EnhancedRiskManagementAgent:
         except Exception as e:
             self.logger.warning(f"Failed to read shared emergency stop state: {e}")
             return bool(self.config["emergency_stop"])
+
+    def _load_shared_risk_state(self):
+        """
+        Rehydrate mutable risk counters (consecutive_losses, daily_trades,
+        peak_portfolio_value, recent_trades, ...) from shared DB state.
+
+        Without this, these counters live only as in-memory instance
+        attributes — a process restart, or a second process (e.g. the API
+        container instantiating its own EnhancedRiskManagementAgent)
+        silently resets them to zero, undercounting drawdown/loss-streak/
+        frequency limits relative to what actually happened. emergency_stop
+        already gets this treatment via _shared_emergency_stop_enabled; this
+        extends the same pattern to the rest of the mutable risk state.
+        """
+        if not self.shared_state_enabled or self.state_store is None:
+            return
+
+        try:
+            state = self.state_store.get_system_state(RISK_STATE_KEY)
+            if not state:
+                return
+            payload = json.loads(state["value"])
+
+            self.consecutive_losses = payload.get("consecutive_losses", self.consecutive_losses)
+            self.daily_trades = payload.get("daily_trades", self.daily_trades)
+            self.peak_portfolio_value = payload.get(
+                "peak_portfolio_value", self.peak_portfolio_value
+            )
+            self.current_drawdown = payload.get("current_drawdown", self.current_drawdown)
+            self.daily_start_value = payload.get("daily_start_value", self.daily_start_value)
+
+            last_trade_time = payload.get("last_trade_time")
+            if last_trade_time:
+                self.last_trade_time = datetime.fromisoformat(last_trade_time)
+
+            drawdown_pause_until = payload.get("drawdown_pause_until")
+            self.drawdown_pause_until = (
+                datetime.fromisoformat(drawdown_pause_until) if drawdown_pause_until else None
+            )
+
+            last_daily_reset = payload.get("last_daily_reset")
+            if last_daily_reset:
+                self.last_daily_reset = date.fromisoformat(last_daily_reset)
+
+            recent_trades = payload.get("recent_trades")
+            if recent_trades is not None:
+                self.recent_trades = [
+                    {**trade, "timestamp": datetime.fromisoformat(trade["timestamp"])}
+                    for trade in recent_trades
+                ]
+        except Exception as e:
+            self.logger.warning(f"Failed to load shared risk state: {e}")
+
+    def _persist_risk_state(self):
+        """Persist mutable risk counters to shared DB state (see _load_shared_risk_state)."""
+        if not self.shared_state_enabled or self.state_store is None:
+            return
+
+        try:
+            payload = {
+                "consecutive_losses": self.consecutive_losses,
+                "daily_trades": self.daily_trades,
+                "peak_portfolio_value": self.peak_portfolio_value,
+                "current_drawdown": self.current_drawdown,
+                "daily_start_value": self.daily_start_value,
+                "last_trade_time": (
+                    self.last_trade_time.isoformat() if self.last_trade_time else None
+                ),
+                "drawdown_pause_until": (
+                    self.drawdown_pause_until.isoformat() if self.drawdown_pause_until else None
+                ),
+                "last_daily_reset": self.last_daily_reset.isoformat(),
+                "recent_trades": [
+                    {**trade, "timestamp": trade["timestamp"].isoformat()}
+                    for trade in self.recent_trades
+                ],
+            }
+            self.state_store.set_system_state(
+                RISK_STATE_KEY, json.dumps(payload), updated_by="risk_management_agent"
+            )
+        except Exception as e:
+            self.logger.error(f"Failed to persist risk state: {e}")
+
+    def _acquire_risk_state_lock(
+        self, timeout_seconds: float = 5.0, poll_interval: float = 0.05
+    ) -> bool:
+        """
+        Best-effort mutual exclusion around the load-mutate-persist critical
+        section in validate_trade/record_trade_result.
+
+        Without this, two processes sharing state (e.g. the dashboard and
+        trading-agent, or two trading-agent instances) can both
+        _load_shared_risk_state() the same snapshot, mutate their own copy
+        independently, and have one process's _persist_risk_state() silently
+        overwrite the other's — losing an increment to daily_trades or a
+        consecutive-loss reset. Reuses the trading loop's own
+        claim/steal-if-stale heartbeat primitive as a named advisory lock
+        rather than introducing a second locking mechanism; a stuck holder
+        (e.g. a crashed process that never released it) self-heals after
+        stale_after_seconds rather than deadlocking every future trade.
+        """
+        if not self.shared_state_enabled or self.state_store is None:
+            return False
+        deadline = time.monotonic() + timeout_seconds
+        while True:
+            if self.state_store.try_claim_heartbeat(
+                RISK_STATE_LOCK_NAME, stale_after_seconds=30, status="locked"
+            ):
+                return True
+            if time.monotonic() >= deadline:
+                self.logger.warning(
+                    "Timed out waiting for the risk-state lock; proceeding without "
+                    "it (risk counters may race with a concurrent writer)"
+                )
+                return False
+            time.sleep(poll_interval)
+
+    def _release_risk_state_lock(self):
+        if self.shared_state_enabled and self.state_store is not None:
+            try:
+                self.state_store.update_heartbeat(RISK_STATE_LOCK_NAME, status="stopped")
+            except Exception as e:
+                self.logger.warning(f"Failed to release risk-state lock: {e}")
 
     def _initialize_risk_rules(self) -> List[RiskRule]:
         """Initialize all risk management rules"""
@@ -236,6 +364,30 @@ class EnhancedRiskManagementAgent:
         """
         self.logger.info(f"Validating trade: {side} {quantity} {symbol} @ ${price}")
 
+        lock_held = self._acquire_risk_state_lock()
+        try:
+            return self._validate_trade_locked(
+                symbol, side, quantity, price, portfolio_value, current_positions, market_data
+            )
+        finally:
+            if lock_held:
+                self._release_risk_state_lock()
+
+    def _validate_trade_locked(
+        self,
+        symbol: str,
+        side: str,
+        quantity: float,
+        price: float,
+        portfolio_value: float,
+        current_positions: Optional[Dict[str, Any]],
+        market_data: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        # Sync counters from shared state before checking anything that
+        # depends on them (drawdown_pause_until, consecutive_losses, etc.) —
+        # another process may have updated them since our last call.
+        self._load_shared_risk_state()
+
         # Initialize assessment
         assessment = RiskAssessment(
             approved=True, risk_level=RiskLevel.LOW, reasons=[], warnings=[]
@@ -284,6 +436,10 @@ class EnhancedRiskManagementAgent:
 
         # Record trade attempt for frequency tracking
         self._record_trade_attempt(symbol, side, quantity, price, assessment.approved)
+
+        # Persist updated counters so other processes (and this process, on
+        # restart) see this call's effect on frequency/drawdown tracking.
+        self._persist_risk_state()
 
         # Final risk level determination
         if not assessment.approved:
@@ -573,10 +729,19 @@ class EnhancedRiskManagementAgent:
 
     def record_trade_result(self, trade_id: str, pnl: float):
         """Record trade result for consecutive loss tracking"""
-        if pnl < 0:
-            self.consecutive_losses += 1
-        else:
-            self.consecutive_losses = 0
+        lock_held = self._acquire_risk_state_lock()
+        try:
+            self._load_shared_risk_state()
+
+            if pnl < 0:
+                self.consecutive_losses += 1
+            else:
+                self.consecutive_losses = 0
+
+            self._persist_risk_state()
+        finally:
+            if lock_held:
+                self._release_risk_state_lock()
 
         self.logger.info(
             f"Trade {trade_id} result: ${pnl:.2f}, consecutive losses: {self.consecutive_losses}"
@@ -608,6 +773,11 @@ class EnhancedRiskManagementAgent:
 
     def get_risk_status(self) -> Dict[str, Any]:
         """Get current risk management status"""
+        # A read-only process (the FastAPI service) only loads shared state
+        # at agent construction otherwise, so its /api/v1/risk/status
+        # response would report this instance's stale counters forever
+        # instead of reflecting updates from the trading-agent process.
+        self._load_shared_risk_state()
         return {
             "emergency_stop": self._shared_emergency_stop_enabled(),
             "consecutive_losses": self.consecutive_losses,

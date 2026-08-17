@@ -168,6 +168,7 @@ class TestHeartbeatRefreshedDuringCycle:
             loop._heartbeat_portfolio = portfolio
             loop.stop_flag = False
             loop.trades_executed = 0
+            loop.stream_trailing_stop_watcher_enabled = False
             loop.orchestrator = MagicMock()
             loop.orchestrator.risk_agent._shared_emergency_stop_enabled = MagicMock(
                 return_value=False
