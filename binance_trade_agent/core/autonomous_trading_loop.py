@@ -8,6 +8,7 @@ import logging
 import os
 import sys
 from datetime import datetime, timedelta
+from typing import Optional
 
 # Add the parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -285,7 +286,9 @@ class AutonomousTradingLoop:
                     f"P&L: {profit_pct:+.2f}%"
                 )
 
-    async def _check_trailing_stop_via_stream(self, symbol: str, interval: str) -> bool:
+    async def _check_trailing_stop_via_stream(
+        self, symbol: str, interval: str, registered_at_ms: Optional[int] = None
+    ) -> bool:
         """
         Check one symbol's trailing stop against the latest closed candle
         from the WebSocket kline stream, if fresh data is available.
@@ -303,8 +306,16 @@ class AutonomousTradingLoop:
 
         open_time_ms, _open, _high, _low, close, _volume = candles[-1]
         last_seen = self._stream_last_candle_time.get(symbol)
+        if last_seen is None and registered_at_ms is not None:
+            # First tick for this symbol since it was (re-)registered — a
+            # candle that opened before the position existed reflects
+            # pre-entry price action, not something the trailing stop should
+            # react to (e.g. it could falsely trigger a stop or seed the
+            # trailing level off a price the position was never exposed to).
+            last_seen = registered_at_ms - 1
         if last_seen is not None and open_time_ms <= last_seen:
-            return False  # already processed this candle
+            self._stream_last_candle_time[symbol] = last_seen
+            return False  # already processed, or predates the position
         self._stream_last_candle_time[symbol] = open_time_ms
 
         results = self.orchestrator.risk_agent.update_all_trailing_stops({symbol: close})
@@ -344,9 +355,18 @@ class AutonomousTradingLoop:
             while not self.stop_flag:
                 risk_agent = self.orchestrator.risk_agent
                 trailing_info = risk_agent.get_trailing_stop_info()
-                for symbol in list(trailing_info.get("positions", {}).keys()):
+                positions = trailing_info.get("positions", {})
+                for symbol, position in list(positions.items()):
                     try:
-                        await self._check_trailing_stop_via_stream(symbol, interval)
+                        registered_at_ms = None
+                        registered_at = position.get("registered_at")
+                        if registered_at:
+                            registered_at_ms = int(
+                                datetime.fromisoformat(registered_at).timestamp() * 1000
+                            )
+                        await self._check_trailing_stop_via_stream(
+                            symbol, interval, registered_at_ms=registered_at_ms
+                        )
                     except Exception as exc:
                         self.logger.warning(
                             f"Trailing-stop watcher: error checking {symbol}: {exc}"

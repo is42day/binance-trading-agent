@@ -101,7 +101,17 @@ async def _binance_ws_stream(symbol: str, interval: str) -> AsyncIterator[dict]:
             "websockets package is required for live WebSocket streams. "
             "Install with: pip install websockets"
         ) from exc
-    url = f"wss://stream.binance.com:9443/ws/" f"{symbol.lower()}@kline_{interval}"
+    from binance_trade_agent.common.config import config
+
+    # Mirror clients/binance_client.py's REST base-URL selection — a
+    # BINANCE_TESTNET=true environment must never source live-market data,
+    # or a testnet trailing stop could be triggered/updated off real prices.
+    base = (
+        "wss://stream.testnet.binance.vision/ws"
+        if config.binance_testnet
+        else "wss://stream.binance.com:9443/ws"
+    )
+    url = f"{base}/{symbol.lower()}@kline_{interval}"
     async with websockets.connect(url) as ws:
         async for raw in ws:
             import json
