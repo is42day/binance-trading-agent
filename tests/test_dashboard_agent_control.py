@@ -140,6 +140,13 @@ class TestAgentStateManagement:
         # Verify stop flag set
         assert mock_trading_loop.stop_flag is True
 
+        # Verify the heartbeat lease is released synchronously, not left to
+        # run()'s own "final summary" section (which task.cancel() below can
+        # skip past entirely, depending on where the task happens to be
+        # awaiting) — otherwise an immediate restart would spuriously fail
+        # with DuplicateTradingLoopError until the stale heartbeat expired.
+        mock_trading_loop.release_heartbeat.assert_called_once()
+
         # Verify task cancelled
         mock_task.cancel.assert_called_once()
 

@@ -7,12 +7,22 @@ import logging
 import os
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 from typing import Any, Callable, Dict, List, Optional
 
-from sqlalchemy import Column, DateTime, Float, String, Text, UniqueConstraint, inspect, text
-from sqlalchemy.exc import OperationalError
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Float,
+    String,
+    Text,
+    UniqueConstraint,
+    inspect,
+    or_,
+    text,
+)
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.orm import declarative_base
 
@@ -1008,6 +1018,87 @@ class PortfolioManager:
                     session.add(heartbeat)
 
                 self.logger.debug(f"Updated heartbeat for {service_name}: {status}")
+        finally:
+            session.close()
+
+    @retry_on_db_error(max_retries=3, backoff_seconds=0.5)
+    def try_claim_heartbeat(
+        self,
+        service_name: str,
+        stale_after_seconds: float,
+        status: str = "starting",
+        details: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """
+        Atomically claim a heartbeat lease for service_name.
+
+        Returns True if no row exists yet, or the existing row is either
+        marked "stopped" or stale (last_update older than
+        stale_after_seconds) — i.e. this call successfully takes the lease.
+        Returns False if a live, fresh heartbeat already exists, meaning
+        another instance holds it.
+
+        A plain read-then-write (get_heartbeat + update_heartbeat) has a
+        TOCTOU race: two instances starting together can both read "no
+        live heartbeat" before either writes. This uses a single
+        UPDATE ... WHERE for the steal-a-stale-lease case, which SQLite
+        evaluates atomically (concurrent writers to the same row serialize
+        at the file-lock level), and falls back to an INSERT guarded by the
+        service_name primary key for the no-row-yet case, so at most one of
+        two racing first-time claims can succeed.
+        """
+        details_json = json.dumps(details) if details else None
+        now = datetime.now()
+        stale_cutoff = now - timedelta(seconds=stale_after_seconds)
+
+        session = self.get_session()
+        try:
+            updated = (
+                session.query(HeartbeatORM)
+                .filter(
+                    HeartbeatORM.service_name == service_name,
+                    or_(
+                        HeartbeatORM.status == "stopped",
+                        HeartbeatORM.last_update < stale_cutoff,
+                    ),
+                )
+                .update(
+                    {
+                        HeartbeatORM.status: status,
+                        HeartbeatORM.last_update: now,
+                        HeartbeatORM.details: details_json,
+                    },
+                    synchronize_session=False,
+                )
+            )
+            if updated:
+                session.commit()
+                return True
+
+            session.rollback()
+
+            exists = (
+                session.query(HeartbeatORM.service_name)
+                .filter(HeartbeatORM.service_name == service_name)
+                .first()
+            )
+            if exists is not None:
+                return False
+
+            try:
+                session.add(
+                    HeartbeatORM(
+                        service_name=service_name,
+                        last_update=now,
+                        status=status,
+                        details=details_json,
+                    )
+                )
+                session.commit()
+                return True
+            except IntegrityError:
+                session.rollback()
+                return False
         finally:
             session.close()
 
