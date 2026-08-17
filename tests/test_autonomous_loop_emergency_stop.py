@@ -33,10 +33,25 @@ def _build_loop():
     return loop
 
 
+@pytest.fixture
+def loop():
+    """
+    Each test here constructs a *real* AutonomousTradingLoop (not the
+    __new__-bypass pattern used elsewhere), which claims the process-wide
+    trading-agent heartbeat lease in __init__. Without releasing it, the
+    next test in this file to construct a loop sees a still-fresh lease and
+    fails with DuplicateTradingLoopError.
+    """
+    built = _build_loop()
+    try:
+        yield built
+    finally:
+        built.release_heartbeat()
+
+
 class TestTrailingStopsRespectEmergencyStop:
     @pytest.mark.asyncio
-    async def test_triggered_trailing_stop_is_not_closed_during_emergency_stop(self):
-        loop = _build_loop()
+    async def test_triggered_trailing_stop_is_not_closed_during_emergency_stop(self, loop):
         risk_agent = loop.orchestrator.risk_agent
         risk_agent.set_emergency_stop(True, "test halt")
 
@@ -64,8 +79,7 @@ class TestTrailingStopsRespectEmergencyStop:
         risk_agent.get_trailing_stop_info.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_trailing_stop_closes_normally_when_not_stopped(self):
-        loop = _build_loop()
+    async def test_trailing_stop_closes_normally_when_not_stopped(self, loop):
         risk_agent = loop.orchestrator.risk_agent
         assert risk_agent._shared_emergency_stop_enabled() is False
 
@@ -94,14 +108,13 @@ class TestTrailingStopsRespectEmergencyStop:
         loop.orchestrator.execution_agent.place_sell_order.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_emergency_stop_activated_mid_call_still_blocks_the_order(self):
+    async def test_emergency_stop_activated_mid_call_still_blocks_the_order(self, loop):
         """
         Emergency stop is cross-process shared state — it can be activated by
         another process after the once-per-call check at the top of
         _update_trailing_stops but before a specific triggered stop's order
         is placed. The per-order recheck must catch this.
         """
-        loop = _build_loop()
         risk_agent = loop.orchestrator.risk_agent
 
         # False for the top-of-method check, True for the per-order recheck.
@@ -131,8 +144,7 @@ class TestTrailingStopsRespectEmergencyStop:
 
 class TestRunLoopRespectsEmergencyStop:
     @pytest.mark.asyncio
-    async def test_run_skips_trade_execution_while_emergency_stop_active(self):
-        loop = _build_loop()
+    async def test_run_skips_trade_execution_while_emergency_stop_active(self, loop):
         loop.duration_minutes = 0
         loop.orchestrator.risk_agent.set_emergency_stop(True, "test halt")
         loop.orchestrator.execute_trading_workflow = AsyncMock()
@@ -146,10 +158,9 @@ class TestRunLoopRespectsEmergencyStop:
         loop.orchestrator.execute_trading_workflow.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_run_executes_trades_when_not_stopped(self):
+    async def test_run_executes_trades_when_not_stopped(self, loop):
         from binance_trade_agent.core.orchestrator import TradeDecision
 
-        loop = _build_loop()
         loop.duration_minutes = 0
         loop.orchestrator.execute_trading_workflow = AsyncMock(
             return_value=TradeDecision(
