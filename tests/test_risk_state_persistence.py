@@ -11,6 +11,8 @@ what actually happened.
 """
 
 import tempfile
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -125,3 +127,73 @@ def test_no_shared_state_falls_back_to_local_in_memory_counters():
 
     agent.record_trade_result("t1", pnl=-10.0)  # must not raise
     assert agent.consecutive_losses == 1
+
+
+def test_get_risk_status_reflects_another_process_without_a_new_trade(shared_agent_factory):
+    """
+    A read-only process (mirroring the FastAPI service) only loaded shared
+    state at construction; get_risk_status() must refresh from shared state
+    on every call, not just report whatever this instance saw at __init__.
+    """
+    first = shared_agent_factory()
+    first.config["min_time_between_trades"] = 0
+    first.validate_trade(symbol="BTCUSDT", side="BUY", quantity=0.001, price=50000.0)
+    assert first.daily_trades == 1
+
+    reader = shared_agent_factory()
+    # Simulate more trades happening in "another process" after reader's
+    # construction-time load.
+    third = shared_agent_factory()
+    third.config["min_time_between_trades"] = 0
+    third.validate_trade(symbol="ETHUSDT", side="BUY", quantity=0.01, price=2000.0)
+
+    status = reader.get_risk_status()
+    assert status["daily_trades"] == 2
+
+
+class TestRiskStateLockPreventsLostUpdates:
+    def test_second_agent_cannot_acquire_lock_while_first_holds_it(self, shared_agent_factory):
+        first = shared_agent_factory()
+        second = shared_agent_factory()
+
+        assert first._acquire_risk_state_lock() is True
+        assert second._acquire_risk_state_lock(timeout_seconds=0.2, poll_interval=0.02) is False
+
+        first._release_risk_state_lock()
+        assert second._acquire_risk_state_lock(timeout_seconds=0.2, poll_interval=0.02) is True
+        second._release_risk_state_lock()
+
+    def test_concurrent_record_trade_result_does_not_lose_an_update(self, shared_agent_factory):
+        """
+        Two "processes" both calling record_trade_result(pnl<0) around the
+        same time must not race: each load-mutate-persist is a critical
+        section, so N total losing trades across both agents must add up to
+        N consecutive_losses, not fewer (a lost update would undercount the
+        loss streak that's supposed to trip max_consecutive_losses).
+        """
+        first = shared_agent_factory()
+        second = shared_agent_factory()
+
+        # Widen the race window: pause partway through the critical section
+        # so the two threads' load-mutate-persist sequences actually
+        # interleave instead of running back-to-back by luck.
+        original_persist = EnhancedRiskManagementAgent._persist_risk_state
+
+        def _slow_persist(self):
+            time.sleep(0.05)
+            return original_persist(self)
+
+        first._persist_risk_state = _slow_persist.__get__(first)
+        second._persist_risk_state = _slow_persist.__get__(second)
+
+        threads = [
+            threading.Thread(target=first.record_trade_result, args=("t1", -1.0)),
+            threading.Thread(target=second.record_trade_result, args=("t2", -1.0)),
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=5)
+
+        verifier = shared_agent_factory()
+        assert verifier.consecutive_losses == 2
