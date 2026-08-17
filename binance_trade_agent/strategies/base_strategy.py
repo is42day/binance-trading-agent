@@ -163,7 +163,7 @@ class BaseStrategy(ABC):
         self,
         market_data: List[Dict[str, Any]],
         volume_multiplier: float = 1.5,
-        lookback_period: int = 20
+        lookback_period: int = 20,
     ) -> Tuple[bool, float]:
         """
         Check if current volume confirms the signal.
@@ -194,7 +194,7 @@ class BaseStrategy(ABC):
                 return True, 1.0  # Not enough volume data
 
             current_volume = volumes[-1]
-            avg_volume = sum(volumes[-lookback_period-1:-1]) / lookback_period
+            avg_volume = sum(volumes[-lookback_period - 1 : -1]) / lookback_period
 
             if avg_volume == 0:
                 return True, 1.0
@@ -207,11 +207,7 @@ class BaseStrategy(ABC):
         except Exception:
             return True, 1.0  # On error, don't block
 
-    def calculate_atr(
-        self,
-        market_data: List[Dict[str, Any]],
-        period: int = 14
-    ) -> float:
+    def calculate_atr(self, market_data: List[Dict[str, Any]], period: int = 14) -> float:
         """
         Calculate Average True Range (ATR) for volatility-based stops.
 
@@ -234,14 +230,10 @@ class BaseStrategy(ABC):
             for i in range(1, len(market_data)):
                 high = float(market_data[i].get("high", market_data[i]["close"]))
                 low = float(market_data[i].get("low", market_data[i]["close"]))
-                prev_close = float(market_data[i-1]["close"])
+                prev_close = float(market_data[i - 1]["close"])
 
                 # True Range = max(high-low, |high-prev_close|, |low-prev_close|)
-                tr = max(
-                    high - low,
-                    abs(high - prev_close),
-                    abs(low - prev_close)
-                )
+                tr = max(high - low, abs(high - prev_close), abs(low - prev_close))
                 true_ranges.append(tr)
 
             # ATR is the moving average of True Range
@@ -259,7 +251,7 @@ class BaseStrategy(ABC):
         atr: float,
         signal: "SignalType",
         atr_multiplier: float = 2.0,
-        take_profit_multiplier: float = 3.0
+        take_profit_multiplier: float = 3.0,
     ) -> Tuple[Optional[float], Optional[float]]:
         """
         Calculate ATR-based stop loss and take profit levels.
@@ -305,11 +297,7 @@ class BaseStrategy(ABC):
 
         return {"volatility": volatility, "risk_level": risk_level}
 
-    def calculate_ema(
-        self,
-        market_data: List[Dict[str, Any]],
-        period: int = 20
-    ) -> Optional[float]:
+    def calculate_ema(self, market_data: List[Dict[str, Any]], period: int = 20) -> Optional[float]:
         """
         Calculate Exponential Moving Average.
 
@@ -342,9 +330,7 @@ class BaseStrategy(ABC):
             return None
 
     def calculate_ema_series(
-        self,
-        market_data: List[Dict[str, Any]],
-        period: int = 20
+        self, market_data: List[Dict[str, Any]], period: int = 20
     ) -> List[float]:
         """
         Calculate EMA series for all data points.
@@ -379,10 +365,7 @@ class BaseStrategy(ABC):
             return []
 
     def get_trend_filter(
-        self,
-        market_data: List[Dict[str, Any]],
-        fast_period: int = 50,
-        slow_period: int = 200
+        self, market_data: List[Dict[str, Any]], fast_period: int = 50, slow_period: int = 200
     ) -> Dict[str, Any]:
         """
         Calculate trend filter using EMA crossover (50/200 EMA).
@@ -414,7 +397,7 @@ class BaseStrategy(ABC):
                 "trend_strength": 0.0,
                 "allows_buy": True,  # Allow both when no trend data
                 "allows_sell": True,
-                "reason": "Insufficient data for trend analysis"
+                "reason": "Insufficient data for trend analysis",
             }
 
         try:
@@ -429,7 +412,7 @@ class BaseStrategy(ABC):
                     "trend_strength": 0.0,
                     "allows_buy": True,
                     "allows_sell": True,
-                    "reason": "EMA calculation failed"
+                    "reason": "EMA calculation failed",
                 }
 
             current_price = float(market_data[-1]["close"])
@@ -461,7 +444,7 @@ class BaseStrategy(ABC):
                 "trend_strength": round(trend_strength, 3),
                 "allows_buy": allows_buy,
                 "allows_sell": allows_sell,
-                "reason": f"50 EMA {'above' if ema_fast > ema_slow else 'below'} 200 EMA"
+                "reason": f"50 EMA {'above' if ema_fast > ema_slow else 'below'} 200 EMA",
             }
 
         except Exception as e:
@@ -472,7 +455,7 @@ class BaseStrategy(ABC):
                 "trend_strength": 0.0,
                 "allows_buy": True,
                 "allows_sell": True,
-                "reason": f"Error: {str(e)}"
+                "reason": f"Error: {str(e)}",
             }
 
     def __str__(self) -> str:

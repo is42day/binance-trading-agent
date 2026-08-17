@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 # Configuration dataclass
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ExecutionPolicy:
     """
@@ -51,9 +52,9 @@ class ExecutionPolicy:
     """
 
     execution_mode: str = "maker_first"
-    max_spread_pct: float = 0.10        # %
-    max_slippage_pct: float = 0.15      # %
-    limit_price_offset_bps: int = 5     # basis points (1 bps = 0.01 %)
+    max_spread_pct: float = 0.10  # %
+    max_slippage_pct: float = 0.15  # %
+    limit_price_offset_bps: int = 5  # basis points (1 bps = 0.01 %)
     stale_order_seconds: int = 60
     depth_limit: int = 50
 
@@ -71,6 +72,7 @@ class ExecutionPolicy:
 # ---------------------------------------------------------------------------
 # Evaluation result
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ExecutionEvaluation:
@@ -123,6 +125,7 @@ class ExecutionEvaluation:
 # Engine
 # ---------------------------------------------------------------------------
 
+
 class ExecutionPolicyEngine:
     """
     Pre-order validation layer. Consumes a BinanceAPIClient and an
@@ -174,19 +177,26 @@ class ExecutionPolicyEngine:
         # Step 1: exchange filter validation
         try:
             validation = self._client.validate_order_params(
-                symbol, side, "LIMIT" if self.policy.execution_mode != "market" else "MARKET",
-                quantity, price
+                symbol,
+                side,
+                "LIMIT" if self.policy.execution_mode != "market" else "MARKET",
+                quantity,
+                price,
             )
         except Exception as exc:
             return self._blocked(
-                symbol, side, quantity,
+                symbol,
+                side,
+                quantity,
                 reason="filter_validation_error",
                 metadata={"error": str(exc)},
             )
 
         if not validation["valid"]:
             return self._blocked(
-                symbol, side, quantity,
+                symbol,
+                side,
+                quantity,
                 reason="filter_validation_failed",
                 metadata={"errors": validation["errors"]},
             )
@@ -200,14 +210,18 @@ class ExecutionPolicyEngine:
             asks = [(float(p), float(q)) for p, q in book.get("asks", [])]
         except Exception as exc:
             return self._blocked(
-                symbol, side, normalised_qty,
+                symbol,
+                side,
+                normalised_qty,
                 reason="order_book_fetch_error",
                 metadata={"error": str(exc)},
             )
 
         if not bids or not asks:
             return self._blocked(
-                symbol, side, normalised_qty,
+                symbol,
+                side,
+                normalised_qty,
                 reason="order_book_empty",
             )
 
@@ -218,7 +232,9 @@ class ExecutionPolicyEngine:
 
         if spread_pct > self.policy.max_spread_pct:
             return self._blocked(
-                symbol, side, normalised_qty,
+                symbol,
+                side,
+                normalised_qty,
                 reason="spread_too_wide",
                 spread_pct=spread_pct,
                 mid_price=mid_price,
@@ -242,7 +258,9 @@ class ExecutionPolicyEngine:
 
             if slippage_pct is not None and slippage_pct > self.policy.max_slippage_pct:
                 return self._blocked(
-                    symbol, side, normalised_qty,
+                    symbol,
+                    side,
+                    normalised_qty,
                     reason="slippage_too_high",
                     spread_pct=spread_pct,
                     slippage_pct=slippage_pct,
@@ -254,13 +272,14 @@ class ExecutionPolicyEngine:
                 )
 
         # Step 4: determine order type and limit price
-        order_type, limit_price = self._resolve_order_params(
-            side, mid_price, price, validation
-        )
+        order_type, limit_price = self._resolve_order_params(side, mid_price, price, validation)
 
         logger.info(
             "Execution approved: %s %s %s qty=%.8f mode=%s spread=%.4f%% slippage=%s",
-            side, symbol, order_type, normalised_qty,
+            side,
+            symbol,
+            order_type,
+            normalised_qty,
             self.policy.execution_mode,
             spread_pct,
             f"{slippage_pct:.4f}%" if slippage_pct is not None else "N/A",
@@ -342,7 +361,9 @@ class ExecutionPolicyEngine:
     ) -> ExecutionEvaluation:
         logger.warning(
             "Execution BLOCKED: %s %s reason=%s spread=%s slippage=%s",
-            side, symbol, reason,
+            side,
+            symbol,
+            reason,
             f"{spread_pct:.4f}%" if spread_pct is not None else "N/A",
             f"{slippage_pct:.4f}%" if slippage_pct is not None else "N/A",
         )

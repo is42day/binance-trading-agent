@@ -13,7 +13,7 @@ from .base_strategy import BaseStrategy, SignalType, StrategyResult
 class BuyStrategyAggressive(BaseStrategy):
     """
     Ultra-aggressive BUY strategy that generates signals in normal market conditions.
-    
+
     Uses momentum-based entry to build positions quickly for testing and evaluation.
     """
 
@@ -75,7 +75,7 @@ class BuyStrategyAggressive(BaseStrategy):
         if len(closes) < period + 1:
             return 50.0
 
-        deltas = [closes[i] - closes[i-1] for i in range(1, len(closes))]
+        deltas = [closes[i] - closes[i - 1] for i in range(1, len(closes))]
         gains = sum(max(d, 0) for d in deltas[-period:]) / period
         losses = sum(max(-d, 0) for d in deltas[-period:]) / period
 
@@ -124,7 +124,11 @@ class BuyStrategyAggressive(BaseStrategy):
                 # Upward momentum - ALWAYS BUY regardless of RSI
                 # Higher confidence if also low RSI
                 base_confidence = min(0.9, abs(momentum) * 10)  # momentum 0.02 = 0.2 confidence
-                rsi_bonus = max(0, (buy_threshold - rsi) / buy_threshold * 0.3) if rsi < buy_threshold else 0.1
+                rsi_bonus = (
+                    max(0, (buy_threshold - rsi) / buy_threshold * 0.3)
+                    if rsi < buy_threshold
+                    else 0.1
+                )
                 confidence = min(0.95, base_confidence + rsi_bonus + 0.3)
                 signal = SignalType.BUY
                 price_target = current_price * (1 + profit_target_pct)
@@ -195,38 +199,42 @@ class BuyStrategyAggressive(BaseStrategy):
     def generate_signal(self, symbol: str, ohlcv_data: list = None) -> dict:
         """Generate trading signal for paper trading loop"""
         from datetime import datetime
-        
+
         if ohlcv_data is None:
             ohlcv_data = []
-        
+
         # Convert OHLCV dicts to market_data format
         market_data = []
         for candle in ohlcv_data:
             if isinstance(candle, dict):
-                market_data.append({
-                    "close": float(candle.get("close", 0)),
-                    "high": float(candle.get("high", 0)),
-                    "low": float(candle.get("low", 0)),
-                    "open": float(candle.get("open", 0)),
-                    "volume": float(candle.get("volume", 0)),
-                })
+                market_data.append(
+                    {
+                        "close": float(candle.get("close", 0)),
+                        "high": float(candle.get("high", 0)),
+                        "low": float(candle.get("low", 0)),
+                        "open": float(candle.get("open", 0)),
+                        "volume": float(candle.get("volume", 0)),
+                    }
+                )
             else:
-                market_data.append({
-                    "close": float(candle[4]) if len(candle) > 4 else 0,
-                    "high": float(candle[2]) if len(candle) > 2 else 0,
-                    "low": float(candle[3]) if len(candle) > 3 else 0,
-                    "open": float(candle[1]) if len(candle) > 1 else 0,
-                    "volume": float(candle[5]) if len(candle) > 5 else 0,
-                })
-        
+                market_data.append(
+                    {
+                        "close": float(candle[4]) if len(candle) > 4 else 0,
+                        "high": float(candle[2]) if len(candle) > 2 else 0,
+                        "low": float(candle[3]) if len(candle) > 3 else 0,
+                        "open": float(candle[1]) if len(candle) > 1 else 0,
+                        "volume": float(candle[5]) if len(candle) > 5 else 0,
+                    }
+                )
+
         result = self.analyze(market_data, symbol)
-        
+
         signal_map = {
             SignalType.BUY: "BUY",
             SignalType.SELL: "SELL",
             SignalType.HOLD: "HOLD",
         }
-        
+
         return {
             "action": signal_map[result.signal],
             "confidence": result.confidence,

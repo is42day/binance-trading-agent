@@ -236,7 +236,9 @@ def update_performance_metrics(n_intervals):
 
         # Determine colors based on values
         win_rate_status = "success" if win_rate >= 50 else "warning" if win_rate >= 40 else "danger"
-        pf_status = "success" if profit_factor >= 1.5 else "warning" if profit_factor >= 1 else "danger"
+        pf_status = (
+            "success" if profit_factor >= 1.5 else "warning" if profit_factor >= 1 else "danger"
+        )
         return_status = "success" if total_return >= 0 else "danger"
         sharpe_status = "success" if sharpe >= 1 else "warning" if sharpe >= 0 else "danger"
 
@@ -260,7 +262,7 @@ def update_performance_metrics(n_intervals):
                     [
                         create_metric_card(
                             label="Profit Factor",
-                            value=f"{profit_factor:.2f}" if profit_factor != float('inf') else "∞",
+                            value=f"{profit_factor:.2f}" if profit_factor != float("inf") else "∞",
                             icon="📊",
                             status=pf_status,
                         )
@@ -329,7 +331,9 @@ def update_risk_metrics_detail(n_intervals):
         rr_ratio = data.get("risk_reward_ratio", 0)
 
         dd_status = "success" if max_dd < 5 else "warning" if max_dd < 10 else "danger"
-        current_dd_status = "success" if current_dd < 3 else "warning" if current_dd < 5 else "danger"
+        current_dd_status = (
+            "success" if current_dd < 3 else "warning" if current_dd < 5 else "danger"
+        )
 
         return dbc.Row(
             [
@@ -379,7 +383,7 @@ def update_risk_metrics_detail(n_intervals):
                     [
                         create_metric_card(
                             label="Risk/Reward",
-                            value=f"{rr_ratio:.2f}" if rr_ratio != float('inf') else "∞",
+                            value=f"{rr_ratio:.2f}" if rr_ratio != float("inf") else "∞",
                             icon="⚖️",
                             status="success" if rr_ratio >= 1.5 else "warning",
                         )
@@ -429,22 +433,50 @@ def update_trade_stats(n_intervals):
                     [
                         dbc.Col(
                             [
-                                html.Div("Total Trades", style={"color": "#b8b4b0", "fontSize": "0.875rem"}),
-                                html.Div(f"{total}", style={"color": "#f4f2ee", "fontSize": "1.5rem", "fontWeight": "bold"}),
+                                html.Div(
+                                    "Total Trades",
+                                    style={"color": "#b8b4b0", "fontSize": "0.875rem"},
+                                ),
+                                html.Div(
+                                    f"{total}",
+                                    style={
+                                        "color": "#f4f2ee",
+                                        "fontSize": "1.5rem",
+                                        "fontWeight": "bold",
+                                    },
+                                ),
                             ],
                             width=4,
                         ),
                         dbc.Col(
                             [
-                                html.Div("Closed", style={"color": "#b8b4b0", "fontSize": "0.875rem"}),
-                                html.Div(f"{closed}", style={"color": "#f4f2ee", "fontSize": "1.5rem", "fontWeight": "bold"}),
+                                html.Div(
+                                    "Closed", style={"color": "#b8b4b0", "fontSize": "0.875rem"}
+                                ),
+                                html.Div(
+                                    f"{closed}",
+                                    style={
+                                        "color": "#f4f2ee",
+                                        "fontSize": "1.5rem",
+                                        "fontWeight": "bold",
+                                    },
+                                ),
                             ],
                             width=4,
                         ),
                         dbc.Col(
                             [
-                                html.Div("Open", style={"color": "#b8b4b0", "fontSize": "0.875rem"}),
-                                html.Div(f"{open_pos}", style={"color": "#ff914d", "fontSize": "1.5rem", "fontWeight": "bold"}),
+                                html.Div(
+                                    "Open", style={"color": "#b8b4b0", "fontSize": "0.875rem"}
+                                ),
+                                html.Div(
+                                    f"{open_pos}",
+                                    style={
+                                        "color": "#ff914d",
+                                        "fontSize": "1.5rem",
+                                        "fontWeight": "bold",
+                                    },
+                                ),
                             ],
                             width=4,
                         ),
@@ -457,15 +489,33 @@ def update_trade_stats(n_intervals):
                     [
                         dbc.Col(
                             [
-                                html.Div("Winning", style={"color": "#b8b4b0", "fontSize": "0.875rem"}),
-                                html.Div(f"{winning}", style={"color": "#4CAF50", "fontSize": "1.5rem", "fontWeight": "bold"}),
+                                html.Div(
+                                    "Winning", style={"color": "#b8b4b0", "fontSize": "0.875rem"}
+                                ),
+                                html.Div(
+                                    f"{winning}",
+                                    style={
+                                        "color": "#4CAF50",
+                                        "fontSize": "1.5rem",
+                                        "fontWeight": "bold",
+                                    },
+                                ),
                             ],
                             width=6,
                         ),
                         dbc.Col(
                             [
-                                html.Div("Losing", style={"color": "#b8b4b0", "fontSize": "0.875rem"}),
-                                html.Div(f"{losing}", style={"color": "#f44336", "fontSize": "1.5rem", "fontWeight": "bold"}),
+                                html.Div(
+                                    "Losing", style={"color": "#b8b4b0", "fontSize": "0.875rem"}
+                                ),
+                                html.Div(
+                                    f"{losing}",
+                                    style={
+                                        "color": "#f44336",
+                                        "fontSize": "1.5rem",
+                                        "fontWeight": "bold",
+                                    },
+                                ),
                             ],
                             width=6,
                         ),
@@ -476,15 +526,33 @@ def update_trade_stats(n_intervals):
                     [
                         dbc.Col(
                             [
-                                html.Div("Avg Win", style={"color": "#b8b4b0", "fontSize": "0.875rem"}),
-                                html.Div(f"${avg_win:,.2f}", style={"color": "#4CAF50", "fontSize": "1.25rem", "fontWeight": "bold"}),
+                                html.Div(
+                                    "Avg Win", style={"color": "#b8b4b0", "fontSize": "0.875rem"}
+                                ),
+                                html.Div(
+                                    f"${avg_win:,.2f}",
+                                    style={
+                                        "color": "#4CAF50",
+                                        "fontSize": "1.25rem",
+                                        "fontWeight": "bold",
+                                    },
+                                ),
                             ],
                             width=6,
                         ),
                         dbc.Col(
                             [
-                                html.Div("Avg Loss", style={"color": "#b8b4b0", "fontSize": "0.875rem"}),
-                                html.Div(f"${avg_loss:,.2f}", style={"color": "#f44336", "fontSize": "1.25rem", "fontWeight": "bold"}),
+                                html.Div(
+                                    "Avg Loss", style={"color": "#b8b4b0", "fontSize": "0.875rem"}
+                                ),
+                                html.Div(
+                                    f"${avg_loss:,.2f}",
+                                    style={
+                                        "color": "#f44336",
+                                        "fontSize": "1.25rem",
+                                        "fontWeight": "bold",
+                                    },
+                                ),
                             ],
                             width=6,
                         ),
@@ -529,9 +597,18 @@ def update_session_info(n_intervals):
                     [
                         dbc.Col(
                             [
-                                html.Div("Session Start", style={"color": "#b8b4b0", "fontSize": "0.875rem"}),
-                                html.Div(session_start[:19] if len(session_start) > 19 else session_start,
-                                         style={"color": "#f4f2ee", "fontSize": "1rem"}),
+                                html.Div(
+                                    "Session Start",
+                                    style={"color": "#b8b4b0", "fontSize": "0.875rem"},
+                                ),
+                                html.Div(
+                                    (
+                                        session_start[:19]
+                                        if len(session_start) > 19
+                                        else session_start
+                                    ),
+                                    style={"color": "#f4f2ee", "fontSize": "1rem"},
+                                ),
                             ],
                             width=12,
                             className="mb-3",
@@ -542,8 +619,12 @@ def update_session_info(n_intervals):
                     [
                         dbc.Col(
                             [
-                                html.Div("Duration", style={"color": "#b8b4b0", "fontSize": "0.875rem"}),
-                                html.Div(session_duration, style={"color": "#ff914d", "fontSize": "1rem"}),
+                                html.Div(
+                                    "Duration", style={"color": "#b8b4b0", "fontSize": "0.875rem"}
+                                ),
+                                html.Div(
+                                    session_duration, style={"color": "#ff914d", "fontSize": "1rem"}
+                                ),
                             ],
                             width=12,
                             className="mb-3",
@@ -555,8 +636,18 @@ def update_session_info(n_intervals):
                     [
                         dbc.Col(
                             [
-                                html.Div("Initial Capital", style={"color": "#b8b4b0", "fontSize": "0.875rem"}),
-                                html.Div(f"${initial_capital:,.2f}", style={"color": "#f4f2ee", "fontSize": "1.25rem", "fontWeight": "bold"}),
+                                html.Div(
+                                    "Initial Capital",
+                                    style={"color": "#b8b4b0", "fontSize": "0.875rem"},
+                                ),
+                                html.Div(
+                                    f"${initial_capital:,.2f}",
+                                    style={
+                                        "color": "#f4f2ee",
+                                        "fontSize": "1.25rem",
+                                        "fontWeight": "bold",
+                                    },
+                                ),
                             ],
                             width=12,
                             className="mb-3",
@@ -567,8 +658,18 @@ def update_session_info(n_intervals):
                     [
                         dbc.Col(
                             [
-                                html.Div("Current Capital", style={"color": "#b8b4b0", "fontSize": "0.875rem"}),
-                                html.Div(f"${current_capital:,.2f}", style={"color": "#f4f2ee", "fontSize": "1.25rem", "fontWeight": "bold"}),
+                                html.Div(
+                                    "Current Capital",
+                                    style={"color": "#b8b4b0", "fontSize": "0.875rem"},
+                                ),
+                                html.Div(
+                                    f"${current_capital:,.2f}",
+                                    style={
+                                        "color": "#f4f2ee",
+                                        "fontSize": "1.25rem",
+                                        "fontWeight": "bold",
+                                    },
+                                ),
                             ],
                             width=12,
                             className="mb-3",
@@ -579,8 +680,17 @@ def update_session_info(n_intervals):
                     [
                         dbc.Col(
                             [
-                                html.Div("Total P&L", style={"color": "#b8b4b0", "fontSize": "0.875rem"}),
-                                html.Div(f"${total_pnl:+,.2f}", style={"color": pnl_color, "fontSize": "1.5rem", "fontWeight": "bold"}),
+                                html.Div(
+                                    "Total P&L", style={"color": "#b8b4b0", "fontSize": "0.875rem"}
+                                ),
+                                html.Div(
+                                    f"${total_pnl:+,.2f}",
+                                    style={
+                                        "color": pnl_color,
+                                        "fontSize": "1.5rem",
+                                        "fontWeight": "bold",
+                                    },
+                                ),
                             ],
                             width=12,
                         ),
@@ -636,19 +746,30 @@ def update_trade_history(n_intervals):
             rows.append(
                 html.Tr(
                     [
-                        html.Td(trade.get("symbol", ""), style={"color": "#f4f2ee", "fontWeight": "bold"}),
+                        html.Td(
+                            trade.get("symbol", ""),
+                            style={"color": "#f4f2ee", "fontWeight": "bold"},
+                        ),
                         html.Td(
                             dbc.Badge(side, color=side_color),
                         ),
                         html.Td(f"${trade.get('entry_price', 0):,.2f}", style={"color": "#f4f2ee"}),
                         html.Td(
-                            f"${trade.get('exit_price', 0):,.2f}" if trade.get("exit_price") else "-",
+                            (
+                                f"${trade.get('exit_price', 0):,.2f}"
+                                if trade.get("exit_price")
+                                else "-"
+                            ),
                             style={"color": "#f4f2ee"},
                         ),
                         html.Td(pnl_display, style={"color": pnl_color, "fontWeight": "bold"}),
                         html.Td(pnl_pct_display, style={"color": pnl_color}),
                         html.Td(
-                            dbc.Badge("Closed", color="secondary") if is_closed else dbc.Badge("Open", color="warning"),
+                            (
+                                dbc.Badge("Closed", color="secondary")
+                                if is_closed
+                                else dbc.Badge("Open", color="warning")
+                            ),
                         ),
                         html.Td(
                             trade.get("entry_time", "")[:19] if trade.get("entry_time") else "-",

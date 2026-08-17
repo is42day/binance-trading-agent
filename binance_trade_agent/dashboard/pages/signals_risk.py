@@ -248,7 +248,11 @@ def update_signals(n_intervals):
         status = status_map.get(signal_type, "info")
 
         # MTF trend color
-        mtf_color = "success" if mtf_trend == "BULLISH" else "danger" if mtf_trend == "BEARISH" else "warning"
+        mtf_color = (
+            "success"
+            if mtf_trend == "BULLISH"
+            else "danger" if mtf_trend == "BEARISH" else "warning"
+        )
 
         signal_card = dbc.Card(
             [
@@ -736,17 +740,29 @@ def update_trailing_stops(n_intervals):
                                                     html.Small("Entry", style={"color": "#b8b4b0"}),
                                                     html.Div(
                                                         f"${entry_price:,.2f}",
-                                                        style={"color": "#f4f2ee", "fontWeight": "bold"},
+                                                        style={
+                                                            "color": "#f4f2ee",
+                                                            "fontWeight": "bold",
+                                                        },
                                                     ),
                                                 ],
                                                 width=6,
                                             ),
                                             dbc.Col(
                                                 [
-                                                    html.Small("Current", style={"color": "#b8b4b0"}),
+                                                    html.Small(
+                                                        "Current", style={"color": "#b8b4b0"}
+                                                    ),
                                                     html.Div(
-                                                        f"${current_price:,.2f}" if current_price else "N/A",
-                                                        style={"color": "#ff914d", "fontWeight": "bold"},
+                                                        (
+                                                            f"${current_price:,.2f}"
+                                                            if current_price
+                                                            else "N/A"
+                                                        ),
+                                                        style={
+                                                            "color": "#ff914d",
+                                                            "fontWeight": "bold",
+                                                        },
                                                     ),
                                                 ],
                                                 width=6,
@@ -759,10 +775,15 @@ def update_trailing_stops(n_intervals):
                                         [
                                             dbc.Col(
                                                 [
-                                                    html.Small("Trail Stop", style={"color": "#b8b4b0"}),
+                                                    html.Small(
+                                                        "Trail Stop", style={"color": "#b8b4b0"}
+                                                    ),
                                                     html.Div(
                                                         f"${current_stop:,.2f}",
-                                                        style={"color": "#FFC107", "fontWeight": "bold"},
+                                                        style={
+                                                            "color": "#FFC107",
+                                                            "fontWeight": "bold",
+                                                        },
                                                     ),
                                                 ],
                                                 width=6,
@@ -773,7 +794,11 @@ def update_trailing_stops(n_intervals):
                                                     html.Div(
                                                         f"{pnl_pct:+.2f}%",
                                                         style={
-                                                            "color": "#4CAF50" if pnl_pct >= 0 else "#f44336",
+                                                            "color": (
+                                                                "#4CAF50"
+                                                                if pnl_pct >= 0
+                                                                else "#f44336"
+                                                            ),
                                                             "fontWeight": "bold",
                                                         },
                                                     ),

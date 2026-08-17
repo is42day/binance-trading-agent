@@ -32,19 +32,19 @@ import random
 import time
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Tuple
+from typing import AsyncIterator, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Configuration defaults (overridable via constructor kwargs or env)
 # ---------------------------------------------------------------------------
-DEFAULT_STALE_SECONDS: float = 60.0      # Data older than this = stale
-DEFAULT_BUFFER_SIZE: int = 500           # Max candles per (symbol, interval)
-DEFAULT_MIN_BACKOFF: float = 1.0         # First reconnect delay
-DEFAULT_MAX_BACKOFF: float = 60.0        # Cap on reconnect delay
-DEFAULT_BACKOFF_FACTOR: float = 2.0      # Exponential multiplier
-DEFAULT_JITTER_RANGE: float = 0.25       # ± fraction of current backoff
+DEFAULT_STALE_SECONDS: float = 60.0  # Data older than this = stale
+DEFAULT_BUFFER_SIZE: int = 500  # Max candles per (symbol, interval)
+DEFAULT_MIN_BACKOFF: float = 1.0  # First reconnect delay
+DEFAULT_MAX_BACKOFF: float = 60.0  # Cap on reconnect delay
+DEFAULT_BACKOFF_FACTOR: float = 2.0  # Exponential multiplier
+DEFAULT_JITTER_RANGE: float = 0.25  # ± fraction of current backoff
 
 
 # ---------------------------------------------------------------------------
@@ -60,8 +60,8 @@ class StreamStatus:
     symbol: str
     interval: str
     connected: bool
-    last_update: Optional[float]       # epoch seconds; None if never received
-    age_seconds: Optional[float]       # seconds since last_update; None if never
+    last_update: Optional[float]  # epoch seconds; None if never received
+    age_seconds: Optional[float]  # seconds since last_update; None if never
     is_stale: bool
     candle_count: int
     reconnect_attempts: int
@@ -72,7 +72,7 @@ class StreamStatus:
 class _SubscriptionState:
     symbol: str
     interval: str
-    buffer: deque                      # deque[OHLCVCandle]
+    buffer: deque  # deque[OHLCVCandle]
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     connected: bool = False
     last_update: Optional[float] = None
@@ -86,6 +86,7 @@ class _SubscriptionState:
 # Default stream factory (production — connects to Binance WebSocket)
 # ---------------------------------------------------------------------------
 
+
 async def _binance_ws_stream(symbol: str, interval: str) -> AsyncIterator[dict]:
     """
     Real Binance WebSocket kline stream.
@@ -95,18 +96,16 @@ async def _binance_ws_stream(symbol: str, interval: str) -> AsyncIterator[dict]:
     """
     try:
         import websockets  # type: ignore
-    except ImportError:
+    except ImportError as exc:
         raise RuntimeError(
             "websockets package is required for live WebSocket streams. "
             "Install with: pip install websockets"
-        )
-    url = (
-        f"wss://stream.binance.com:9443/ws/"
-        f"{symbol.lower()}@kline_{interval}"
-    )
+        ) from exc
+    url = f"wss://stream.binance.com:9443/ws/" f"{symbol.lower()}@kline_{interval}"
     async with websockets.connect(url) as ws:
         async for raw in ws:
             import json
+
             msg = json.loads(raw)
             yield msg
 
@@ -125,13 +124,17 @@ def _parse_kline_message(msg: dict) -> Optional[OHLCVCandle]:
         k = msg.get("k") or msg.get("kline") or msg
         is_closed = bool(k.get("x", True))  # default True makes fakes simpler
         return (
-            int(k["t"]),
-            float(k["o"]),
-            float(k["h"]),
-            float(k["l"]),
-            float(k["c"]),
-            float(k["v"]),
-        ) if is_closed else None
+            (
+                int(k["t"]),
+                float(k["o"]),
+                float(k["h"]),
+                float(k["l"]),
+                float(k["c"]),
+                float(k["v"]),
+            )
+            if is_closed
+            else None
+        )
     except (KeyError, TypeError, ValueError):
         return None
 
@@ -139,6 +142,7 @@ def _parse_kline_message(msg: dict) -> Optional[OHLCVCandle]:
 # ---------------------------------------------------------------------------
 # KlineStreamManager
 # ---------------------------------------------------------------------------
+
 
 class KlineStreamManager:
     """
@@ -240,7 +244,8 @@ class KlineStreamManager:
         if self._is_stale(state):
             logger.warning(
                 "Stream %s@%s is stale (%.1fs); failing closed",
-                symbol, interval,
+                symbol,
+                interval,
                 time.time() - state.last_update,
             )
             return None
@@ -302,7 +307,9 @@ class KlineStreamManager:
                 state.connected = False
                 logger.debug(
                     "Connecting to stream %s@kline_%s (attempt %d)",
-                    state.symbol, state.interval, state.reconnect_attempts + 1,
+                    state.symbol,
+                    state.interval,
+                    state.reconnect_attempts + 1,
                 )
                 async for msg in self._stream_factory(state.symbol, state.interval):
                     if state._stop_event.is_set():
@@ -324,8 +331,11 @@ class KlineStreamManager:
                 state.connected = False
                 logger.warning(
                     "Stream %s@kline_%s error (attempt %d): %s — retrying in %.1fs",
-                    state.symbol, state.interval,
-                    state.reconnect_attempts, exc, backoff,
+                    state.symbol,
+                    state.interval,
+                    state.reconnect_attempts,
+                    exc,
+                    backoff,
                 )
 
             if state._stop_event.is_set():

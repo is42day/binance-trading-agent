@@ -10,16 +10,15 @@ Verifies that:
 - Testnet and demo paths are unaffected by the arming check
 """
 
-import importlib
 import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_config(env: dict):
     """
@@ -33,12 +32,14 @@ def _make_config(env: dict):
 
     with patch.dict("os.environ", env, clear=True):
         from binance_trade_agent.common.config import Config
+
         return Config()
 
 
 # ---------------------------------------------------------------------------
 # Config.runtime_mode derivation tests
 # ---------------------------------------------------------------------------
+
 
 class TestRuntimeMode:
     def test_demo_mode_no_keys(self):
@@ -48,85 +49,100 @@ class TestRuntimeMode:
 
     def test_demo_mode_explicit_flag(self):
         """DEMO_MODE=true → demo even with keys present."""
-        cfg = _make_config({
-            "DEMO_MODE": "true",
-            "BINANCE_API_KEY": "key",
-            "BINANCE_API_SECRET": "secret",
-        })
+        cfg = _make_config(
+            {
+                "DEMO_MODE": "true",
+                "BINANCE_API_KEY": "key",
+                "BINANCE_API_SECRET": "secret",
+            }
+        )
         assert cfg.runtime_mode == "demo"
 
     def test_testnet_mode(self):
         """Real keys + testnet=true → testnet."""
-        cfg = _make_config({
-            "BINANCE_API_KEY": "key",
-            "BINANCE_API_SECRET": "secret",
-            "BINANCE_TESTNET": "true",
-            "DEMO_MODE": "false",
-        })
+        cfg = _make_config(
+            {
+                "BINANCE_API_KEY": "key",
+                "BINANCE_API_SECRET": "secret",
+                "BINANCE_TESTNET": "true",
+                "DEMO_MODE": "false",
+            }
+        )
         assert cfg.runtime_mode == "testnet"
 
     def test_live_blocked_missing_enabled(self):
         """testnet=false + no LIVE_TRADING_ENABLED → live_blocked."""
-        cfg = _make_config({
-            "BINANCE_API_KEY": "key",
-            "BINANCE_API_SECRET": "secret",
-            "BINANCE_TESTNET": "false",
-            "DEMO_MODE": "false",
-            "LIVE_TRADING_ACK": "I_ACCEPT_LIVE_BINANCE_SPOT_RISK",
-        })
+        cfg = _make_config(
+            {
+                "BINANCE_API_KEY": "key",
+                "BINANCE_API_SECRET": "secret",
+                "BINANCE_TESTNET": "false",
+                "DEMO_MODE": "false",
+                "LIVE_TRADING_ACK": "I_ACCEPT_LIVE_BINANCE_SPOT_RISK",
+            }
+        )
         assert cfg.runtime_mode == "live_blocked"
 
     def test_live_blocked_missing_ack(self):
         """testnet=false + LIVE_TRADING_ENABLED=true but no ACK → live_blocked."""
-        cfg = _make_config({
-            "BINANCE_API_KEY": "key",
-            "BINANCE_API_SECRET": "secret",
-            "BINANCE_TESTNET": "false",
-            "DEMO_MODE": "false",
-            "LIVE_TRADING_ENABLED": "true",
-        })
+        cfg = _make_config(
+            {
+                "BINANCE_API_KEY": "key",
+                "BINANCE_API_SECRET": "secret",
+                "BINANCE_TESTNET": "false",
+                "DEMO_MODE": "false",
+                "LIVE_TRADING_ENABLED": "true",
+            }
+        )
         assert cfg.runtime_mode == "live_blocked"
 
     def test_live_blocked_wrong_ack(self):
         """testnet=false + LIVE_TRADING_ENABLED=true + wrong ACK phrase → live_blocked."""
-        cfg = _make_config({
-            "BINANCE_API_KEY": "key",
-            "BINANCE_API_SECRET": "secret",
-            "BINANCE_TESTNET": "false",
-            "DEMO_MODE": "false",
-            "LIVE_TRADING_ENABLED": "true",
-            "LIVE_TRADING_ACK": "yes_i_agree",
-        })
+        cfg = _make_config(
+            {
+                "BINANCE_API_KEY": "key",
+                "BINANCE_API_SECRET": "secret",
+                "BINANCE_TESTNET": "false",
+                "DEMO_MODE": "false",
+                "LIVE_TRADING_ENABLED": "true",
+                "LIVE_TRADING_ACK": "yes_i_agree",
+            }
+        )
         assert cfg.runtime_mode == "live_blocked"
 
     def test_live_blocked_enabled_false(self):
         """LIVE_TRADING_ENABLED=false with correct ACK → still live_blocked."""
-        cfg = _make_config({
-            "BINANCE_API_KEY": "key",
-            "BINANCE_API_SECRET": "secret",
-            "BINANCE_TESTNET": "false",
-            "DEMO_MODE": "false",
-            "LIVE_TRADING_ENABLED": "false",
-            "LIVE_TRADING_ACK": "I_ACCEPT_LIVE_BINANCE_SPOT_RISK",
-        })
+        cfg = _make_config(
+            {
+                "BINANCE_API_KEY": "key",
+                "BINANCE_API_SECRET": "secret",
+                "BINANCE_TESTNET": "false",
+                "DEMO_MODE": "false",
+                "LIVE_TRADING_ENABLED": "false",
+                "LIVE_TRADING_ACK": "I_ACCEPT_LIVE_BINANCE_SPOT_RISK",
+            }
+        )
         assert cfg.runtime_mode == "live_blocked"
 
     def test_live_armed_all_conditions_met(self):
         """All four arming conditions satisfied → live_armed."""
-        cfg = _make_config({
-            "BINANCE_API_KEY": "key",
-            "BINANCE_API_SECRET": "secret",
-            "BINANCE_TESTNET": "false",
-            "DEMO_MODE": "false",
-            "LIVE_TRADING_ENABLED": "true",
-            "LIVE_TRADING_ACK": "I_ACCEPT_LIVE_BINANCE_SPOT_RISK",
-        })
+        cfg = _make_config(
+            {
+                "BINANCE_API_KEY": "key",
+                "BINANCE_API_SECRET": "secret",
+                "BINANCE_TESTNET": "false",
+                "DEMO_MODE": "false",
+                "LIVE_TRADING_ENABLED": "true",
+                "LIVE_TRADING_ACK": "I_ACCEPT_LIVE_BINANCE_SPOT_RISK",
+            }
+        )
         assert cfg.runtime_mode == "live_armed"
 
 
 # ---------------------------------------------------------------------------
 # BinanceAPIClient.create_order() live-arming guard tests
 # ---------------------------------------------------------------------------
+
 
 def _make_armed_client(runtime_mode: str):
     """
@@ -148,6 +164,7 @@ def _make_armed_client(runtime_mode: str):
         # Prevent actual Binance SDK connection
         with patch("binance.client.Client.__init__", return_value=None):
             from binance_trade_agent.clients.binance_client import BinanceAPIClient
+
             client = BinanceAPIClient.__new__(BinanceAPIClient)
             # Minimal attribute setup
             mock_cfg = MagicMock()
@@ -160,11 +177,13 @@ def _make_armed_client(runtime_mode: str):
             client._circuit_breaker.can_execute.return_value = True
 
             # Patch validate_order_params to always pass
-            client.validate_order_params = MagicMock(return_value={
-                "valid": True,
-                "normalized_quantity": 0.001,
-                "normalized_price": 50000.0,
-            })
+            client.validate_order_params = MagicMock(
+                return_value={
+                    "valid": True,
+                    "normalized_quantity": 0.001,
+                    "normalized_price": 50000.0,
+                }
+            )
             return client
 
 
@@ -172,7 +191,9 @@ class TestCreateOrderArmingGate:
     def test_live_armed_allows_market_order(self):
         """live_armed → order call reaches Binance SDK."""
         client = _make_armed_client("live_armed")
-        with patch.object(client, "_api_call_with_retry", return_value={"status": "FILLED", "orderId": 1}):
+        with patch.object(
+            client, "_api_call_with_retry", return_value={"status": "FILLED", "orderId": 1}
+        ):
             result = client.create_order("BTCUSDT", "BUY", "MARKET", 0.001)
         assert result["status"] == "FILLED"
 
@@ -194,6 +215,7 @@ class TestCreateOrderArmingGate:
         with patch.dict("os.environ", {}, clear=True):
             with patch("binance.client.Client.__init__", return_value=None):
                 from binance_trade_agent.clients.binance_client import BinanceAPIClient
+
                 client = BinanceAPIClient.__new__(BinanceAPIClient)
                 mock_cfg = MagicMock()
                 mock_cfg.demo_mode = True
@@ -202,10 +224,12 @@ class TestCreateOrderArmingGate:
                 client._circuit_breaker = MagicMock()
 
                 # validate_order_params and get_latest_price needed by demo path
-                client.validate_order_params = MagicMock(return_value={
-                    "valid": True,
-                    "normalized_quantity": 0.001,
-                    "normalized_price": None,
-                })
+                client.validate_order_params = MagicMock(
+                    return_value={
+                        "valid": True,
+                        "normalized_quantity": 0.001,
+                        "normalized_price": None,
+                    }
+                )
                 result = client.create_order("BTCUSDT", "BUY", "MARKET", 0.001)
         assert result["status"] == "FILLED"

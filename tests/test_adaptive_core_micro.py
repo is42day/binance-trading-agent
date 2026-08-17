@@ -21,15 +21,15 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from binance_trade_agent.core.decision_journal import DecisionJournal
+from binance_trade_agent.core.strategy_validation_gate import ValidationGate
 from binance_trade_agent.strategies.adaptive_core_micro import AdaptiveCoreMicroStrategy
 from binance_trade_agent.strategies.base_strategy import SignalType
-from binance_trade_agent.core.strategy_validation_gate import ValidationGate
-from binance_trade_agent.core.decision_journal import DecisionJournal
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def gate_dir():
@@ -65,8 +65,15 @@ def _pass_symbol(daily_eur=5.0, max_dd=2.0):
 
 
 def _fail_symbol(reason="negative_daily_eur"):
-    return {"gate_pass": False, "gate_reason": reason, "strategy": "micro_grid",
-            "daily_eur": -1.0, "max_drawdown_pct": 5.0, "trades": 10, "win_rate": 0.4}
+    return {
+        "gate_pass": False,
+        "gate_reason": reason,
+        "strategy": "micro_grid",
+        "daily_eur": -1.0,
+        "max_drawdown_pct": 5.0,
+        "trades": 10,
+        "win_rate": 0.4,
+    }
 
 
 def _null_journal():
@@ -79,6 +86,7 @@ def _null_journal():
 # ---------------------------------------------------------------------------
 # OHLCV helpers
 # ---------------------------------------------------------------------------
+
 
 def _candles(closes: List[float]) -> List[list]:
     """Build minimal OHLCV candles from a list of close prices."""
@@ -113,6 +121,7 @@ def _rsi_overbought_candles() -> List[list]:
 def _neutral_candles() -> List[list]:
     """25 flat candles → RSI ~50 → HOLD."""
     import math
+
     closes = [100.0 + math.sin(i * 0.4) for i in range(25)]
     return _candles(closes)
 
@@ -120,6 +129,7 @@ def _neutral_candles() -> List[list]:
 # ---------------------------------------------------------------------------
 # Tests: Micro gate blocks
 # ---------------------------------------------------------------------------
+
 
 class TestMicroGateBlocks:
     def test_missing_gate_returns_hold(self, gate_dir):
@@ -132,13 +142,18 @@ class TestMicroGateBlocks:
 
     def test_stale_gate_returns_hold(self, gate_dir):
         from datetime import timedelta
+
         old_time = (datetime.now(tz=timezone.utc) - timedelta(hours=3)).strftime(
             "%Y-%m-%dT%H:%M:%SZ"
         )
         artifact = {
-            "generated_at": old_time, "ttl_seconds": 3600,
-            "gate_strategy": "micro_grid", "max_drawdown_threshold_pct": 10.0,
-            "assumptions": {}, "symbols": {"BTCUSDT": _pass_symbol()}, "overall_pass": True,
+            "generated_at": old_time,
+            "ttl_seconds": 3600,
+            "gate_strategy": "micro_grid",
+            "max_drawdown_threshold_pct": 10.0,
+            "assumptions": {},
+            "symbols": {"BTCUSDT": _pass_symbol()},
+            "overall_pass": True,
         }
         p = gate_dir / "stale.json"
         p.write_text(json.dumps(artifact), encoding="utf-8")
@@ -174,12 +189,14 @@ class TestMicroGateBlocks:
 # Tests: Core trend gate blocks
 # ---------------------------------------------------------------------------
 
+
 class TestCoreTrendGateBlocks:
     def test_negative_htf_trend_returns_hold(self, gate_dir):
         gate = _write_gate(gate_dir, {"BTCUSDT": _pass_symbol()})
         strat = AdaptiveCoreMicroStrategy(gate=gate, journal=_null_journal())
-        result = strat.analyze(_rsi_oversold_candles(), "BTCUSDT",
-                               htf_ohlcv_data=_trend_negative_candles())
+        result = strat.analyze(
+            _rsi_oversold_candles(), "BTCUSDT", htf_ohlcv_data=_trend_negative_candles()
+        )
         assert result.signal == SignalType.HOLD
         assert result.metadata["component"] == "core_gate"
         assert result.metadata["hold_reason"] == "htf_trend_negative"
@@ -198,12 +215,14 @@ class TestCoreTrendGateBlocks:
 # Tests: Both gates cleared — signal generation
 # ---------------------------------------------------------------------------
 
+
 class TestBothGatesCleared:
     def test_oversold_rsi_produces_buy(self, gate_dir):
         gate = _write_gate(gate_dir, {"BTCUSDT": _pass_symbol()})
         strat = AdaptiveCoreMicroStrategy(gate=gate, journal=_null_journal())
-        result = strat.analyze(_rsi_oversold_candles(), "BTCUSDT",
-                               htf_ohlcv_data=_trend_positive_candles())
+        result = strat.analyze(
+            _rsi_oversold_candles(), "BTCUSDT", htf_ohlcv_data=_trend_positive_candles()
+        )
         assert result.signal == SignalType.BUY
         assert result.confidence > 0
         assert result.metadata["component"] == "adaptive_core_micro"
@@ -213,8 +232,9 @@ class TestBothGatesCleared:
     def test_overbought_rsi_produces_sell(self, gate_dir):
         gate = _write_gate(gate_dir, {"BTCUSDT": _pass_symbol()})
         strat = AdaptiveCoreMicroStrategy(gate=gate, journal=_null_journal())
-        result = strat.analyze(_rsi_overbought_candles(), "BTCUSDT",
-                               htf_ohlcv_data=_trend_positive_candles())
+        result = strat.analyze(
+            _rsi_overbought_candles(), "BTCUSDT", htf_ohlcv_data=_trend_positive_candles()
+        )
         assert result.signal == SignalType.SELL
 
     def test_neutral_rsi_produces_hold(self, gate_dir):
@@ -222,8 +242,7 @@ class TestBothGatesCleared:
         strat = AdaptiveCoreMicroStrategy(gate=gate, journal=_null_journal())
         # Candles too short for RSI computation → HOLD
         short = _candles([100.0 + i for i in range(10)])
-        result = strat.analyze(short, "BTCUSDT",
-                               htf_ohlcv_data=_trend_positive_candles())
+        result = strat.analyze(short, "BTCUSDT", htf_ohlcv_data=_trend_positive_candles())
         assert result.signal == SignalType.HOLD
 
 
@@ -231,13 +250,15 @@ class TestBothGatesCleared:
 # Tests: Non-core symbol skips trend gate
 # ---------------------------------------------------------------------------
 
+
 class TestNonCoreSymbol:
     def test_sol_skips_trend_gate(self, gate_dir):
         gate = _write_gate(gate_dir, {"SOLUSDT": _pass_symbol()})
         strat = AdaptiveCoreMicroStrategy(gate=gate, journal=_null_journal())
         # Deliberately pass trend-negative data — should NOT block SOLUSDT
-        result = strat.analyze(_rsi_oversold_candles(), "SOLUSDT",
-                               htf_ohlcv_data=_trend_negative_candles())
+        result = strat.analyze(
+            _rsi_oversold_candles(), "SOLUSDT", htf_ohlcv_data=_trend_negative_candles()
+        )
         # Gate cleared (SOLUSDT not in core symbols) so signal from RSI
         assert result.metadata["core_gate"]["cleared"] is True
         assert result.signal == SignalType.BUY
@@ -250,8 +271,9 @@ class TestNonCoreSymbol:
             parameters={"core_symbols": ["SOLUSDT"]},
         )
         # SOLUSDT is now in core symbols, negative HTF should block
-        result = strat.analyze(_rsi_oversold_candles(), "SOLUSDT",
-                               htf_ohlcv_data=_trend_negative_candles())
+        result = strat.analyze(
+            _rsi_oversold_candles(), "SOLUSDT", htf_ohlcv_data=_trend_negative_candles()
+        )
         assert result.signal == SignalType.HOLD
         assert result.metadata["hold_reason"] == "htf_trend_negative"
 
@@ -259,6 +281,7 @@ class TestNonCoreSymbol:
 # ---------------------------------------------------------------------------
 # Tests: Decision journal integration
 # ---------------------------------------------------------------------------
+
 
 class TestDecisionJournalIntegration:
     def test_journal_record_called_on_hold(self, gate_dir):
@@ -275,15 +298,15 @@ class TestDecisionJournalIntegration:
         journal = _null_journal()
         gate = _write_gate(gate_dir, {"BTCUSDT": _pass_symbol()})
         strat = AdaptiveCoreMicroStrategy(gate=gate, journal=journal)
-        strat.analyze(_rsi_oversold_candles(), "BTCUSDT",
-                      htf_ohlcv_data=_trend_positive_candles())
+        strat.analyze(_rsi_oversold_candles(), "BTCUSDT", htf_ohlcv_data=_trend_positive_candles())
         journal.record.assert_called_once()
 
     def test_journal_skipped_when_disabled(self, gate_dir):
         journal = _null_journal()
         gate = ValidationGate(str(gate_dir / "missing.json"))
         strat = AdaptiveCoreMicroStrategy(
-            gate=gate, journal=journal,
+            gate=gate,
+            journal=journal,
             parameters={"record_decisions": False},
         )
         strat.analyze(_trend_positive_candles(), "BTCUSDT")

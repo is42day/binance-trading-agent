@@ -68,7 +68,11 @@ class TradeExecutionAgent:
             )
 
             if not isinstance(order, dict):
-                return {"success": False, "error": "Invalid order response", "original_response": order}
+                return {
+                    "success": False,
+                    "error": "Invalid order response",
+                    "original_response": order,
+                }
 
             if order.get("error"):
                 return {"success": False, "error": order["error"], "original_response": order}

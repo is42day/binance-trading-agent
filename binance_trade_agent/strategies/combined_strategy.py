@@ -157,7 +157,9 @@ class CombinedStrategy(BaseStrategy):
             self.rsi_strategy.requires_minimum_data(),
             self.macd_strategy.requires_minimum_data(),
         )
-        trend_requirement = self.get_parameter("trend_ema_slow") if self.get_parameter("use_trend_filter") else 0
+        trend_requirement = (
+            self.get_parameter("trend_ema_slow") if self.get_parameter("use_trend_filter") else 0
+        )
         return max(base_requirement, trend_requirement)
 
     def analyze(self, market_data: List[Dict[str, Any]], symbol: str = None) -> StrategyResult:
@@ -252,7 +254,7 @@ class CombinedStrategy(BaseStrategy):
                         market_data,
                         is_long=(combined_signal == SignalType.BUY),
                         atr_multiplier=atr_stop_mult,
-                        take_profit_multiplier=atr_tp_mult
+                        take_profit_multiplier=atr_tp_mult,
                     )
                     price_target = take_profit  # Use take profit as price target
                     combined_indicators["atr"] = atr_value

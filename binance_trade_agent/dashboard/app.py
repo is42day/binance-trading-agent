@@ -64,6 +64,7 @@ def dashboard_health():
     """Unauthenticated health endpoint for Docker and VPS monitoring."""
     return {"status": "healthy", "service": "dashboard"}
 
+
 # Configure app metadata
 app.title = "Binance Trading Agent"
 app.index_string = """

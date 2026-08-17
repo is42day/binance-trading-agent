@@ -20,16 +20,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from binance_trade_agent.core.portfolio_manager import Base, PortfolioManager
 from binance_trade_agent.core.order_lifecycle import (
-    OrderLifecycleService,
     OPEN_STATUSES,
     TERMINAL_STATUSES,
+    OrderLifecycleService,
 )
-
+from binance_trade_agent.core.portfolio_manager import Base, PortfolioManager
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -51,8 +49,9 @@ def engine():
 def portfolio(engine):
     """PortfolioManager backed by the test in-memory engine (use_shared_session=False)."""
     # Inject the test engine via the db module globals so PortfolioManager picks it up
-    import binance_trade_agent.core.db as _db
     from sqlalchemy.orm import sessionmaker as _SM
+
+    import binance_trade_agent.core.db as _db
 
     old_engine = _db._engine
     old_factory = _db._session_factory
@@ -199,7 +198,9 @@ class TestPollOrderStatusNormalization:
 
 class TestPartialFillDelta:
     def test_first_partial_fill_books_delta(self, svc, mock_client, portfolio):
-        local = _seed_order(portfolio, status="NEW", executed_quantity=0.0, last_booked_quantity=0.0)
+        local = _seed_order(
+            portfolio, status="NEW", executed_quantity=0.0, last_booked_quantity=0.0
+        )
         coid = local["client_order_id"]
         mock_client.get_order.return_value = _make_exchange_response(
             "PARTIALLY_FILLED", exec_qty=0.0005, price=50000.0
@@ -448,6 +449,7 @@ class TestOrderLifecycleEndpoints:
 
     def test_open_orders_endpoint(self):
         from fastapi.testclient import TestClient
+
         from binance_trade_agent.api.api import app
 
         client = TestClient(app)
@@ -457,6 +459,7 @@ class TestOrderLifecycleEndpoints:
 
     def test_terminal_orders_endpoint(self):
         from fastapi.testclient import TestClient
+
         from binance_trade_agent.api.api import app
 
         client = TestClient(app)
@@ -466,6 +469,7 @@ class TestOrderLifecycleEndpoints:
 
     def test_stale_orders_endpoint(self):
         from fastapi.testclient import TestClient
+
         from binance_trade_agent.api.api import app
 
         client = TestClient(app)
@@ -475,6 +479,7 @@ class TestOrderLifecycleEndpoints:
 
     def test_cancel_order_endpoint_not_found(self):
         from fastapi.testclient import TestClient
+
         from binance_trade_agent.api.api import app
 
         client = TestClient(app)

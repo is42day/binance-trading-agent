@@ -8,7 +8,7 @@ Binance API Client with Production-Ready Features:
 import logging
 import time
 from datetime import datetime, timedelta
-from decimal import Decimal, InvalidOperation, ROUND_DOWN
+from decimal import ROUND_DOWN, Decimal, InvalidOperation
 from enum import Enum
 from functools import wraps
 from threading import Lock
@@ -18,7 +18,7 @@ from binance.client import Client
 from binance.exceptions import BinanceAPIException
 
 from ..common.config import config
-from .rate_limit_tracker import RateLimitTracker, RateLimitExceeded, ENDPOINT_WEIGHTS
+from .rate_limit_tracker import RateLimitExceeded, RateLimitTracker
 
 logger = logging.getLogger(__name__)
 
@@ -292,7 +292,9 @@ class BinanceAPIClient:
         return self._rate_limiter.get_status()
 
     def _api_call_with_retry(
-        self, func: Callable, *args,
+        self,
+        func: Callable,
+        *args,
         max_retries: int = 3,
         endpoint: str = "unknown",
         is_order: bool = False,
@@ -340,7 +342,9 @@ class BinanceAPIClient:
                     self._rate_limiter.record_429(retry_after)
                     logger.warning(
                         "Binance 429 received (attempt %d/%d); retry_after=%s",
-                        attempt + 1, max_retries, retry_after,
+                        attempt + 1,
+                        max_retries,
+                        retry_after,
                     )
                 # Don't retry on other 4xx client errors
                 elif e.status_code and 400 <= e.status_code < 500:
@@ -776,7 +780,10 @@ class BinanceAPIClient:
             return klines
 
         return self._api_call_with_retry(
-            self.client.get_klines, symbol=symbol, interval=interval, limit=limit,
+            self.client.get_klines,
+            symbol=symbol,
+            interval=interval,
+            limit=limit,
             endpoint="klines",
         )
 
@@ -851,8 +858,11 @@ class BinanceAPIClient:
             if client_order_id:
                 params["newClientOrderId"] = client_order_id
             return self._api_call_with_retry(
-                self.client.create_order, **params, max_retries=1,
-                endpoint="create_order", is_order=True
+                self.client.create_order,
+                **params,
+                max_retries=1,
+                endpoint="create_order",
+                is_order=True,
             )
         elif order_type == "LIMIT":
             if price is None:
@@ -868,8 +878,11 @@ class BinanceAPIClient:
             if client_order_id:
                 params["newClientOrderId"] = client_order_id
             return self._api_call_with_retry(
-                self.client.create_order, **params, max_retries=1,
-                endpoint="create_order", is_order=True
+                self.client.create_order,
+                **params,
+                max_retries=1,
+                endpoint="create_order",
+                is_order=True,
             )
         else:
             raise ValueError("Unsupported order type")
@@ -951,8 +964,11 @@ class BinanceAPIClient:
             }
 
         return self._api_call_with_retry(
-            self.client.cancel_order, symbol=symbol, orderId=order_id,
-            max_retries=2, endpoint="cancel_order",
+            self.client.cancel_order,
+            symbol=symbol,
+            orderId=order_id,
+            max_retries=2,
+            endpoint="cancel_order",
         )
 
     def create_oco_order(
@@ -997,26 +1013,40 @@ class BinanceAPIClient:
                 "transactionTime": now,
                 "symbol": symbol,
                 "orders": [
-                    {"symbol": symbol, "orderId": base_id,
-                     "clientOrderId": client_order_id or f"mock_lmt_{base_id}"},
-                    {"symbol": symbol, "orderId": base_id + 1,
-                     "clientOrderId": stop_client_order_id or f"mock_stp_{base_id}"},
+                    {
+                        "symbol": symbol,
+                        "orderId": base_id,
+                        "clientOrderId": client_order_id or f"mock_lmt_{base_id}",
+                    },
+                    {
+                        "symbol": symbol,
+                        "orderId": base_id + 1,
+                        "clientOrderId": stop_client_order_id or f"mock_stp_{base_id}",
+                    },
                 ],
                 "orderReports": [
                     {
-                        "symbol": symbol, "orderId": base_id,
+                        "symbol": symbol,
+                        "orderId": base_id,
                         "clientOrderId": client_order_id or f"mock_lmt_{base_id}",
-                        "price": str(price), "origQty": str(quantity),
-                        "executedQty": "0.00000000", "status": "NEW",
-                        "type": "LIMIT_MAKER", "side": side,
+                        "price": str(price),
+                        "origQty": str(quantity),
+                        "executedQty": "0.00000000",
+                        "status": "NEW",
+                        "type": "LIMIT_MAKER",
+                        "side": side,
                     },
                     {
-                        "symbol": symbol, "orderId": base_id + 1,
+                        "symbol": symbol,
+                        "orderId": base_id + 1,
                         "clientOrderId": stop_client_order_id or f"mock_stp_{base_id}",
-                        "price": str(stop_limit_price), "stopPrice": str(stop_price),
+                        "price": str(stop_limit_price),
+                        "stopPrice": str(stop_price),
                         "origQty": str(quantity),
-                        "executedQty": "0.00000000", "status": "NEW",
-                        "type": "STOP_LOSS_LIMIT", "side": side,
+                        "executedQty": "0.00000000",
+                        "status": "NEW",
+                        "type": "STOP_LOSS_LIMIT",
+                        "side": side,
                     },
                 ],
             }
@@ -1042,6 +1072,9 @@ class BinanceAPIClient:
             params["stopClientOrderId"] = stop_client_order_id
 
         return self._api_call_with_retry(
-            self.client.create_oco_order, **params,
-            max_retries=1, endpoint="create_oco_order", is_order=True,
+            self.client.create_oco_order,
+            **params,
+            max_retries=1,
+            endpoint="create_oco_order",
+            is_order=True,
         )

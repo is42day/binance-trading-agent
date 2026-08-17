@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable
 
 from binance_trade_agent.clients.binance_client import BinanceAPIClient
 from binance_trade_agent.core.portfolio_manager import PortfolioManager
@@ -96,7 +96,8 @@ class ExchangeReconciliationService:
         )
 
         return {
-            "client_order_id": exchange_order.get("clientOrderId") or local_order["client_order_id"],
+            "client_order_id": exchange_order.get("clientOrderId")
+            or local_order["client_order_id"],
             "order_id": order_id,
             "symbol": exchange_order.get("symbol") or local_order["symbol"],
             "side": exchange_order.get("side") or local_order["side"],
@@ -155,7 +156,9 @@ class ExchangeReconciliationService:
 
         return local_order.get("avg_fill_price")
 
-    def _extract_fee(self, symbol: str, order_id: str | int | None, raw_order: Dict[str, Any]) -> float:
+    def _extract_fee(
+        self, symbol: str, order_id: str | int | None, raw_order: Dict[str, Any]
+    ) -> float:
         fills = raw_order.get("fills") or []
         if fills:
             return self._sum_commissions(fills)
