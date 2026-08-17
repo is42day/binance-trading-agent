@@ -121,9 +121,7 @@ class SignalAgent:
             mtf_confirmed = True
             mtf_trend = "NEUTRAL"
             if config.get("use_multi_timeframe", True) and result.signal.value != "HOLD":
-                mtf_confirmed, mtf_trend = self._check_higher_timeframe(
-                    symbol, result.signal.value
-                )
+                mtf_confirmed, mtf_trend = self._check_higher_timeframe(symbol, result.signal.value)
                 if not mtf_confirmed:
                     # Downgrade signal if higher timeframe doesn't confirm
                     self.logger.info(
@@ -238,6 +236,7 @@ class SignalAgent:
         """
         if config.testnet_aggressive_mode and signal_result.get("signal", "").lower() == "hold":
             import random
+
             forced_signal = random.choice(["buy", "sell"])
             self.logger.info(f"Aggressive mode: Converting HOLD to {forced_signal.upper()}")
             return {

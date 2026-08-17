@@ -38,6 +38,7 @@ class MainnetDataClient:
     def get_latest_price(self, symbol: str) -> float:
         """Get real price from mainnet"""
         import requests
+
         response = requests.get(
             f"{self.base_url}/ticker/price",
             params={"symbol": symbol},
@@ -48,6 +49,7 @@ class MainnetDataClient:
     def get_klines(self, symbol: str, interval: str = "1h", limit: int = 100) -> list:
         """Get real OHLCV data from mainnet"""
         import requests
+
         response = requests.get(
             f"{self.base_url}/klines",
             params={"symbol": symbol, "interval": interval, "limit": limit},
@@ -58,6 +60,7 @@ class MainnetDataClient:
     def get_order_book(self, symbol: str, limit: int = 10) -> dict:
         """Get real order book from mainnet"""
         import requests
+
         response = requests.get(
             f"{self.base_url}/depth",
             params={"symbol": symbol, "limit": limit},
@@ -138,14 +141,16 @@ class PaperTradingLoop:
             klines = self.data_client.get_klines(symbol, interval, limit)
             ohlcv_data = []
             for kline in klines:
-                ohlcv_data.append({
-                    "timestamp": int(kline[0]),
-                    "open": float(kline[1]),
-                    "high": float(kline[2]),
-                    "low": float(kline[3]),
-                    "close": float(kline[4]),
-                    "volume": float(kline[5]),
-                })
+                ohlcv_data.append(
+                    {
+                        "timestamp": int(kline[0]),
+                        "open": float(kline[1]),
+                        "high": float(kline[2]),
+                        "low": float(kline[3]),
+                        "close": float(kline[4]),
+                        "volume": float(kline[5]),
+                    }
+                )
             return ohlcv_data
         except Exception as e:
             logger.error(f"Failed to fetch OHLCV for {symbol}: {e}")
@@ -208,8 +213,7 @@ class PaperTradingLoop:
             timestamp = datetime.now().strftime("%H:%M:%S")
             if action != "HOLD":
                 logger.info(
-                    f"[{timestamp}] {symbol}: {action} signal "
-                    f"(confidence: {confidence:.2f})"
+                    f"[{timestamp}] {symbol}: {action} signal " f"(confidence: {confidence:.2f})"
                 )
                 if rejection_reason:
                     logger.info(f"    [!] Not executed: {rejection_reason}")
@@ -273,7 +277,9 @@ class PaperTradingLoop:
         while not self.stop_flag:
             iteration += 1
 
-            logger.info(f"\n--- Iteration {iteration} @ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---")
+            logger.info(
+                f"\n--- Iteration {iteration} @ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---"
+            )
 
             # Process each symbol
             for symbol in self.symbols:
@@ -310,14 +316,18 @@ class PaperTradingLoop:
         logger.info("=" * 40)
         logger.info(f"Balance: ${stats['current_balance']:.2f}")
         logger.info(f"Total P&L: ${stats['total_pnl']:.2f} ({stats['total_pnl_percent']:.2f}%)")
-        logger.info(f"Trades: {stats['total_trades']} (W:{stats['winning_trades']} L:{stats['losing_trades']})")
+        logger.info(
+            f"Trades: {stats['total_trades']} (W:{stats['winning_trades']} L:{stats['losing_trades']})"
+        )
         logger.info(f"Win Rate: {stats['win_rate']:.1f}%")
-        logger.info(f"Max Drawdown: ${stats['max_drawdown']:.2f} ({stats['max_drawdown_percent']:.1f}%)")
+        logger.info(
+            f"Max Drawdown: ${stats['max_drawdown']:.2f} ({stats['max_drawdown_percent']:.1f}%)"
+        )
 
-        if stats['open_positions'] > 0:
+        if stats["open_positions"] > 0:
             logger.info("\nOpen Positions:")
-            for symbol, pos in stats.get('position_values', {}).items():
-                marker = "[+]" if pos['unrealized_pnl'] > 0 else "[-]"
+            for symbol, pos in stats.get("position_values", {}).items():
+                marker = "[+]" if pos["unrealized_pnl"] > 0 else "[-]"
                 logger.info(
                     f"  {marker} {symbol}: ${pos['value']:.2f} "
                     f"(P&L: ${pos['unrealized_pnl']:.2f})"
@@ -350,7 +360,7 @@ def run_paper_trading(
         handlers=[
             logging.StreamHandler(sys.stdout),
             logging.FileHandler("data/paper_trading/paper_trading.log"),
-        ]
+        ],
     )
 
     symbols = symbols or ["BTCUSDT"]

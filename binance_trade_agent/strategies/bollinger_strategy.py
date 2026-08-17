@@ -137,7 +137,9 @@ class BollingerBandsStrategy(BaseStrategy):
                     "percent_b": percent_b,
                     "bandwidth": bandwidth,
                     "rsi": rsi,
-                    "price_position": self._get_price_position(current_price, upper_band, lower_band),
+                    "price_position": self._get_price_position(
+                        current_price, upper_band, lower_band
+                    ),
                 },
                 metadata={
                     "strategy": self.name,
@@ -164,7 +166,7 @@ class BollingerBandsStrategy(BaseStrategy):
 
         # Standard deviation
         variance = sum((x - middle_band) ** 2 for x in recent_closes) / period
-        std_dev = variance ** 0.5
+        std_dev = variance**0.5
 
         # Upper and lower bands
         upper_band = middle_band + (std_multiplier * std_dev)

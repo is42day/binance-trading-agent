@@ -13,13 +13,11 @@ from datetime import datetime, timedelta
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from binance_trade_agent.common.config import config
-from binance_trade_agent.common.logging_config import (
-    get_logger,
-    setup_logging,
-)
+from binance_trade_agent.common.logging_config import get_logger, setup_logging
 from binance_trade_agent.core.exchange_reconciliation import ExchangeReconciliationService
 from binance_trade_agent.core.orchestrator import TradingOrchestrator
 from binance_trade_agent.core.performance_analytics import get_performance_analytics
+from binance_trade_agent.core.portfolio_manager import PortfolioManager
 
 # Setup structured logging for trading loop
 setup_logging(
@@ -29,6 +27,12 @@ setup_logging(
 )
 
 logger = get_logger(__name__)
+
+HEARTBEAT_SERVICE_NAME = "trading-agent"
+
+
+class DuplicateTradingLoopError(RuntimeError):
+    """Raised when a live trading-agent heartbeat indicates another instance is already running."""
 
 
 class AutonomousTradingLoop:
@@ -54,6 +58,9 @@ class AutonomousTradingLoop:
             strategy_name: Trading strategy to use
             strategy_parameters: Custom strategy parameters
         """
+        # Setup logging
+        self.logger = logging.getLogger(__name__)
+
         # Use configured symbols if not specified
         self.symbols = symbols or config.supported_symbols
         self.trade_interval = max(trade_interval_seconds, 60)  # Min 60 seconds for testnet
@@ -61,14 +68,20 @@ class AutonomousTradingLoop:
         self.strategy_name = strategy_name or "combined_default"
         self.strategy_parameters = strategy_parameters
 
+        # Refuse to start a second instance trading against the same portfolio
+        # (e.g. an accidental scale-out or a stale container left over from a
+        # redeploy). Must run before the orchestrator/execution agent stand up
+        # their own client connections.
+        self.heartbeat_stale_after_seconds = max(self.trade_interval * 3, 180)
+        self._heartbeat_portfolio = PortfolioManager("/app/data/web_portfolio.db")
+        self._check_no_concurrent_instance()
+
         # Initialize orchestrator
         self.orchestrator = TradingOrchestrator(
             strategy_name=self.strategy_name,
             strategy_parameters=self.strategy_parameters,
         )
 
-        # Setup logging
-        self.logger = logging.getLogger(__name__)
         self.logger.info(
             f"AutonomousTradingLoop initialized:\n"
             f"  Symbols: {self.symbols}\n"
@@ -89,6 +102,57 @@ class AutonomousTradingLoop:
             "on",
         }:
             self._reconcile_exchange_orders()
+
+    def _check_no_concurrent_instance(self):
+        """
+        Refuse to start if another trading-agent instance's heartbeat is still
+        fresh, to prevent two loops trading against the same portfolio
+        concurrently (e.g. an accidental scale-out or a stale container left
+        running after a redeploy).
+
+        Claims the lease atomically (a single UPDATE...WHERE / INSERT, not a
+        separate read-then-write) so two instances starting at the same time
+        can't both observe "no live heartbeat" and both proceed.
+        """
+        claimed = self._heartbeat_portfolio.try_claim_heartbeat(
+            HEARTBEAT_SERVICE_NAME,
+            stale_after_seconds=self.heartbeat_stale_after_seconds,
+            status="starting",
+            details={"pid": os.getpid()},
+        )
+        if not claimed:
+            raise DuplicateTradingLoopError(
+                "Refusing to start: another trading-agent instance appears to be "
+                "running (heartbeat lease is live, considered stale after "
+                f"{self.heartbeat_stale_after_seconds}s). If you're certain no "
+                "other instance is running, wait for the heartbeat to go stale "
+                "or clear the 'trading-agent' row in the heartbeat table."
+            )
+
+    def _refresh_heartbeat(self, status: str = "healthy", details: dict | None = None):
+        """Record that this instance is the live trading-agent."""
+        try:
+            self._heartbeat_portfolio.update_heartbeat(
+                HEARTBEAT_SERVICE_NAME,
+                status=status,
+                details={"pid": os.getpid(), **(details or {})},
+            )
+        except Exception as exc:
+            self.logger.warning(f"Failed to refresh trading-agent heartbeat: {exc}")
+
+    def release_heartbeat(self):
+        """
+        Mark this instance's heartbeat lease as released.
+
+        Callers that stop the loop from outside (e.g. the dashboard's
+        stop_agent(), which cancels the run() task without awaiting it)
+        should call this directly rather than relying on run() reaching its
+        own "final summary" section — task.cancel() delivers CancelledError
+        at whatever await point the loop happens to be at, which can skip
+        past that section entirely, leaving a live-looking heartbeat behind
+        that then blocks a restart until it goes stale.
+        """
+        self._refresh_heartbeat(status="stopped")
 
     def _reconcile_exchange_orders(self):
         """Reconcile locally tracked exchange orders before trading resumes."""
@@ -193,8 +257,7 @@ class AutonomousTradingLoop:
 
                     # Close the trailing stop tracking
                     close_result = risk_agent.close_trailing_stop(
-                        symbol,
-                        close_price=result["current_price"]
+                        symbol, close_price=result["current_price"]
                     )
                     pnl_pct = close_result.get("pnl_pct", 0) * 100
                     self.logger.info(f"      PnL: {pnl_pct:+.2f}%")
@@ -305,6 +368,15 @@ class AutonomousTradingLoop:
                 except Exception as e:
                     self.logger.error(f"  ❌ Error processing {symbol}: {str(e)}", exc_info=True)
 
+                # Renew the lease after each symbol, not just once per cycle —
+                # a cycle covering many symbols (or a slow one) could
+                # otherwise let the heartbeat go stale before the next
+                # top-of-cycle refresh, letting another instance start while
+                # this one is still live and trading.
+                self._refresh_heartbeat(
+                    status="healthy", details={"cycle": cycle, "symbol": symbol}
+                )
+
             # Check and update trailing stops for all active positions
             await self._update_trailing_stops()
 
@@ -338,6 +410,9 @@ class AutonomousTradingLoop:
         self.logger.info(
             f"Average trades per minute: {(self.trades_executed / elapsed.total_seconds() * 60):.2f}"
         )
+        # Mark the heartbeat "stopped" on a clean exit so a restart doesn't have
+        # to wait out the staleness window unnecessarily.
+        self._refresh_heartbeat(status="stopped", details={"cycle": cycle})
 
 
 async def main():

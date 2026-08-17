@@ -29,8 +29,6 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy.orm import Session
-
 from binance_trade_agent.core import db
 from binance_trade_agent.core.portfolio_manager import TradingDecisionORM
 
@@ -133,18 +131,14 @@ class DecisionJournal:
                     TradingDecisionORM.timestamp.desc()
                 )
                 if symbol:
-                    query = query.filter(
-                        TradingDecisionORM.symbol == symbol.upper()
-                    )
+                    query = query.filter(TradingDecisionORM.symbol == symbol.upper())
                 row = query.first()
                 return row.to_dict() if row else None
         except Exception:
             logger.exception("Failed to query latest decision for %s", symbol)
             return None
 
-    def get_history(
-        self, symbol: Optional[str] = None, limit: int = 50
-    ) -> List[Dict[str, Any]]:
+    def get_history(self, symbol: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
         """
         Return the most recent ``limit`` decisions, newest first.
 
@@ -161,9 +155,7 @@ class DecisionJournal:
                     TradingDecisionORM.timestamp.desc()
                 )
                 if symbol:
-                    query = query.filter(
-                        TradingDecisionORM.symbol == symbol.upper()
-                    )
+                    query = query.filter(TradingDecisionORM.symbol == symbol.upper())
                 rows = query.limit(limit).all()
                 return [r.to_dict() for r in rows]
         except Exception:

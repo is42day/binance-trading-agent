@@ -327,7 +327,9 @@ def update_portfolio_stats(n_intervals):
         banner = dbc.Alert(
             [
                 html.Strong("Paper trading not running. "),
-                html.Span("Start with: python run_paper_trading.py --strategy combined_edge --balance 100"),
+                html.Span(
+                    "Start with: python run_paper_trading.py --strategy combined_edge --balance 100"
+                ),
             ],
             color="warning",
         )
@@ -571,11 +573,11 @@ def update_signal_details(n_intervals):
                 dbc.Col(html.Strong("Action:"), width=2),
                 dbc.Col(
                     sig.get("action", ""),
-                    style={
-                        "color": "#27ae60" if sig.get("action") == "BUY" else "#e74c3c"
-                    }
-                    if sig.get("action") != "HOLD"
-                    else {},
+                    style=(
+                        {"color": "#27ae60" if sig.get("action") == "BUY" else "#e74c3c"}
+                        if sig.get("action") != "HOLD"
+                        else {}
+                    ),
                     width=2,
                 ),
                 dbc.Col(html.Strong("Confidence:"), width=2),
@@ -608,7 +610,11 @@ def update_signal_details(n_intervals):
                 interp = factor_data.get("interpretation", "")
                 value = factor_data.get("value", "")
 
-                color = "#27ae60" if signal == "bullish" else "#e74c3c" if signal == "bearish" else "#6c757d"
+                color = (
+                    "#27ae60"
+                    if signal == "bullish"
+                    else "#e74c3c" if signal == "bearish" else "#6c757d"
+                )
 
                 factor_items.append(
                     html.Div(
@@ -662,9 +668,7 @@ def update_signal_details(n_intervals):
                     dbc.Col(
                         [
                             html.Strong("Volatility Compressed: "),
-                            html.Span(
-                                "Yes" if entry_data.get("volatility_compressed") else "No"
-                            ),
+                            html.Span("Yes" if entry_data.get("volatility_compressed") else "No"),
                         ],
                         width=4,
                     ),

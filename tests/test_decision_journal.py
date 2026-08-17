@@ -10,7 +10,6 @@ Verifies:
 - API endpoints /decisions/latest and /decisions/history respond correctly
 """
 
-import json
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 
@@ -20,13 +19,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from binance_trade_agent.core.portfolio_manager import Base
 from binance_trade_agent.core.decision_journal import DecisionJournal
-
+from binance_trade_agent.core.portfolio_manager import Base
 
 # ---------------------------------------------------------------------------
 # In-memory SQLite session factory for tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def in_memory_session_factory():
@@ -58,6 +57,7 @@ def journal(in_memory_session_factory):
 # ---------------------------------------------------------------------------
 # DecisionJournal.record() tests
 # ---------------------------------------------------------------------------
+
 
 class TestDecisionJournalRecord:
     def test_record_returns_uuid(self, journal):
@@ -109,6 +109,7 @@ class TestDecisionJournalRecord:
 # DecisionJournal.get_latest() tests
 # ---------------------------------------------------------------------------
 
+
 class TestDecisionJournalGetLatest:
     def test_returns_none_when_empty(self, journal):
         assert journal.get_latest("BTCUSDT") is None
@@ -140,6 +141,7 @@ class TestDecisionJournalGetLatest:
 # DecisionJournal.get_history() tests
 # ---------------------------------------------------------------------------
 
+
 class TestDecisionJournalGetHistory:
     def test_returns_empty_list_when_no_records(self, journal):
         assert journal.get_history("BTCUSDT") == []
@@ -169,6 +171,7 @@ class TestDecisionJournalGetHistory:
 # ---------------------------------------------------------------------------
 # API endpoint tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def api_journal(in_memory_session_factory, monkeypatch):

@@ -163,10 +163,9 @@ def setup_logging(
         log_file = os.path.join(log_dir, f"{service_name.replace('-', '_')}.log")
         try:
             from logging.handlers import RotatingFileHandler
+
             file_handler = RotatingFileHandler(
-                log_file,
-                maxBytes=10*1024*1024,  # 10MB
-                backupCount=3
+                log_file, maxBytes=10 * 1024 * 1024, backupCount=3  # 10MB
             )
             file_handler.setLevel(numeric_level)
             file_handler.setFormatter(PlainFormatter())

@@ -12,7 +12,6 @@ import os
 import sys
 from pathlib import Path
 
-
 PLACEHOLDER_FRAGMENTS = (
     "CHANGE_ME",
     "changeme",

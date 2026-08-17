@@ -13,8 +13,22 @@ on:
   workflow_dispatch:
 
 env:
-  # Use in-memory SQLite for unit tests (no Postgres needed)
-  DATABASE_URL: sqlite:///:memory:
+  # DB_PATH, not DATABASE_URL: DATABASE_URL pins every PortfolioManager to
+  # one shared SQLite file for the whole pytest session (cross-test
+  # UNIQUE-constraint collisions); DB_PATH lets each test that constructs
+  # its own PortfolioManager(db_path=...) reset the engine to an isolated
+  # file. A prior unquoted "sqlite:///:memory:" DATABASE_URL also broke the
+  # YAML parser outright (trailing ":" with nothing after it), so this
+  # workflow never ran at all; and :memory: is broken separately at the SQL
+  # level since this repo's engine uses NullPool for SQLite, which opens a
+  # fresh connection per checkout — wiping an in-memory DB between them.
+  # (The separate "integration" job below sets its own DATABASE_URL against
+  # real Postgres at the step level, which still takes precedence there.)
+  DB_PATH: /tmp/ci_test_portfolio.db
+  # Demo mode returns synthetic market data instead of calling the real
+  # Binance API with the dummy credentials below — required for
+  # BinanceAPIClient-touching tests to behave deterministically in CI.
+  DEMO_MODE: "true"
   BINANCE_API_URL: https://testnet.binance.vision
   BINANCE_API_KEY: dummy_key_for_ci
   BINANCE_API_SECRET: dummy_secret_for_ci
@@ -102,11 +116,8 @@ jobs:
         run: mkdir -p data logs
 
       - name: Run unit tests with coverage
-        env:
-          # Force SQLite for unit tests
-          DATABASE_URL: sqlite:///:memory:
         run: |
-          pytest binance_trade_agent/tests/ \
+          pytest binance_trade_agent/tests/ tests/ \
             --cov=binance_trade_agent \
             --cov-report=xml \
             --cov-report=term \

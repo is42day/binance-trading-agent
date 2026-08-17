@@ -18,7 +18,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -106,11 +105,23 @@ def client():
     stream_mgr = _make_mock_stream_manager()
 
     with (
-        patch("binance_trade_agent.core.order_lifecycle.get_order_lifecycle_service", return_value=svc),
-        patch("binance_trade_agent.core.decision_journal.get_decision_journal", return_value=journal),
-        patch("binance_trade_agent.core.strategy_validation_gate.get_validation_gate", return_value=gate),
-        patch("binance_trade_agent.core.market_streams.get_stream_manager", return_value=stream_mgr),
-        patch("binance_trade_agent.clients.binance_client.BinanceAPIClient", return_value=binance_client),
+        patch(
+            "binance_trade_agent.core.order_lifecycle.get_order_lifecycle_service", return_value=svc
+        ),
+        patch(
+            "binance_trade_agent.core.decision_journal.get_decision_journal", return_value=journal
+        ),
+        patch(
+            "binance_trade_agent.core.strategy_validation_gate.get_validation_gate",
+            return_value=gate,
+        ),
+        patch(
+            "binance_trade_agent.core.market_streams.get_stream_manager", return_value=stream_mgr
+        ),
+        patch(
+            "binance_trade_agent.clients.binance_client.BinanceAPIClient",
+            return_value=binance_client,
+        ),
     ):
         yield TestClient(app)
 
@@ -155,12 +166,11 @@ class TestOperatorStatusEndpoint:
         for secret_fragment in ("api_key", "api_secret", "secret", "password", "token"):
             # Ensure secret field names are not keys in the JSON (values containing them OK, e.g. "test-token")
             import json as _json
+
             body = _json.loads(body_str)
             # Flatten top-level keys only — sufficient for the surface contract
             for key in body.keys():
-                assert secret_fragment not in key.lower(), (
-                    f"Potential secret key found: {key!r}"
-                )
+                assert secret_fragment not in key.lower(), f"Potential secret key found: {key!r}"
 
     def test_circuit_breaker_state(self, client):
         resp = client.get("/api/v1/operator/status", headers={"X-API-Token": "test-token"})
@@ -197,11 +207,26 @@ class TestOperatorStatusEndpoint:
         stream_mgr = _make_mock_stream_manager()
 
         with (
-            patch("binance_trade_agent.core.order_lifecycle.get_order_lifecycle_service", return_value=svc),
-            patch("binance_trade_agent.core.decision_journal.get_decision_journal", return_value=journal),
-            patch("binance_trade_agent.core.strategy_validation_gate.get_validation_gate", return_value=gate),
-            patch("binance_trade_agent.core.market_streams.get_stream_manager", return_value=stream_mgr),
-            patch("binance_trade_agent.clients.binance_client.BinanceAPIClient", return_value=binance_client),
+            patch(
+                "binance_trade_agent.core.order_lifecycle.get_order_lifecycle_service",
+                return_value=svc,
+            ),
+            patch(
+                "binance_trade_agent.core.decision_journal.get_decision_journal",
+                return_value=journal,
+            ),
+            patch(
+                "binance_trade_agent.core.strategy_validation_gate.get_validation_gate",
+                return_value=gate,
+            ),
+            patch(
+                "binance_trade_agent.core.market_streams.get_stream_manager",
+                return_value=stream_mgr,
+            ),
+            patch(
+                "binance_trade_agent.clients.binance_client.BinanceAPIClient",
+                return_value=binance_client,
+            ),
         ):
             tc = TestClient(app)
             resp = tc.get("/api/v1/operator/status", headers={"X-API-Token": "test-token"})
@@ -241,11 +266,26 @@ class TestOperatorStatusEndpoint:
         stream_mgr = _make_mock_stream_manager()
 
         with (
-            patch("binance_trade_agent.core.order_lifecycle.get_order_lifecycle_service", return_value=svc),
-            patch("binance_trade_agent.core.decision_journal.get_decision_journal", return_value=journal),
-            patch("binance_trade_agent.core.strategy_validation_gate.get_validation_gate", return_value=gate),
-            patch("binance_trade_agent.core.market_streams.get_stream_manager", return_value=stream_mgr),
-            patch("binance_trade_agent.clients.binance_client.BinanceAPIClient", return_value=binance_client),
+            patch(
+                "binance_trade_agent.core.order_lifecycle.get_order_lifecycle_service",
+                return_value=svc,
+            ),
+            patch(
+                "binance_trade_agent.core.decision_journal.get_decision_journal",
+                return_value=journal,
+            ),
+            patch(
+                "binance_trade_agent.core.strategy_validation_gate.get_validation_gate",
+                return_value=gate,
+            ),
+            patch(
+                "binance_trade_agent.core.market_streams.get_stream_manager",
+                return_value=stream_mgr,
+            ),
+            patch(
+                "binance_trade_agent.clients.binance_client.BinanceAPIClient",
+                return_value=binance_client,
+            ),
         ):
             tc = TestClient(app)
             resp = tc.get("/api/v1/operator/status", headers={"X-API-Token": "test-token"})
@@ -269,11 +309,26 @@ class TestOperatorStatusEndpoint:
         stream_mgr = _make_mock_stream_manager()
 
         with (
-            patch("binance_trade_agent.core.order_lifecycle.get_order_lifecycle_service", return_value=svc),
-            patch("binance_trade_agent.core.decision_journal.get_decision_journal", return_value=journal),
-            patch("binance_trade_agent.core.strategy_validation_gate.get_validation_gate", return_value=gate),
-            patch("binance_trade_agent.core.market_streams.get_stream_manager", return_value=stream_mgr),
-            patch("binance_trade_agent.clients.binance_client.BinanceAPIClient", return_value=binance_client),
+            patch(
+                "binance_trade_agent.core.order_lifecycle.get_order_lifecycle_service",
+                return_value=svc,
+            ),
+            patch(
+                "binance_trade_agent.core.decision_journal.get_decision_journal",
+                return_value=journal,
+            ),
+            patch(
+                "binance_trade_agent.core.strategy_validation_gate.get_validation_gate",
+                return_value=gate,
+            ),
+            patch(
+                "binance_trade_agent.core.market_streams.get_stream_manager",
+                return_value=stream_mgr,
+            ),
+            patch(
+                "binance_trade_agent.clients.binance_client.BinanceAPIClient",
+                return_value=binance_client,
+            ),
         ):
             tc = TestClient(app)
             resp = tc.get("/api/v1/operator/status", headers={"X-API-Token": "test-token"})
@@ -302,11 +357,26 @@ class TestOperatorStatusEndpoint:
             return True
 
         with (
-            patch("binance_trade_agent.core.order_lifecycle.get_order_lifecycle_service", return_value=svc),
-            patch("binance_trade_agent.core.decision_journal.get_decision_journal", return_value=journal),
-            patch("binance_trade_agent.core.strategy_validation_gate.get_validation_gate", return_value=gate),
-            patch("binance_trade_agent.core.market_streams.get_stream_manager", return_value=stream_mgr),
-            patch("binance_trade_agent.clients.binance_client.BinanceAPIClient", return_value=binance_client),
+            patch(
+                "binance_trade_agent.core.order_lifecycle.get_order_lifecycle_service",
+                return_value=svc,
+            ),
+            patch(
+                "binance_trade_agent.core.decision_journal.get_decision_journal",
+                return_value=journal,
+            ),
+            patch(
+                "binance_trade_agent.core.strategy_validation_gate.get_validation_gate",
+                return_value=gate,
+            ),
+            patch(
+                "binance_trade_agent.core.market_streams.get_stream_manager",
+                return_value=stream_mgr,
+            ),
+            patch(
+                "binance_trade_agent.clients.binance_client.BinanceAPIClient",
+                return_value=binance_client,
+            ),
             patch.object(risk_agent, "_shared_emergency_stop_enabled", mock_enabled),
         ):
             tc = TestClient(app)
@@ -366,7 +436,9 @@ class TestOperatorActionEndpoints:
             {"client_order_id": "bta_2", "success": False, "error": "already closed"},
         ]
 
-        with patch("binance_trade_agent.core.order_lifecycle.get_order_lifecycle_service", return_value=svc):
+        with patch(
+            "binance_trade_agent.core.order_lifecycle.get_order_lifecycle_service", return_value=svc
+        ):
             tc = TestClient(app)
             resp = tc.post(
                 "/api/v1/orders/stale/cancel",
@@ -385,7 +457,9 @@ class TestOperatorActionEndpoints:
         engine = MagicMock()
         engine.get_portfolio_summary.return_value = {"current_balance": 2500.0}
 
-        with patch("binance_trade_agent.core.paper_trading.get_paper_trading_engine", return_value=engine):
+        with patch(
+            "binance_trade_agent.core.paper_trading.get_paper_trading_engine", return_value=engine
+        ):
             tc = TestClient(app)
             resp = tc.post(
                 "/api/v1/paper-trading/reset",

@@ -12,21 +12,19 @@ Verifies:
 """
 
 import json
-import os
 import tempfile
-import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 
-from binance_trade_agent.core.strategy_validation_gate import ValidationGate, GateResult
+from binance_trade_agent.core.strategy_validation_gate import ValidationGate
 from binance_trade_agent.scripts.micro_strategy_validator import build_gate_artifact
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _write_gate(directory: Path, symbols: dict, generated_at: str = None, ttl: int = 86400) -> Path:
     """Write a gate artifact JSON and return the path."""
@@ -81,6 +79,7 @@ def _fail_entry(reason="negative_daily_eur"):
 # ValidationGate.check() tests
 # ---------------------------------------------------------------------------
 
+
 class TestValidationGateMissing:
     def test_missing_file_returns_gate_missing(self, gate_dir):
         gate = ValidationGate(str(gate_dir / "nonexistent.json"))
@@ -133,9 +132,7 @@ class TestValidationGateSymbolAbsent:
 
 class TestValidationGateNegativeEUR:
     def test_negative_daily_eur_blocks(self, gate_dir):
-        gate_file = _write_gate(
-            gate_dir, symbols={"BTCUSDT": _fail_entry("negative_daily_eur")}
-        )
+        gate_file = _write_gate(gate_dir, symbols={"BTCUSDT": _fail_entry("negative_daily_eur")})
         gate = ValidationGate(str(gate_file))
         result = gate.check("BTCUSDT")
         assert not result.cleared
@@ -144,9 +141,7 @@ class TestValidationGateNegativeEUR:
 
 class TestValidationGateDrawdown:
     def test_drawdown_exceeded_blocks(self, gate_dir):
-        gate_file = _write_gate(
-            gate_dir, symbols={"BTCUSDT": _fail_entry("drawdown_exceeded")}
-        )
+        gate_file = _write_gate(gate_dir, symbols={"BTCUSDT": _fail_entry("drawdown_exceeded")})
         gate = ValidationGate(str(gate_file))
         result = gate.check("BTCUSDT")
         assert not result.cleared
@@ -174,6 +169,7 @@ class TestValidationGatePositive:
 # ---------------------------------------------------------------------------
 # build_gate_artifact() tests
 # ---------------------------------------------------------------------------
+
 
 class TestBuildGateArtifact:
     def _fake_validation_output(self):
@@ -241,7 +237,9 @@ class TestBuildGateArtifact:
         assert artifact["symbols"]["BTCUSDT"]["gate_reason"] == "drawdown_exceeded"
 
     def test_artifact_contains_generated_at_and_ttl(self):
-        artifact = build_gate_artifact(self._fake_validation_output(), "micro_grid", ttl_seconds=3600)
+        artifact = build_gate_artifact(
+            self._fake_validation_output(), "micro_grid", ttl_seconds=3600
+        )
         assert "generated_at" in artifact
         assert artifact["ttl_seconds"] == 3600
 

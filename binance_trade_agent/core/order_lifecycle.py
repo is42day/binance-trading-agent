@@ -126,12 +126,12 @@ class OrderLifecycleService:
 
         order_id = int(local["order_id"]) if local.get("order_id") else None
         if order_id is None:
-            raise ValueError(f"Cannot cancel order without an exchange order_id: {client_order_id!r}")
+            raise ValueError(
+                f"Cannot cancel order without an exchange order_id: {client_order_id!r}"
+            )
 
         self.client.cancel_order(symbol, order_id)
-        logger.info(
-            "Cancelled order %s / %s: %s", client_order_id, order_id, reason
-        )
+        logger.info("Cancelled order %s / %s: %s", client_order_id, order_id, reason)
 
         updated = {
             **local,
@@ -184,11 +184,13 @@ class OrderLifecycleService:
 
             pct_deviation = abs(current_price - float(limit_price)) / float(limit_price) * 100
             if pct_deviation > price_pct_threshold:
-                stale.append({
-                    **order,
-                    "current_price": current_price,
-                    "price_deviation_pct": round(pct_deviation, 4),
-                })
+                stale.append(
+                    {
+                        **order,
+                        "current_price": current_price,
+                        "price_deviation_pct": round(pct_deviation, 4),
+                    }
+                )
 
         return stale
 
@@ -202,7 +204,9 @@ class OrderLifecycleService:
 
         Returns the list of cancellation results (one per order).
         """
-        stale = self.detect_stale_limit_orders(symbol=symbol, price_pct_threshold=price_pct_threshold)
+        stale = self.detect_stale_limit_orders(
+            symbol=symbol, price_pct_threshold=price_pct_threshold
+        )
         results: List[Dict[str, Any]] = []
         for order in stale:
             coid = order["client_order_id"]
@@ -269,23 +273,25 @@ class OrderLifecycleService:
         for report in response.get("orderReports", []):
             order_type = str(report.get("type", "LIMIT")).upper()
             coid = report.get("clientOrderId") or limit_coid
-            self.portfolio.upsert_exchange_order({
-                "client_order_id": coid,
-                "order_id": str(report.get("orderId") or ""),
-                "symbol": symbol,
-                "side": side,
-                "order_type": order_type,
-                "status": str(report.get("status", "NEW")).upper(),
-                "quantity": quantity,
-                "executed_quantity": float(report.get("executedQty") or 0),
-                "last_booked_quantity": 0.0,
-                "price": float(report.get("price") or 0) or None,
-                "avg_fill_price": None,
-                "fee": 0.0,
-                "correlation_id": f"oco_{response.get('orderListId', '')}",
-                "raw_response": report,
-                "created_at": now,
-            })
+            self.portfolio.upsert_exchange_order(
+                {
+                    "client_order_id": coid,
+                    "order_id": str(report.get("orderId") or ""),
+                    "symbol": symbol,
+                    "side": side,
+                    "order_type": order_type,
+                    "status": str(report.get("status", "NEW")).upper(),
+                    "quantity": quantity,
+                    "executed_quantity": float(report.get("executedQty") or 0),
+                    "last_booked_quantity": 0.0,
+                    "price": float(report.get("price") or 0) or None,
+                    "avg_fill_price": None,
+                    "fee": 0.0,
+                    "correlation_id": f"oco_{response.get('orderListId', '')}",
+                    "raw_response": report,
+                    "created_at": now,
+                }
+            )
 
         return {
             **response,
@@ -300,7 +306,8 @@ class OrderLifecycleService:
     def get_open_orders(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
         """Return locally tracked orders in an open (non-terminal) state."""
         return [
-            o for o in self.portfolio.get_open_exchange_orders(symbol=symbol)
+            o
+            for o in self.portfolio.get_open_exchange_orders(symbol=symbol)
             if o.get("status", "").upper() in OPEN_STATUSES
         ]
 
@@ -323,10 +330,7 @@ class OrderLifecycleService:
     ) -> None:
         """Book a portfolio trade for the fill delta since the last booking."""
         # trade_id encodes the fill level to prevent double-booking on retry
-        trade_id = (
-            f"{local_order['client_order_id']}"
-            f"_fill_{int(round(current_exec_qty * 1e8))}"
-        )
+        trade_id = f"{local_order['client_order_id']}" f"_fill_{int(round(current_exec_qty * 1e8))}"
         try:
             self.portfolio.add_trade(
                 trade_id=trade_id,

@@ -17,7 +17,6 @@ from typing import Callable
 
 import pandas as pd
 
-
 BINANCE_REST_BASE = "https://api.binance.com"
 
 
@@ -256,7 +255,10 @@ def micro_grid(frame: pd.DataFrame, config: SimulationConfig) -> dict:
                 fill = price * (1 - config.slippage_rate)
                 proceeds = position["quantity"] * fill * (1 - config.fee_rate)
                 trades.append(
-                    {"pnl": proceeds - position["quantity"] * position["entry"], "reason": exit_reason}
+                    {
+                        "pnl": proceeds - position["quantity"] * position["entry"],
+                        "reason": exit_reason,
+                    }
                 )
                 cash += proceeds
             else:
@@ -311,7 +313,10 @@ def maker_reversion_grid(frame: pd.DataFrame, config: SimulationConfig) -> dict:
             if exit_reason:
                 proceeds = position["quantity"] * price * (1 - config.fee_rate)
                 trades.append(
-                    {"pnl": proceeds - position["quantity"] * position["entry"], "reason": exit_reason}
+                    {
+                        "pnl": proceeds - position["quantity"] * position["entry"],
+                        "reason": exit_reason,
+                    }
                 )
                 cash += proceeds
             else:
@@ -360,8 +365,7 @@ def run_validation(args: argparse.Namespace) -> dict:
     for symbol in args.symbols:
         frame = add_indicators(fetch_klines(symbol, args.interval, args.days))
         results[symbol] = {
-            strategy_name: strategy(frame, config)
-            for strategy_name, strategy in STRATEGIES.items()
+            strategy_name: strategy(frame, config) for strategy_name, strategy in STRATEGIES.items()
         }
 
     return {
@@ -427,9 +431,7 @@ def build_gate_artifact(
             "win_rate": metrics.get("win_rate", 0.0),
         }
 
-    overall_pass = bool(symbols_gate) and all(
-        s.get("gate_pass") for s in symbols_gate.values()
-    )
+    overall_pass = bool(symbols_gate) and all(s.get("gate_pass") for s in symbols_gate.values())
 
     return {
         "generated_at": _dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),

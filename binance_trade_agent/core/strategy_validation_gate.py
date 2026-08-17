@@ -43,6 +43,7 @@ DEFAULT_GATE_PATH = os.getenv(
 # Result dataclass
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class GateResult:
     """
@@ -55,6 +56,7 @@ class GateResult:
         age_seconds:  Age of the gate file in seconds.
         gate_data:    Raw gate entry for the symbol (or None).
     """
+
     cleared: bool
     symbol: str
     age_seconds: Optional[float]
@@ -74,6 +76,7 @@ class GateResult:
 # ---------------------------------------------------------------------------
 # Gate reader
 # ---------------------------------------------------------------------------
+
 
 class ValidationGate:
     """
@@ -111,7 +114,9 @@ class ValidationGate:
             artifact = self._load()
         except Exception as exc:
             logger.error("Failed to read strategy gate: %s", exc)
-            return GateResult(cleared=False, symbol=symbol, age_seconds=None, reason="gate_read_error")
+            return GateResult(
+                cleared=False, symbol=symbol, age_seconds=None, reason="gate_read_error"
+            )
 
         # 3. Staleness
         age = self._age_seconds(artifact)
@@ -125,8 +130,11 @@ class ValidationGate:
         if symbol not in symbols:
             logger.warning("Symbol %s not found in strategy gate", symbol)
             return GateResult(
-                cleared=False, symbol=symbol, age_seconds=age,
-                reason="symbol_not_in_gate", gate_data=None,
+                cleared=False,
+                symbol=symbol,
+                age_seconds=age,
+                reason="symbol_not_in_gate",
+                gate_data=None,
             )
 
         # 5. Gate pass evaluation
@@ -135,8 +143,11 @@ class ValidationGate:
             reason = entry.get("gate_reason", "gate_fail")
             logger.warning("Strategy gate BLOCKED for %s: %s", symbol, reason)
             return GateResult(
-                cleared=False, symbol=symbol, age_seconds=age,
-                reason=reason, gate_data=entry,
+                cleared=False,
+                symbol=symbol,
+                age_seconds=age,
+                reason=reason,
+                gate_data=entry,
             )
 
         logger.debug("Strategy gate CLEARED for %s (age=%.0fs)", symbol, age)

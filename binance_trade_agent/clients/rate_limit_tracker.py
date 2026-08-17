@@ -34,7 +34,7 @@ from __future__ import annotations
 import logging
 import time
 from threading import Lock
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -63,9 +63,9 @@ ENDPOINT_WEIGHTS: Dict[str, int] = {
 }
 
 # Default safety thresholds
-DEFAULT_WEIGHT_BUDGET: int = 1_200         # per 1-minute window
-DEFAULT_WEIGHT_SAFETY_MARGIN: float = 0.85 # block at 85 % utilization
-DEFAULT_ORDER_BUDGET_1S: int = 10          # orders per second
+DEFAULT_WEIGHT_BUDGET: int = 1_200  # per 1-minute window
+DEFAULT_WEIGHT_SAFETY_MARGIN: float = 0.85  # block at 85 % utilization
+DEFAULT_ORDER_BUDGET_1S: int = 10  # orders per second
 DEFAULT_WINDOW_SECONDS: float = 60.0
 
 
@@ -80,6 +80,7 @@ class RateLimitExceeded(Exception):
 # ---------------------------------------------------------------------------
 # RateLimitTracker
 # ---------------------------------------------------------------------------
+
 
 class RateLimitTracker:
     """
@@ -186,7 +187,10 @@ class RateLimitTracker:
 
         logger.debug(
             "RateLimit: endpoint=%s weight=%d used=%d/%d",
-            endpoint, weight, self._weight_used, self._weight_budget,
+            endpoint,
+            weight,
+            self._weight_used,
+            self._weight_budget,
         )
         return weight
 
@@ -201,9 +205,7 @@ class RateLimitTracker:
         hold = retry_after_seconds if retry_after_seconds is not None else 60.0
         with self._lock:
             self._retry_after_until = time.time() + hold
-            logger.warning(
-                "Binance 429 received. Rate-limit hold-off for %.0fs", hold
-            )
+            logger.warning("Binance 429 received. Rate-limit hold-off for %.0fs", hold)
 
     def get_status(self) -> dict:
         """Return a snapshot of current rate-limit state (safe to call anytime)."""
@@ -219,9 +221,7 @@ class RateLimitTracker:
             return {
                 "weight_used": self._weight_used,
                 "weight_budget": self._weight_budget,
-                "weight_utilization_pct": round(
-                    self._weight_used / self._weight_budget * 100, 1
-                ),
+                "weight_utilization_pct": round(self._weight_used / self._weight_budget * 100, 1),
                 "safety_threshold": self._safety_threshold,
                 "window_seconds": self._window_seconds,
                 "window_age_seconds": round(window_age, 1),

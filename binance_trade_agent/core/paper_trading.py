@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class PaperTrade:
     """Represents a simulated trade"""
+
     trade_id: str
     symbol: str
     side: str  # BUY or SELL
@@ -53,8 +54,8 @@ class PaperTrade:
 
         # Subtract simulated fees (0.1% each way)
         fee_rate = 0.001
-        self.pnl -= (self.entry_price * self.quantity * fee_rate)
-        self.pnl -= (exit_price * self.quantity * fee_rate)
+        self.pnl -= self.entry_price * self.quantity * fee_rate
+        self.pnl -= exit_price * self.quantity * fee_rate
 
         return self
 
@@ -62,6 +63,7 @@ class PaperTrade:
 @dataclass
 class PaperPortfolio:
     """Tracks paper trading portfolio state"""
+
     initial_balance: float = 10000.0  # Starting USDT
     current_balance: float = 10000.0
     open_positions: Dict[str, PaperTrade] = field(default_factory=dict)
@@ -87,7 +89,11 @@ class PaperPortfolio:
         if losses:
             avg_loss = sum(t.pnl for t in losses) / len(losses)
 
-        profit_factor = abs(sum(t.pnl for t in wins)) / abs(sum(t.pnl for t in losses)) if losses and sum(t.pnl for t in losses) != 0 else 0
+        profit_factor = (
+            abs(sum(t.pnl for t in wins)) / abs(sum(t.pnl for t in losses))
+            if losses and sum(t.pnl for t in losses) != 0
+            else 0
+        )
 
         return {
             "initial_balance": self.initial_balance,
@@ -102,7 +108,9 @@ class PaperPortfolio:
             "avg_loss": avg_loss,
             "profit_factor": profit_factor,
             "max_drawdown": self.max_drawdown,
-            "max_drawdown_percent": (self.max_drawdown / self.peak_balance) * 100 if self.peak_balance > 0 else 0,
+            "max_drawdown_percent": (
+                (self.max_drawdown / self.peak_balance) * 100 if self.peak_balance > 0 else 0
+            ),
             "open_positions": len(self.open_positions),
         }
 
@@ -224,7 +232,7 @@ class PaperTradingEngine:
             if trade_value > self.portfolio.current_balance:
                 return {
                     "success": False,
-                    "error": f"Insufficient balance: need ${trade_value:.2f}, have ${self.portfolio.current_balance:.2f}"
+                    "error": f"Insufficient balance: need ${trade_value:.2f}, have ${self.portfolio.current_balance:.2f}",
                 }
 
         # Check if we have position to sell
@@ -317,9 +325,10 @@ class PaperTradingEngine:
         rejection_reason: str = None,
     ):
         """Log a signal (whether executed or not) for analysis"""
+
         # Convert numpy types to Python native types for JSON serialization
         def convert_numpy(obj):
-            if hasattr(obj, 'item'):  # numpy scalar
+            if hasattr(obj, "item"):  # numpy scalar
                 return obj.item()
             elif isinstance(obj, dict):
                 return {k: convert_numpy(v) for k, v in obj.items()}
@@ -443,13 +452,17 @@ class PaperTradingEngine:
 
                 # Restore basic stats
                 stats = state.get("portfolio", {})
-                self.portfolio.current_balance = stats.get("current_balance", self.portfolio.initial_balance)
+                self.portfolio.current_balance = stats.get(
+                    "current_balance", self.portfolio.initial_balance
+                )
                 self.portfolio.total_pnl = stats.get("total_pnl", 0)
                 self.portfolio.total_trades = stats.get("total_trades", 0)
                 self.portfolio.winning_trades = stats.get("winning_trades", 0)
                 self.portfolio.losing_trades = stats.get("losing_trades", 0)
                 self.portfolio.max_drawdown = stats.get("max_drawdown", 0)
-                self.portfolio.peak_balance = stats.get("current_balance", self.portfolio.initial_balance)
+                self.portfolio.peak_balance = stats.get(
+                    "current_balance", self.portfolio.initial_balance
+                )
 
                 # Restore open positions
                 open_positions = state.get("open_positions", {})
@@ -460,13 +473,17 @@ class PaperTradingEngine:
                         side="BUY",  # Assume all open positions are long for now
                         entry_price=pos_data.get("entry_price", 0),
                         quantity=pos_data.get("quantity", 0),
-                        entry_time=datetime.fromisoformat(pos_data.get("entry_time", datetime.now().isoformat())),
+                        entry_time=datetime.fromisoformat(
+                            pos_data.get("entry_time", datetime.now().isoformat())
+                        ),
                         strategy=pos_data.get("strategy", "unknown"),
                     )
                     self.portfolio.open_positions[symbol] = trade
                     logger.info(f"Restored open position: {symbol} @ ${trade.entry_price:.2f}")
 
-                logger.info(f"Loaded paper trading state: balance=${self.portfolio.current_balance:.2f}, positions={len(self.portfolio.open_positions)}")
+                logger.info(
+                    f"Loaded paper trading state: balance=${self.portfolio.current_balance:.2f}, positions={len(self.portfolio.open_positions)}"
+                )
             except Exception as e:
                 logger.warning(f"Failed to load paper trading state: {e}")
 
@@ -489,7 +506,10 @@ class PaperTradingEngine:
                     "quantity": trade.quantity,
                     "value": current_value,
                     "unrealized_pnl": unrealized_pnl,
-                    "unrealized_pnl_percent": (unrealized_pnl / (trade.entry_price * trade.quantity)) * 100,
+                    "unrealized_pnl_percent": (
+                        unrealized_pnl / (trade.entry_price * trade.quantity)
+                    )
+                    * 100,
                 }
                 total_position_value += current_value
 
