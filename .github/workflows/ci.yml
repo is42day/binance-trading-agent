@@ -49,21 +49,14 @@ jobs:
       - name: Create test directories
         run: mkdir -p data logs
 
-      # Lint/format/isort report pre-existing repo-wide debt (tracked
-      # separately) and must not block the test step below from running —
-      # that's the actual safety-relevant signal. continue-on-error mirrors
-      # the existing mypy step in test.yml.
       - name: Lint with ruff
         run: ruff check binance_trade_agent tests
-        continue-on-error: true
 
       - name: Format check with black
         run: black --check binance_trade_agent tests
-        continue-on-error: true
 
       - name: Import sort check with isort
         run: isort --check-only binance_trade_agent tests
-        continue-on-error: true
 
       - name: Run unit tests
         run: |

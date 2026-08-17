@@ -397,9 +397,7 @@ class TestBinanceWsStreamUrl:
     async def test_uses_testnet_url_when_binance_testnet_true(self, monkeypatch):
         from binance_trade_agent.core.market_streams import _binance_ws_stream
 
-        monkeypatch.setattr(
-            "binance_trade_agent.common.config.config.binance_testnet", True
-        )
+        monkeypatch.setattr("binance_trade_agent.common.config.config.binance_testnet", True)
         captured = {}
 
         class _FakeWs:
@@ -433,9 +431,7 @@ class TestBinanceWsStreamUrl:
     async def test_uses_mainnet_url_when_binance_testnet_false(self, monkeypatch):
         from binance_trade_agent.core.market_streams import _binance_ws_stream
 
-        monkeypatch.setattr(
-            "binance_trade_agent.common.config.config.binance_testnet", False
-        )
+        monkeypatch.setattr("binance_trade_agent.common.config.config.binance_testnet", False)
         captured = {}
 
         class _FakeWs:
