@@ -116,7 +116,14 @@ def require_auth(app):
         print("🔓 Dashboard authentication DISABLED (DASHBOARD_AUTH_ENABLED=false)")
         return
 
-    username, _ = get_credentials()
+    username, password = get_credentials()
+    if password == DEFAULT_PASSWORD:
+        raise RuntimeError(
+            "Refusing to start: dashboard authentication is enabled but "
+            "DASHBOARD_PASSWORD is still the default 'changeme'. Set a real "
+            "DASHBOARD_PASSWORD, or explicitly set DASHBOARD_AUTH_ENABLED=false "
+            "to run without authentication (development only)."
+        )
     print(f"🔐 Dashboard authentication ENABLED (username: {username})")
 
     @app.server.before_request

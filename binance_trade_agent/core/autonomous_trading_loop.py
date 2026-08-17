@@ -82,6 +82,7 @@ class AutonomousTradingLoop:
             strategy_name=self.strategy_name,
             strategy_parameters=self.strategy_parameters,
         )
+        self._check_shared_risk_state_for_live_trading()
 
         self.logger.info(
             f"AutonomousTradingLoop initialized:\n"
@@ -137,6 +138,35 @@ class AutonomousTradingLoop:
                 "other instance is running, wait for the heartbeat to go stale "
                 "or clear the 'trading-agent' row in the heartbeat table."
             )
+
+    def _check_shared_risk_state_for_live_trading(self):
+        """
+        Refuse to start live (real-money) trading unless risk state is
+        shared across processes.
+
+        emergency_stop, consecutive_losses, daily_trades, and drawdown
+        tracking only reach other processes (the API/dashboard's "Emergency
+        Stop" button, in particular) when EnhancedRiskManagementAgent's
+        shared_state_enabled is true. Outside docker-compose (which sets
+        DATABASE_URL), that flag silently defaults to false and each process
+        gets its own in-memory, per-process copy — an operator hitting
+        Emergency Stop from the dashboard would have no effect on a
+        standalone trading-agent process. Testnet/demo trading is allowed to
+        run without this, since the blast radius of that gap is zero; real
+        money is not.
+        """
+        if config.runtime_mode != "live_armed":
+            return
+        if self.orchestrator.risk_agent.shared_state_enabled:
+            return
+        raise RuntimeError(
+            "Refusing to start live trading: risk state is not shared across "
+            "processes (RISK_SHARED_STATE_ENABLED is not set and DATABASE_URL is "
+            "not configured). Without it, the Emergency Stop button and other "
+            "risk controls in the API/dashboard process can't reach this trading "
+            "loop. Set RISK_SHARED_STATE_ENABLED=true or DATABASE_URL before "
+            "starting live trading."
+        )
 
     def _refresh_heartbeat(self, status: str = "healthy", details: dict | None = None):
         """Record that this instance is the live trading-agent."""

@@ -34,6 +34,11 @@ env:
   BINANCE_API_SECRET: dummy_secret_for_ci
   LOG_LEVEL: WARNING
   PYTHONPATH: /home/runner/work/binance-trading-agent/binance-trading-agent
+  # require_api_token defaults to enforcing auth (fail-closed) so a bare
+  # `uvicorn` run outside docker-compose isn't silently wide open. Tests
+  # hit the API directly without configuring a token, so opt out explicitly
+  # here rather than relying on the (now secure-by-default) code default.
+  API_AUTH_REQUIRED: "false"
 
 permissions:
   contents: read
