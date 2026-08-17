@@ -95,6 +95,14 @@ class AutonomousTradingLoop:
         self.start_time = None
         self.stop_flag = False
 
+        # Tracks the last kline open_time (ms) processed per symbol by the
+        # stream-driven trailing-stop watcher, to avoid re-evaluating the
+        # same closed candle on every check tick.
+        self._stream_last_candle_time: dict[str, int] = {}
+        self.stream_trailing_stop_watcher_enabled = os.getenv(
+            "ENABLE_STREAM_TRAILING_STOP_WATCHER", "true"
+        ).lower() in {"true", "1", "yes", "on"}
+
         if os.getenv("EXCHANGE_RECONCILE_ON_START", "true").lower() in {
             "true",
             "1",
@@ -181,8 +189,13 @@ class AutonomousTradingLoop:
 
     async def _update_trailing_stops(self):
         """
-        Update trailing stops for all active positions.
-        If a stop is triggered, close the position.
+        Update trailing stops for all active positions using REST prices.
+
+        This is the periodic, cycle-bound fallback — it runs once per
+        trading cycle regardless of whether the stream-driven watcher
+        (_run_trailing_stop_watcher) is active, so a stop is never left
+        unchecked for longer than one full cycle even if streaming is
+        unavailable.
         """
         risk_agent = self.orchestrator.risk_agent
         trailing_info = risk_agent.get_trailing_stop_info()
@@ -201,10 +214,20 @@ class AutonomousTradingLoop:
             except Exception as e:
                 self.logger.error(f"   Failed to get price for {symbol}: {e}")
 
-        # Update all trailing stops with current prices
         results = risk_agent.update_all_trailing_stops(prices)
+        await self._process_trailing_stop_results(results)
 
-        # Handle triggered stops
+    async def _process_trailing_stop_results(self, results: dict):
+        """
+        Given per-symbol results from risk_agent.update_all_trailing_stops(),
+        close any triggered stops and log status for the rest.
+
+        Shared between the REST-cycle path (_update_trailing_stops) and the
+        stream-driven watcher (_check_trailing_stop_via_stream) so both use
+        the exact same close-order logic.
+        """
+        risk_agent = self.orchestrator.risk_agent
+
         for symbol, result in results.items():
             if result.get("stop_triggered"):
                 self.logger.warning(f"   ⚠️ {symbol} trailing stop TRIGGERED!")
@@ -262,6 +285,88 @@ class AutonomousTradingLoop:
                     f"P&L: {profit_pct:+.2f}%"
                 )
 
+    async def _check_trailing_stop_via_stream(self, symbol: str, interval: str) -> bool:
+        """
+        Check one symbol's trailing stop against the latest closed candle
+        from the WebSocket kline stream, if fresh data is available.
+
+        Returns True if a new candle was processed (regardless of whether a
+        stop triggered), so the caller can track per-symbol last-seen candle
+        time and avoid re-evaluating the same candle repeatedly.
+        """
+        from .market_streams import get_stream_manager
+
+        manager = get_stream_manager()
+        candles = manager.get_ohlcv(symbol, interval, limit=1)
+        if not candles:
+            return False
+
+        open_time_ms, _open, _high, _low, close, _volume = candles[-1]
+        last_seen = self._stream_last_candle_time.get(symbol)
+        if last_seen is not None and open_time_ms <= last_seen:
+            return False  # already processed this candle
+        self._stream_last_candle_time[symbol] = open_time_ms
+
+        results = self.orchestrator.risk_agent.update_all_trailing_stops({symbol: close})
+        if results:
+            await self._process_trailing_stop_results(results)
+        return True
+
+    async def _run_trailing_stop_watcher(
+        self, interval: str = "1m", check_every_seconds: float = 5.0
+    ):
+        """
+        Background task: react to trailing-stop breaches as soon as a new
+        kline closes on the WebSocket stream, instead of waiting for the
+        next full trading cycle (which can be minutes away with several
+        symbols and a long trade_interval).
+
+        This is additive, not a replacement for _update_trailing_stops — if
+        streaming is unavailable (package missing, network issue, symbol not
+        subscribed yet), get_ohlcv returns None/stale and this tick is
+        skipped; the REST-based per-cycle check remains the reliable
+        fallback regardless of whether this watcher is running at all.
+        """
+        from .market_streams import get_stream_manager
+
+        manager = get_stream_manager()
+        subscribed = []
+        for symbol in self.symbols:
+            try:
+                await manager.subscribe(symbol, interval)
+                subscribed.append(symbol)
+            except Exception as exc:
+                self.logger.warning(
+                    f"Trailing-stop watcher: failed to subscribe to {symbol}@{interval}: {exc}"
+                )
+
+        try:
+            while not self.stop_flag:
+                risk_agent = self.orchestrator.risk_agent
+                trailing_info = risk_agent.get_trailing_stop_info()
+                for symbol in list(trailing_info.get("positions", {}).keys()):
+                    try:
+                        await self._check_trailing_stop_via_stream(symbol, interval)
+                    except Exception as exc:
+                        self.logger.warning(
+                            f"Trailing-stop watcher: error checking {symbol}: {exc}"
+                        )
+                await asyncio.sleep(check_every_seconds)
+        except asyncio.CancelledError:
+            pass
+        finally:
+            # get_stream_manager() is a shared, process-wide singleton — only
+            # unsubscribe the (symbol, interval) pairs this watcher itself
+            # subscribed, not every subscription in the process (e.g. ones
+            # held for the /api/v1/market/streams/status endpoint).
+            for symbol in subscribed:
+                try:
+                    await manager.unsubscribe(symbol, interval)
+                except Exception as exc:
+                    self.logger.warning(
+                        f"Trailing-stop watcher: failed to unsubscribe {symbol}@{interval}: {exc}"
+                    )
+
     async def run(self):
         """
         Run the autonomous trading loop
@@ -278,6 +383,12 @@ class AutonomousTradingLoop:
             self.logger.info(f"   Will run until: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
         else:
             self.logger.info("   Running indefinitely (press Ctrl+C to stop)")
+
+        watcher_task = None
+        if self.stream_trailing_stop_watcher_enabled:
+            watcher_task = asyncio.create_task(
+                self._run_trailing_stop_watcher(), name="trailing-stop-watcher"
+            )
 
         cycle = 0
         while not self.stop_flag:
@@ -371,6 +482,13 @@ class AutonomousTradingLoop:
                 except asyncio.CancelledError:
                     self.logger.info("Interrupted by user during sleep")
                     self.stop_flag = True
+
+        if watcher_task is not None:
+            watcher_task.cancel()
+            try:
+                await watcher_task
+            except asyncio.CancelledError:
+                pass
 
         # Final summary
         elapsed = datetime.now() - self.start_time
