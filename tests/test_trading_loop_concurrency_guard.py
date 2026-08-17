@@ -168,6 +168,7 @@ class TestHeartbeatRefreshedDuringCycle:
             loop._heartbeat_portfolio = portfolio
             loop.stop_flag = False
             loop.trades_executed = 0
+            loop.stream_trailing_stop_watcher_enabled = False
             loop.orchestrator = MagicMock()
             loop.orchestrator.execute_trading_workflow = AsyncMock(
                 side_effect=Exception("no orchestrator behavior needed for this test")
