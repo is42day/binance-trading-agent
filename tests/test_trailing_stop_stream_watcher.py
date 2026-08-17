@@ -156,6 +156,69 @@ class TestCheckTrailingStopViaStream:
         assert processed is False
         loop.orchestrator.risk_agent.update_all_trailing_stops.assert_not_called()
 
+    async def test_ignores_a_candle_that_closed_before_the_position_was_registered(
+        self, monkeypatch
+    ):
+        """
+        A symbol's first tick after register_trailing_stop() must not
+        evaluate whatever candle happens to be buffered if that candle
+        opened before the position existed — that price action predates the
+        entry and isn't a valid trailing-stop signal.
+        """
+        candle_open_ms = 10_000
+        manager = KlineStreamManager(
+            stream_factory=_factory_from_messages([_kline_msg(candle_open_ms, 94.0)])
+        )
+        monkeypatch.setattr(
+            "binance_trade_agent.core.market_streams.get_stream_manager", lambda **_kw: manager
+        )
+
+        loop = _build_bare_loop(["BTCUSDT"])
+        risk_agent = loop.orchestrator.risk_agent
+
+        await manager.subscribe("BTCUSDT", "1m")
+        await _wait_for_candles(manager, "BTCUSDT", "1m", count=1)
+
+        # Position registered *after* the buffered candle opened.
+        processed = await loop._check_trailing_stop_via_stream(
+            "BTCUSDT", "1m", registered_at_ms=candle_open_ms + 5_000
+        )
+
+        assert processed is False
+        risk_agent.update_all_trailing_stops.assert_not_called()
+
+        await manager.unsubscribe("BTCUSDT", "1m")
+
+    async def test_processes_a_candle_that_opened_after_registration(self, monkeypatch):
+        candle_open_ms = 10_000
+        manager = KlineStreamManager(
+            stream_factory=_factory_from_messages([_kline_msg(candle_open_ms, 94.0)])
+        )
+        monkeypatch.setattr(
+            "binance_trade_agent.core.market_streams.get_stream_manager", lambda **_kw: manager
+        )
+
+        loop = _build_bare_loop(["BTCUSDT"])
+        risk_agent = loop.orchestrator.risk_agent
+        risk_agent.update_all_trailing_stops = MagicMock(
+            return_value={
+                "BTCUSDT": {"stop_triggered": False, "current_price": 94.0, "current_stop": 90.0}
+            }
+        )
+
+        await manager.subscribe("BTCUSDT", "1m")
+        await _wait_for_candles(manager, "BTCUSDT", "1m", count=1)
+
+        # Position registered *before* the buffered candle opened.
+        processed = await loop._check_trailing_stop_via_stream(
+            "BTCUSDT", "1m", registered_at_ms=candle_open_ms - 5_000
+        )
+
+        assert processed is True
+        risk_agent.update_all_trailing_stops.assert_called_once_with({"BTCUSDT": 94.0})
+
+        await manager.unsubscribe("BTCUSDT", "1m")
+
 
 @pytest.mark.asyncio
 class TestTrailingStopWatcherLifecycle:
@@ -184,6 +247,44 @@ class TestTrailingStopWatcherLifecycle:
         await task  # completes normally — cancellation is caught internally to run cleanup
 
         assert manager._subscriptions == {}
+
+    async def test_watcher_passes_registered_at_from_the_position_through_to_the_check(
+        self, monkeypatch
+    ):
+        manager = KlineStreamManager(stream_factory=_factory_from_messages([]))
+        monkeypatch.setattr(
+            "binance_trade_agent.core.market_streams.get_stream_manager", lambda **_kw: manager
+        )
+
+        loop = _build_bare_loop(["BTCUSDT"])
+        loop.orchestrator.risk_agent.get_trailing_stop_info = MagicMock(
+            return_value={
+                "positions": {"BTCUSDT": {"registered_at": "2026-08-17T12:00:00"}},
+                "active_stops": 1,
+            }
+        )
+        seen_calls = []
+
+        async def _fake_check(symbol, interval, registered_at_ms=None):
+            seen_calls.append((symbol, interval, registered_at_ms))
+            return False
+
+        loop._check_trailing_stop_via_stream = _fake_check
+
+        task = asyncio.create_task(
+            loop._run_trailing_stop_watcher(interval="1m", check_every_seconds=0.05)
+        )
+        await asyncio.sleep(0.1)
+        task.cancel()
+        await task
+
+        assert seen_calls
+        symbol, interval, registered_at_ms = seen_calls[0]
+        assert symbol == "BTCUSDT"
+        from datetime import datetime
+
+        expected_ms = int(datetime.fromisoformat("2026-08-17T12:00:00").timestamp() * 1000)
+        assert registered_at_ms == expected_ms
 
 
 @pytest.mark.asyncio
