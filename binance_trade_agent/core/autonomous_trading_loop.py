@@ -197,8 +197,19 @@ class AutonomousTradingLoop:
         (_run_trailing_stop_watcher) is active, so a stop is never left
         unchecked for longer than one full cycle even if streaming is
         unavailable.
+
+        Skips entirely while emergency stop is active — a triggered trailing
+        stop otherwise places a real order directly via the execution agent,
+        bypassing risk_agent.validate_trade.
         """
         risk_agent = self.orchestrator.risk_agent
+
+        if risk_agent._shared_emergency_stop_enabled():
+            self.logger.warning(
+                "🛑 Emergency stop is ACTIVE — skipping trailing stop updates/closes this cycle."
+            )
+            return
+
         trailing_info = risk_agent.get_trailing_stop_info()
 
         if not trailing_info.get("positions"):
@@ -231,6 +242,17 @@ class AutonomousTradingLoop:
 
         for symbol, result in results.items():
             if result.get("stop_triggered"):
+                # Emergency stop is cross-process shared state — it can be
+                # activated by another process between the check at the top
+                # of this method and this specific order placement, so
+                # re-check immediately before each order rather than relying
+                # on the once-per-call check above.
+                if risk_agent._shared_emergency_stop_enabled():
+                    self.logger.warning(
+                        f"   🛑 Emergency stop activated mid-cycle — skipping {symbol} stop order."
+                    )
+                    continue
+
                 self.logger.warning(f"   ⚠️ {symbol} trailing stop TRIGGERED!")
                 self.logger.info(
                     f"      Entry: ${result['entry_price']:,.2f}, "
@@ -422,11 +444,16 @@ class AutonomousTradingLoop:
             self.logger.info(f"Trading Cycle #{cycle} - {datetime.now().strftime('%H:%M:%S')}")
             self.logger.info(f"{'='*70}")
 
-            self._refresh_heartbeat(status="healthy", details={"cycle": cycle})
+            emergency_stop_active = self.orchestrator.risk_agent._shared_emergency_stop_enabled()
+            if emergency_stop_active:
+                self.logger.warning(
+                    "🛑 Emergency stop is ACTIVE — skipping trade execution this cycle. "
+                    "Resume trading to continue."
+                )
 
             # Execute trades for each symbol
             for symbol in self.symbols:
-                if self.stop_flag:
+                if self.stop_flag or emergency_stop_active:
                     break
 
                 try:

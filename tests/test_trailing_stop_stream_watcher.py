@@ -74,6 +74,11 @@ def _build_bare_loop(symbols):
     loop.trades_executed = 0
     loop._stream_last_candle_time = {}
     loop.orchestrator = MagicMock()
+    # An unstubbed MagicMock() call returns a truthy MagicMock, which the
+    # per-order emergency-stop recheck in _process_trailing_stop_results
+    # would otherwise treat as "active", skipping every close order these
+    # tests expect to see placed.
+    loop.orchestrator.risk_agent._shared_emergency_stop_enabled = MagicMock(return_value=False)
     return loop
 
 
