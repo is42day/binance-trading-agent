@@ -21,11 +21,14 @@ def normalize_sqlite_path(db_path: str) -> str:
     """
     Normalize SQLite paths for Docker and local development.
 
-    Docker services use /app/data/*.db. When the code is executed from a
-    Windows/local checkout, that path points at C:/app instead of the repo.
-    In that case, map it to the project-local data directory.
+    Docker services use /app/data/*.db. When the code is executed outside
+    that container — a Windows/local checkout, or a bare CI runner with no
+    Docker involved — that path doesn't exist and isn't writable (attempting
+    to create it fails, e.g. PermissionError at the filesystem root on
+    Linux). In that case, map it to a data directory relative to the current
+    working directory instead.
     """
-    if os.name == "nt" and db_path.startswith("/app/"):
+    if db_path.startswith("/app/") and not os.path.isdir("/app"):
         db_path = db_path.removeprefix("/app/").replace("/", os.sep)
 
     path = Path(db_path)
