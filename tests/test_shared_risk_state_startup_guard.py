@@ -69,6 +69,29 @@ def test_refuses_live_armed_start_without_shared_risk_state(monkeypatch):
         _build_loop()
 
 
+def test_rejected_start_does_not_block_an_immediate_retry(monkeypatch):
+    """
+    Regression: this check must run before _check_no_concurrent_instance()
+    claims the heartbeat lease. Claim-then-raise would leave the lease in
+    "starting" status with nothing to release it (construction never
+    returns), forcing an operator who fixes the config to wait out
+    heartbeat_stale_after_seconds (>= 180s) before a retry could succeed,
+    even though no loop is actually running.
+    """
+    from binance_trade_agent.common.config import config
+
+    monkeypatch.delenv("RISK_SHARED_STATE_ENABLED", raising=False)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setattr(config, "runtime_mode", "live_armed")
+    with pytest.raises(RuntimeError):
+        _build_loop()
+
+    monkeypatch.setenv("RISK_SHARED_STATE_ENABLED", "true")
+    loop = _build_loop()  # must not raise DuplicateTradingLoopError
+
+    loop.release_heartbeat()
+
+
 def test_allows_live_armed_start_with_risk_shared_state_enabled(monkeypatch):
     from binance_trade_agent.common.config import config
 

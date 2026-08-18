@@ -13,6 +13,7 @@ from typing import Optional
 # Add the parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from binance_trade_agent.agents.risk_management_agent import shared_risk_state_enabled
 from binance_trade_agent.common.config import config
 from binance_trade_agent.common.logging_config import get_logger, setup_logging
 from binance_trade_agent.core.exchange_reconciliation import ExchangeReconciliationService
@@ -69,6 +70,15 @@ class AutonomousTradingLoop:
         self.strategy_name = strategy_name or "combined_default"
         self.strategy_parameters = strategy_parameters
 
+        # Refuse to start live (real-money) trading unless risk state is
+        # shared across processes. Checked first, before claiming the
+        # heartbeat lease below or constructing the orchestrator, purely
+        # from env vars — claiming the lease and then raising here would
+        # leave it in "starting" status with nothing to release it, forcing
+        # the operator to wait out heartbeat_stale_after_seconds (>= 180s)
+        # on a corrected retry even though nothing is actually running.
+        self._check_shared_risk_state_for_live_trading()
+
         # Refuse to start a second instance trading against the same portfolio
         # (e.g. an accidental scale-out or a stale container left over from a
         # redeploy). Must run before the orchestrator/execution agent stand up
@@ -82,7 +92,6 @@ class AutonomousTradingLoop:
             strategy_name=self.strategy_name,
             strategy_parameters=self.strategy_parameters,
         )
-        self._check_shared_risk_state_for_live_trading()
 
         self.logger.info(
             f"AutonomousTradingLoop initialized:\n"
@@ -157,7 +166,7 @@ class AutonomousTradingLoop:
         """
         if config.runtime_mode != "live_armed":
             return
-        if self.orchestrator.risk_agent.shared_state_enabled:
+        if shared_risk_state_enabled():
             return
         raise RuntimeError(
             "Refusing to start live trading: risk state is not shared across "
