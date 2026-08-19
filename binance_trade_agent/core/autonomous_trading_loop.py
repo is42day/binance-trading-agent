@@ -463,6 +463,15 @@ class AutonomousTradingLoop:
                     "Resume trading to continue."
                 )
 
+            # Renew the lease at the top of every cycle, before the
+            # per-symbol loop below — which is the only other place that
+            # refreshes it, and is skipped entirely while emergency stop is
+            # active. Without this, a process left halted-but-alive for
+            # longer than heartbeat_stale_after_seconds lets its own
+            # heartbeat go stale, so the concurrent-instance guard would
+            # wrongly let a second instance start once this one resumes.
+            self._refresh_heartbeat(status="healthy", details={"cycle": cycle})
+
             # Execute trades for each symbol
             for symbol in self.symbols:
                 if self.stop_flag or emergency_stop_active:
