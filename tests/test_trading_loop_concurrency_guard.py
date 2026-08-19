@@ -199,3 +199,69 @@ class TestHeartbeatRefreshedDuringCycle:
         assert len(refresh_calls) >= len(loop.symbols)
         per_symbol_refreshes = [d for d in refresh_calls if d and "symbol" in d]
         assert {d["symbol"] for d in per_symbol_refreshes} == set(loop.symbols)
+
+    @pytest.mark.asyncio
+    async def test_heartbeat_still_refreshed_while_emergency_stop_is_active(self):
+        """
+        Regression: the per-symbol loop that normally refreshes the
+        heartbeat is skipped entirely while emergency stop is active (it
+        breaks on the first symbol), so a process left halted-but-alive
+        for longer than heartbeat_stale_after_seconds would let its own
+        heartbeat go stale — making _check_no_concurrent_instance() wrongly
+        allow a second instance to start once this one resumes, defeating
+        the whole point of the guard for exactly the scenario (operator
+        intervention) where it matters most.
+        """
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        with tempfile.TemporaryDirectory() as _tmpdir:
+            tmp_path = Path(_tmpdir)
+            portfolio = PortfolioManager(str(tmp_path / "portfolio.db"), use_shared_session=False)
+
+            loop = AutonomousTradingLoop.__new__(AutonomousTradingLoop)
+            loop.logger = logging.getLogger("test-autonomous-loop")
+            loop.symbols = ["BTCUSDT", "ETHUSDT"]
+            loop.trade_interval = 60
+            loop.duration_minutes = 0
+            loop.heartbeat_stale_after_seconds = 180
+            loop._heartbeat_portfolio = portfolio
+            loop.stop_flag = False
+            loop.trades_executed = 0
+            loop.stream_trailing_stop_watcher_enabled = False
+            loop.orchestrator = MagicMock()
+            loop.orchestrator.risk_agent._shared_emergency_stop_enabled = MagicMock(
+                return_value=True
+            )
+            loop.orchestrator.execute_trading_workflow = AsyncMock(
+                side_effect=Exception("must not be called — emergency stop is active")
+            )
+            loop._update_trailing_stops = AsyncMock()
+
+            refresh_calls = []
+            original_refresh = loop._refresh_heartbeat
+
+            def _tracking_refresh(status="healthy", details=None):
+                refresh_calls.append((status, details))
+                return original_refresh(status=status, details=details)
+
+            loop._refresh_heartbeat = _tracking_refresh
+
+            async def _stop_after_sleep(*_args, **_kwargs):
+                loop.stop_flag = True
+
+            with patch("asyncio.sleep", side_effect=_stop_after_sleep):
+                await loop.run()
+
+            portfolio.engine.dispose()
+
+        loop.orchestrator.execute_trading_workflow.assert_not_called()
+        # run()'s cleanup path always does one final status="stopped"
+        # refresh regardless of this fix, which would make a bare
+        # "at least one call happened" assertion pass even without it —
+        # this must specifically be a "healthy" refresh made *during* the
+        # (skipped) cycle, not just the unconditional shutdown one.
+        healthy_calls = [
+            (status, details) for status, details in refresh_calls if status == "healthy"
+        ]
+        assert len(healthy_calls) >= 1
+        assert healthy_calls[0][1] == {"cycle": 1}
