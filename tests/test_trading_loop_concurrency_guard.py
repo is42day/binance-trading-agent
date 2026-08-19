@@ -6,6 +6,7 @@ redeploy). The 'heartbeat' table/methods already existed but were never
 wired into the trading loop.
 """
 
+import asyncio
 import logging
 import tempfile
 from pathlib import Path
@@ -169,6 +170,7 @@ class TestHeartbeatRefreshedDuringCycle:
             loop.stop_flag = False
             loop.trades_executed = 0
             loop.stream_trailing_stop_watcher_enabled = False
+            loop._stop_event = asyncio.Event()
             loop.orchestrator = MagicMock()
             loop.orchestrator.risk_agent._shared_emergency_stop_enabled = MagicMock(
                 return_value=False

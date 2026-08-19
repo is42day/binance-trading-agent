@@ -46,6 +46,15 @@ def main():
     def signal_handler(signum, frame):
         logger.info(f"Received signal {signum}, stopping trading loop...")
         trading_loop.stop_flag = True
+        # Wake the loop immediately if it's mid-wait between cycles, rather
+        # than leaving it blocked for up to trade_interval_seconds — under
+        # Docker's default stop grace period (~10s), a long interval meant
+        # the process almost always got SIGKILLed before reaching its own
+        # graceful-shutdown/heartbeat-release code. set() is safe to call
+        # here: signal handlers registered via signal.signal() always run
+        # on the same thread as the event loop, so this isn't a cross-
+        # thread call.
+        trading_loop._stop_event.set()
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)

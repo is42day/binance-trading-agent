@@ -96,6 +96,18 @@ class AutonomousTradingLoop:
         self.start_time = None
         self.stop_flag = False
 
+        # Set (in addition to stop_flag) by an external stop request — e.g.
+        # main.py's SIGTERM handler — to interrupt an in-progress
+        # end-of-cycle wait immediately, rather than leaving the loop
+        # blocked in a plain asyncio.sleep(trade_interval) for up to
+        # trade_interval seconds before it next checks stop_flag. Under
+        # Docker's default ~10s stop grace period, that meant a routine
+        # `docker stop`/restart almost always got SIGKILLed mid-sleep,
+        # skipping release_heartbeat() and leaving the concurrent-instance
+        # guard blocking the replacement container for
+        # heartbeat_stale_after_seconds.
+        self._stop_event = asyncio.Event()
+
         # Tracks the last kline open_time (ms) processed per symbol by the
         # stream-driven trailing-stop watcher, to avoid re-evaluating the
         # same closed candle on every check tick.
@@ -525,7 +537,24 @@ class AutonomousTradingLoop:
 
                 self.logger.info(f"\n⏳ Waiting {self.trade_interval} seconds before next cycle...")
                 try:
-                    await asyncio.sleep(self.trade_interval)
+                    # Races the normal interval sleep against _stop_event,
+                    # so a SIGTERM handler setting the event interrupts the
+                    # wait immediately instead of leaving the loop blocked
+                    # for up to trade_interval seconds. Under Docker's
+                    # default ~10s stop grace period, that meant a routine
+                    # `docker stop`/restart almost always got SIGKILLed
+                    # mid-sleep, skipping release_heartbeat() and leaving
+                    # the concurrent-instance guard blocking the
+                    # replacement container until the lease went stale.
+                    sleep_task = asyncio.ensure_future(asyncio.sleep(self.trade_interval))
+                    stop_task = asyncio.ensure_future(self._stop_event.wait())
+                    done, pending = await asyncio.wait(
+                        {sleep_task, stop_task}, return_when=asyncio.FIRST_COMPLETED
+                    )
+                    for task in pending:
+                        task.cancel()
+                    if stop_task in done:
+                        self.logger.info("Wait interrupted by stop request")
                 except asyncio.CancelledError:
                     self.logger.info("Interrupted by user during sleep")
                     self.stop_flag = True
