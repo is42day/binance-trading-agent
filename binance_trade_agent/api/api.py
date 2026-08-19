@@ -54,12 +54,14 @@ def _configured_cors_origins():
 
 def require_api_token(authorization: str | None = Header(default=None)):
     """
-    Optional bearer-token guard.
+    Bearer-token guard, enforced by default.
 
     Set API_AUTH_TOKEN in production to require Authorization: Bearer <token>.
-    Leaving it unset keeps local/test workflows compatible.
+    Defaults to fail-closed (API_AUTH_REQUIRED=true) so a bare `uvicorn` run
+    outside docker-compose isn't silently unauthenticated — set
+    API_AUTH_REQUIRED=false explicitly to opt out for local/test workflows.
     """
-    auth_required = os.getenv("API_AUTH_REQUIRED", "false").lower() in {
+    auth_required = os.getenv("API_AUTH_REQUIRED", "true").lower() in {
         "true",
         "1",
         "yes",

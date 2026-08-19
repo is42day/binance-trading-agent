@@ -13,6 +13,7 @@ from typing import Optional
 # Add the parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from binance_trade_agent.agents.risk_management_agent import shared_risk_state_enabled
 from binance_trade_agent.common.config import config
 from binance_trade_agent.common.logging_config import get_logger, setup_logging
 from binance_trade_agent.core.exchange_reconciliation import ExchangeReconciliationService
@@ -68,6 +69,15 @@ class AutonomousTradingLoop:
         self.duration_minutes = duration_minutes
         self.strategy_name = strategy_name or "combined_default"
         self.strategy_parameters = strategy_parameters
+
+        # Refuse to start live (real-money) trading unless risk state is
+        # shared across processes. Checked first, before claiming the
+        # heartbeat lease below or constructing the orchestrator, purely
+        # from env vars — claiming the lease and then raising here would
+        # leave it in "starting" status with nothing to release it, forcing
+        # the operator to wait out heartbeat_stale_after_seconds (>= 180s)
+        # on a corrected retry even though nothing is actually running.
+        self._check_shared_risk_state_for_live_trading()
 
         # Refuse to start a second instance trading against the same portfolio
         # (e.g. an accidental scale-out or a stale container left over from a
@@ -149,6 +159,35 @@ class AutonomousTradingLoop:
                 "other instance is running, wait for the heartbeat to go stale "
                 "or clear the 'trading-agent' row in the heartbeat table."
             )
+
+    def _check_shared_risk_state_for_live_trading(self):
+        """
+        Refuse to start live (real-money) trading unless risk state is
+        shared across processes.
+
+        emergency_stop, consecutive_losses, daily_trades, and drawdown
+        tracking only reach other processes (the API/dashboard's "Emergency
+        Stop" button, in particular) when EnhancedRiskManagementAgent's
+        shared_state_enabled is true. Outside docker-compose (which sets
+        DATABASE_URL), that flag silently defaults to false and each process
+        gets its own in-memory, per-process copy — an operator hitting
+        Emergency Stop from the dashboard would have no effect on a
+        standalone trading-agent process. Testnet/demo trading is allowed to
+        run without this, since the blast radius of that gap is zero; real
+        money is not.
+        """
+        if config.runtime_mode != "live_armed":
+            return
+        if shared_risk_state_enabled():
+            return
+        raise RuntimeError(
+            "Refusing to start live trading: risk state is not shared across "
+            "processes (RISK_SHARED_STATE_ENABLED is not set and DATABASE_URL is "
+            "not configured). Without it, the Emergency Stop button and other "
+            "risk controls in the API/dashboard process can't reach this trading "
+            "loop. Set RISK_SHARED_STATE_ENABLED=true or DATABASE_URL before "
+            "starting live trading."
+        )
 
     def _refresh_heartbeat(self, status: str = "healthy", details: dict | None = None):
         """Record that this instance is the live trading-agent."""

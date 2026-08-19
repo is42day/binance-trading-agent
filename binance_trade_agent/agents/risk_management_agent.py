@@ -18,6 +18,21 @@ RISK_STATE_KEY = "risk_counters"
 RISK_STATE_LOCK_NAME = "risk-state-lock"
 
 
+def shared_risk_state_enabled() -> bool:
+    """
+    Whether risk state (emergency_stop, consecutive_losses, daily_trades,
+    drawdown tracking, ...) is shared across processes via the DB, rather
+    than kept in-memory per-process. True when RISK_SHARED_STATE_ENABLED is
+    set, or implicitly whenever DATABASE_URL is configured (docker-compose's
+    default). Factored out so callers that need this before constructing an
+    EnhancedRiskManagementAgent (e.g. a startup guard) don't duplicate the
+    condition.
+    """
+    return os.getenv("RISK_SHARED_STATE_ENABLED", "false").lower() == "true" or bool(
+        os.getenv("DATABASE_URL")
+    )
+
+
 class RiskLevel(Enum):
     """Risk severity levels"""
 
@@ -125,9 +140,7 @@ class EnhancedRiskManagementAgent:
         # Trailing stop tracking - tracks highest price for each position
         # Format: {symbol: {"entry_price": float, "side": str, "highest_price": float, "lowest_price": float, "current_stop": float}}
         self.trailing_stops: Dict[str, Dict[str, float]] = {}
-        self.shared_state_enabled = os.getenv(
-            "RISK_SHARED_STATE_ENABLED", "false"
-        ).lower() == "true" or bool(os.getenv("DATABASE_URL"))
+        self.shared_state_enabled = shared_risk_state_enabled()
         self.state_store = (
             PortfolioManager("/app/data/web_portfolio.db") if self.shared_state_enabled else None
         )

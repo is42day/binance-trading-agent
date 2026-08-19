@@ -10,7 +10,6 @@ Verifies that:
 - Testnet and demo paths are unaffected by the arming check
 """
 
-import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -23,13 +22,20 @@ import pytest
 def _make_config(env: dict):
     """
     Build a fresh Config instance with an isolated environment.
-    Re-imports the module so os.getenv() picks up monkeypatched values.
-    """
-    # Remove cached module so __init__ runs fresh
-    for key in list(sys.modules.keys()):
-        if "binance_trade_agent.common.config" in key:
-            del sys.modules[key]
 
+    Config() is a plain class — every call re-runs __init__ and re-reads
+    os.environ regardless of module caching, so no sys.modules trickery is
+    needed. Deleting binance_trade_agent.common.config from sys.modules
+    (as this used to do) forces the module to re-execute its own
+    module-level `config = Config()` singleton, replacing it with a new
+    instance — but every module that already did
+    `from ...config import config` (e.g. autonomous_trading_loop.py) keeps
+    its own reference to the old one. That silently splits the singleton in
+    two for the rest of the test session: any test that later does a fresh
+    `from ...config import config` gets the new object, while
+    already-imported application code keeps reading the old one — so a
+    monkeypatch on one is invisible to the other.
+    """
     with patch.dict("os.environ", env, clear=True):
         from binance_trade_agent.common.config import Config
 
