@@ -384,6 +384,59 @@ class TestOperatorStatusEndpoint:
             es = resp.json()["emergency_stop"]
             assert es["enabled"] is True
 
+    def test_emergency_stop_reason_is_surfaced_from_shared_state(self):
+        """
+        Regression: get_system_state() returns a dict ({"value": <json str>,
+        "updated_at": ..., ...}), not the raw JSON string itself. The
+        operator/status handler was calling json.loads() directly on that
+        dict, which always raises (silently swallowed), leaving `reason`
+        stuck at None regardless of what was actually set.
+        """
+        import json
+
+        from binance_trade_agent.api.api import app, risk_agent
+
+        svc = _make_mock_svc()
+        journal = _make_mock_journal()
+        gate = _make_mock_gate()
+        binance_client = _make_mock_client()
+        stream_mgr = _make_mock_stream_manager()
+
+        mock_state_store = MagicMock()
+        mock_state_store.get_system_state.return_value = {
+            "value": json.dumps({"enabled": True, "reason": "manual halt for testing"}),
+        }
+
+        with (
+            patch(
+                "binance_trade_agent.core.order_lifecycle.get_order_lifecycle_service",
+                return_value=svc,
+            ),
+            patch(
+                "binance_trade_agent.core.decision_journal.get_decision_journal",
+                return_value=journal,
+            ),
+            patch(
+                "binance_trade_agent.core.strategy_validation_gate.get_validation_gate",
+                return_value=gate,
+            ),
+            patch(
+                "binance_trade_agent.core.market_streams.get_stream_manager",
+                return_value=stream_mgr,
+            ),
+            patch(
+                "binance_trade_agent.clients.binance_client.BinanceAPIClient",
+                return_value=binance_client,
+            ),
+            patch.object(risk_agent, "_shared_emergency_stop_enabled", return_value=True),
+            patch.object(risk_agent, "state_store", mock_state_store),
+        ):
+            tc = TestClient(app)
+            resp = tc.get("/api/v1/operator/status", headers={"X-API-Token": "test-token"})
+            es = resp.json()["emergency_stop"]
+            assert es["enabled"] is True
+            assert es["reason"] == "manual halt for testing"
+
 
 class TestOperatorActionEndpoints:
     def test_emergency_stop_requires_reason(self):

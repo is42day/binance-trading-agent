@@ -1182,7 +1182,7 @@ def _get_operator_status_sync() -> dict:
 
                 raw = risk_agent.state_store.get_system_state("emergency_stop")
                 if raw:
-                    parsed = _json.loads(raw)
+                    parsed = _json.loads(raw["value"])
                     es_reason = parsed.get("reason")
             except Exception:
                 pass
