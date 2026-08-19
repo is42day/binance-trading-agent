@@ -89,12 +89,20 @@ class PaperTradingLoop:
         position_size_pct: float = 0.25,  # 25% per trade max
         max_iterations: int = 0,
         reset: bool = False,
+        kline_interval: str = "1h",
     ):
         self.symbols = symbols or ["BTCUSDT"]
         self.strategy_name = strategy_name
         self.trade_interval = trade_interval_seconds
         self.position_size_pct = position_size_pct
         self.max_iterations = max_iterations
+        # How often a new candle (and thus a real chance of a new signal)
+        # becomes available — independent of trade_interval_seconds, which
+        # only controls how often the loop *checks*. Re-polling every 60s
+        # against unchanged 1h candles just re-evaluates the same signal;
+        # a shorter kline_interval (e.g. "5m") is useful for exercising the
+        # pipeline faster during testing, at the cost of realism.
+        self.kline_interval = kline_interval
 
         # Use mainnet data client
         self.data_client = MainnetDataClient()
@@ -185,7 +193,7 @@ class PaperTradingLoop:
         """Process a single symbol for trading signals"""
         try:
             # Fetch real data
-            ohlcv_data = self._fetch_ohlcv(symbol)
+            ohlcv_data = self._fetch_ohlcv(symbol, interval=self.kline_interval)
             if not ohlcv_data:
                 return
 
@@ -267,7 +275,7 @@ class PaperTradingLoop:
         logger.info("=" * 60)
         logger.info(f"Strategy: {self.strategy_name}")
         logger.info(f"Symbols: {', '.join(self.symbols)}")
-        logger.info(f"Interval: {self.trade_interval}s")
+        logger.info(f"Poll interval: {self.trade_interval}s, kline interval: {self.kline_interval}")
 
         stats = self.paper_engine.get_portfolio_summary()
         logger.info(f"Starting balance: ${stats['current_balance']:.2f}")
