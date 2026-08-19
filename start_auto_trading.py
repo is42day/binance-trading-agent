@@ -1,9 +1,25 @@
 #!/usr/bin/env python3
 """
-Automated Trading Loop - Run trading agent in background
+Automated Trading Loop - CLI wrapper around binance_trade_agent.main
 
-This script starts the autonomous trading agent with a specified strategy.
-It continuously monitors market data and executes trades based on signals.
+Thin argument-parsing wrapper: translates the --strategy/--symbols/--interval
+CLI flags into the STRATEGY_NAME/TRADING_SYMBOLS/TRADING_INTERVAL_SECONDS env
+vars that binance_trade_agent.main.main() already reads, then delegates to
+it. Flags left unset fall through to main()'s own env-var defaults, which
+match this script's historical defaults exactly (combined / BTCUSDT / 60s).
+
+This used to be a second, independent trading-loop implementation
+(AutomatedTradingAgent) that duplicated core/autonomous_trading_loop.py's
+AutonomousTradingLoop without any of its safety mechanisms — no
+concurrent-instance heartbeat guard, no emergency-stop handling, no
+shared-risk-state startup guard, no config.validate(). Both `make start`
+and the README's documented quick-start `docker run` command invoke this
+script directly, so that gap wasn't theoretical: it was the actual,
+documented, commonly-used entrypoint. Delegating to the same code
+binance_trade_agent.main.py / docker-compose's trading-agent service use
+closes it by construction — there is now exactly one trading-loop
+implementation, and this script can't drift out of sync with its safety
+fixes again.
 
 Usage:
     python start_auto_trading.py [--strategy STRATEGY] [--symbols SYMBOL1,SYMBOL2] [--interval SECONDS]
@@ -16,122 +32,10 @@ Examples:
 """
 
 import argparse
-import asyncio
-import logging
 import os
-import signal
-from datetime import datetime
-from typing import List
-
-# Setup logging
-log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
-os.makedirs(log_dir, exist_ok=True)
-log_file = os.path.join(log_dir, "auto_trading.log")
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(), logging.FileHandler(log_file)],
-)
-logger = logging.getLogger(__name__)
 
 
-class AutomatedTradingAgent:
-    """Runs automated trading loop with specified strategy"""
-
-    def __init__(self, strategy: str = "combined", symbols: List[str] = None, interval: int = 60):
-        """
-        Initialize automated trading agent
-
-        Args:
-            strategy: Strategy name ('rsi', 'macd', 'combined')
-            symbols: List of symbols to trade (default: ['BTCUSDT'])
-            interval: Seconds between trading cycles
-        """
-        from binance_trade_agent.common.config import config
-        from binance_trade_agent.core.orchestrator import TradingOrchestrator
-        from binance_trade_agent.core.portfolio_manager import PortfolioManager
-
-        self.strategy = strategy
-        self.symbols = symbols or ["BTCUSDT"]
-        self.interval = interval
-        self.config = config
-        self.orchestrator = TradingOrchestrator(strategy_name=strategy)
-
-        # Use same portfolio DB as dashboard so trades show up in real-time
-        self.portfolio = PortfolioManager("/app/data/web_portfolio.db")
-
-        self.running = False
-        self.trades_executed = 0
-        self.errors = 0
-
-        logger.info("Initialized AutomatedTradingAgent")
-        logger.info(f"  Strategy: {strategy}")
-        logger.info(f"  Symbols: {', '.join(self.symbols)}")
-        logger.info(f"  Interval: {interval}s")
-
-    async def run(self):
-        """Main trading loop"""
-        self.running = True
-        logger.info("Starting automated trading loop...")
-
-        while self.running:
-            try:
-                for symbol in self.symbols:
-                    try:
-                        await self._trade_symbol(symbol)
-                    except Exception as e:
-                        self.errors += 1
-                        logger.error(f"Error trading {symbol}: {str(e)}")
-                        import traceback
-
-                        traceback.print_exc()
-
-                # Wait before next cycle
-                logger.debug(f"Waiting {self.interval}s until next cycle...")
-                await asyncio.sleep(self.interval)
-
-            except asyncio.CancelledError:
-                logger.info("Trading loop cancelled")
-                break
-            except Exception as e:
-                self.errors += 1
-                logger.error(f"Unexpected error in trading loop: {str(e)}")
-                await asyncio.sleep(self.interval)
-
-    async def _trade_symbol(self, symbol: str):
-        """Execute trading workflow for a symbol"""
-        try:
-            quantity = self.config.get_default_quantity(symbol)
-
-            logger.info(f"Executing trading workflow for {symbol} ({quantity} units)")
-
-            trade_decision = await self.orchestrator.execute_trading_workflow(
-                symbol=symbol, quantity=quantity, strategy_name=self.strategy
-            )
-
-            if trade_decision.executed:
-                self.trades_executed += 1
-                logger.info(
-                    f"Trade executed: {symbol} {trade_decision.signal_type} "
-                    f"@ {trade_decision.execution_price} "
-                    f"(Order: {trade_decision.order_id})"
-                )
-            else:
-                logger.debug(f"No trade signal or risk rejected: {symbol}")
-
-        except Exception as e:
-            logger.error(f"Error in trading workflow for {symbol}: {str(e)}")
-            raise
-
-    def stop(self):
-        """Stop the trading loop"""
-        logger.info("Stopping trading loop...")
-        self.running = False
-        logger.info(f"Summary: {self.trades_executed} trades, {self.errors} errors")
-
-
-async def main():
+def parse_args(argv=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Automated Trading Agent",
         epilog="Examples:\n"
@@ -142,54 +46,37 @@ async def main():
     )
     parser.add_argument(
         "--strategy",
-        default="combined",
-        help="Strategy: rsi, macd, combined (default: combined)",
+        default=None,
+        help="Strategy name (default: $STRATEGY_NAME, or 'combined')",
     )
     parser.add_argument(
         "--symbols",
-        default="BTCUSDT",
-        help="Comma-separated symbols (default: BTCUSDT)",
+        default=None,
+        help="Comma-separated symbols (default: $TRADING_SYMBOLS, or 'BTCUSDT')",
     )
     parser.add_argument(
         "--interval",
         type=int,
-        default=60,
-        help="Seconds between trading cycles (default: 60)",
+        default=None,
+        help="Seconds between trading cycles (default: $TRADING_INTERVAL_SECONDS, or 60)",
     )
+    return parser.parse_args(argv)
 
-    args = parser.parse_args()
 
-    symbols = [s.strip() for s in args.symbols.split(",")]
+def main(argv=None):
+    args = parse_args(argv)
 
-    logger.info("=" * 70)
-    logger.info("AUTOMATED TRADING AGENT STARTED")
-    logger.info("=" * 70)
-    logger.info(f"Time: {datetime.now().isoformat()}")
-    logger.info(f"Strategy: {args.strategy}")
-    logger.info(f"Symbols: {', '.join(symbols)}")
-    logger.info(f"Interval: {args.interval}s")
-    logger.info(f"Logs: {log_file}")
-    logger.info("=" * 70)
+    if args.strategy is not None:
+        os.environ["STRATEGY_NAME"] = args.strategy
+    if args.symbols is not None:
+        os.environ["TRADING_SYMBOLS"] = args.symbols
+    if args.interval is not None:
+        os.environ["TRADING_INTERVAL_SECONDS"] = str(args.interval)
 
-    agent = AutomatedTradingAgent(strategy=args.strategy, symbols=symbols, interval=args.interval)
+    from binance_trade_agent.main import main as run_trading_agent
 
-    # Setup signal handlers for graceful shutdown
-    def signal_handler(signum, frame):
-        logger.info(f"Received signal {signum}, shutting down gracefully...")
-        agent.stop()
-
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-
-    try:
-        await agent.run()
-    except KeyboardInterrupt:
-        logger.info("Interrupted by user")
-    finally:
-        logger.info("=" * 70)
-        logger.info("AUTOMATED TRADING AGENT STOPPED")
-        logger.info("=" * 70)
+    run_trading_agent()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

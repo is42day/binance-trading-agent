@@ -297,11 +297,11 @@ docker run -it --env-file .env binance-trading-agent:latest python -m binance_tr
 
 ### Trading Loop (in `start_auto_trading.py`)
 ```python
---strategy combined     # Strategy: rsi, macd, or combined
+--strategy combined     # Strategy name (default: combined)
 --symbols BTCUSDT      # Trading symbols (comma-separated)
 --interval 60          # Trading loop interval in seconds
---quantity 0.001       # Trade quantity per order
 ```
+Trade quantity per symbol is configured via env vars (e.g. `TRADING_DEFAULT_QUANTITY_BTC`), not a CLI flag — see `.env.example`.
 
 ### Database
 - Location: `data/web_portfolio.db` (SQLite)
