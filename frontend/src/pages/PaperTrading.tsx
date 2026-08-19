@@ -31,10 +31,24 @@ export default function PaperTrading() {
 
   const isLoopRunning = loopStatus?.running ?? false;
 
+  const [symbolsInput, setSymbolsInput] = useState('BTCUSDT');
+  const [strategy, setStrategy] = useState('combined_edge');
+  const [intervalSeconds, setIntervalSeconds] = useState(60);
+  const [klineInterval, setKlineInterval] = useState('1h');
+
   const handleStart = async () => {
     setLoopMsg(null);
+    const symbols = symbolsInput
+      .split(',')
+      .map((s) => s.trim().toUpperCase())
+      .filter(Boolean);
     try {
-      await startLoop.mutateAsync({});
+      await startLoop.mutateAsync({
+        symbols: symbols.length > 0 ? symbols : undefined,
+        strategy,
+        interval_seconds: intervalSeconds,
+        kline_interval: klineInterval,
+      });
       setLoopMsg({ text: 'Paper trading started.', ok: true });
       refetchLoop();
       refetch();
@@ -107,6 +121,72 @@ export default function PaperTrading() {
             {resetPaper.isPending ? 'Resetting…' : '↺ Reset Portfolio'}
           </button>
         </div>
+      </div>
+
+      <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+        <h3 className="text-sm font-semibold text-gray-300 mb-3">Loop Configuration</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <label className="text-xs text-gray-400 space-y-1">
+            <span>Symbols (comma-separated)</span>
+            <input
+              type="text"
+              value={symbolsInput}
+              onChange={(e) => setSymbolsInput(e.target.value)}
+              disabled={isLoopRunning}
+              placeholder="BTCUSDT, ETHUSDT"
+              className="w-full px-2 py-1.5 rounded bg-gray-900 border border-gray-600 text-white text-sm disabled:opacity-50"
+            />
+          </label>
+          <label className="text-xs text-gray-400 space-y-1">
+            <span>Strategy</span>
+            <select
+              value={strategy}
+              onChange={(e) => setStrategy(e.target.value)}
+              disabled={isLoopRunning}
+              className="w-full px-2 py-1.5 rounded bg-gray-900 border border-gray-600 text-white text-sm disabled:opacity-50"
+            >
+              <option value="combined_edge">combined_edge (conservative, default)</option>
+              <option value="edge_conservative">edge_conservative</option>
+              <option value="edge">edge</option>
+              <option value="smart_entry">smart_entry</option>
+              <option value="rsi_default">rsi_default (frequent, for testing)</option>
+              <option value="macd_default">macd_default</option>
+              <option value="combined_default">combined_default</option>
+            </select>
+          </label>
+          <label className="text-xs text-gray-400 space-y-1">
+            <span>Poll interval (seconds)</span>
+            <input
+              type="number"
+              min={5}
+              value={intervalSeconds}
+              onChange={(e) => setIntervalSeconds(Number(e.target.value))}
+              disabled={isLoopRunning}
+              className="w-full px-2 py-1.5 rounded bg-gray-900 border border-gray-600 text-white text-sm disabled:opacity-50"
+            />
+          </label>
+          <label className="text-xs text-gray-400 space-y-1">
+            <span>Kline interval (candle size)</span>
+            <select
+              value={klineInterval}
+              onChange={(e) => setKlineInterval(e.target.value)}
+              disabled={isLoopRunning}
+              className="w-full px-2 py-1.5 rounded bg-gray-900 border border-gray-600 text-white text-sm disabled:opacity-50"
+            >
+              <option value="1m">1m (fastest, for testing)</option>
+              <option value="5m">5m</option>
+              <option value="15m">15m</option>
+              <option value="1h">1h (default, realistic)</option>
+              <option value="4h">4h</option>
+              <option value="1d">1d</option>
+            </select>
+          </label>
+        </div>
+        <p className="text-xs text-gray-500 mt-2">
+          A new candle only becomes available once per kline interval, regardless of the poll interval — a new signal
+          can only appear that often. Use a short kline interval (1m/5m) to exercise the pipeline quickly while
+          testing; leave it at 1h for realistic strategy behavior.
+        </p>
       </div>
 
       {loopMsg && (

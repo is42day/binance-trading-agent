@@ -36,6 +36,7 @@ def test_start_with_no_body_uses_documented_defaults():
         strategy_name="combined_edge",
         initial_balance=10000.0,
         trade_interval_seconds=60,
+        kline_interval="1h",
     )
 
 
@@ -60,6 +61,39 @@ def test_start_with_partial_body_overrides_only_given_fields():
         strategy_name="combined_edge",
         initial_balance=10000.0,
         trade_interval_seconds=60,
+        kline_interval="1h",
+    )
+
+
+def test_start_can_override_kline_interval_for_faster_test_iteration():
+    """
+    kline_interval controls how often a *new candle* — and thus a real
+    chance of a new signal — becomes available, independent of
+    interval_seconds (how often the loop polls). Regression coverage for
+    exposing it, since it previously had no way to be set at all: paper
+    trading always evaluated the same hourly candle regardless of how
+    often the loop checked, making it look idle over short observation
+    windows.
+    """
+    from binance_trade_agent.api.api import app
+
+    client = TestClient(app)
+
+    with patch("binance_trade_agent.core.paper_trading_loop.PaperTradingLoop") as mock_loop_cls:
+        mock_loop_cls.return_value.run = AsyncMock(return_value=None)
+        response = client.post(
+            "/api/v1/paper-trading/start",
+            json={"kline_interval": "5m"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["kline_interval"] == "5m"
+    mock_loop_cls.assert_called_once_with(
+        symbols=["BTCUSDT"],
+        strategy_name="combined_edge",
+        initial_balance=10000.0,
+        trade_interval_seconds=60,
+        kline_interval="5m",
     )
 
 

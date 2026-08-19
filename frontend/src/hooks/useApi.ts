@@ -250,8 +250,13 @@ export function usePaperLoopStatus() {
 export function useStartPaperTrading() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (opts?: { symbols?: string[]; strategy?: string; initial_balance?: number; interval_seconds?: number }) =>
-      poster('/api/v1/paper-trading/start', opts ?? {}),
+    mutationFn: (opts?: {
+      symbols?: string[];
+      strategy?: string;
+      initial_balance?: number;
+      interval_seconds?: number;
+      kline_interval?: string;
+    }) => poster('/api/v1/paper-trading/start', opts ?? {}),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['paper-trading'] }),
   });
 }

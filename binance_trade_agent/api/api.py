@@ -113,6 +113,7 @@ class StartPaperTradingRequest(BaseModel):
     strategy: str = "combined_edge"
     initial_balance: float = 10000.0
     interval_seconds: int = 60
+    kline_interval: str = "1h"
 
 
 # --- Lifecycle Events ---
@@ -796,6 +797,7 @@ async def start_paper_trading(request: StartPaperTradingRequest | None = None):
                 strategy_name=request.strategy,
                 initial_balance=request.initial_balance,
                 trade_interval_seconds=request.interval_seconds,
+                kline_interval=request.kline_interval,
             )
 
             def _run():
@@ -814,6 +816,7 @@ async def start_paper_trading(request: StartPaperTradingRequest | None = None):
                 "message": "Paper trading started",
                 "symbols": symbols,
                 "strategy": request.strategy,
+                "kline_interval": request.kline_interval,
             }
         except Exception as e:
             logger.error(f"Error starting paper trading loop: {e}")
