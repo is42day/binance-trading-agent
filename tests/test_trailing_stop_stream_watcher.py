@@ -73,6 +73,7 @@ def _build_bare_loop(symbols):
     loop.stop_flag = False
     loop.trades_executed = 0
     loop._stream_last_candle_time = {}
+    loop._stop_event = asyncio.Event()
     loop.orchestrator = MagicMock()
     # An unstubbed MagicMock() call returns a truthy MagicMock, which the
     # per-order emergency-stop recheck in _process_trailing_stop_results

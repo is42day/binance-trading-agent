@@ -67,7 +67,7 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command: >
       "python -m binance_trade_agent.scripts.preflight --service api &&
-      uvicorn binance_trade_agent.api.api:app --host 0.0.0.0 --port 8000"
+      exec uvicorn binance_trade_agent.api.api:app --host 0.0.0.0 --port 8000"
     environment:
       - BINANCE_API_KEY=${BINANCE_API_KEY:-}
       - BINANCE_API_SECRET=${BINANCE_API_SECRET:-}
@@ -142,7 +142,7 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command: >
       "python -m binance_trade_agent.scripts.preflight --service dashboard &&
-      cd /app/binance_trade_agent/dashboard && python run.py"
+      cd /app/binance_trade_agent/dashboard && exec python run.py"
     environment:
       - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-trading_user}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-binance_trading}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
@@ -196,7 +196,7 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command: >
       "python -m binance_trade_agent.scripts.preflight --service trading-agent &&
-      python -m binance_trade_agent.main"
+      exec python -m binance_trade_agent.main"
     environment:
       - BINANCE_API_KEY=${BINANCE_API_KEY:-}
       - BINANCE_API_SECRET=${BINANCE_API_SECRET:-}
