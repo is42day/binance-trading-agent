@@ -192,15 +192,39 @@ class PaperTradingLoop:
     async def _process_symbol(self, symbol: str):
         """Process a single symbol for trading signals"""
         try:
-            # Fetch real data
-            ohlcv_data = self._fetch_ohlcv(symbol, interval=self.kline_interval)
+            # Fetch enough candles for whatever the strategy needs (e.g.
+            # CombinedStrategy's 200-period trend filter) — the old fixed
+            # limit=100 silently starved it into "Insufficient data" HOLDs.
+            required = 100
+            if hasattr(self.strategy, "requires_minimum_data"):
+                required = max(required, self.strategy.requires_minimum_data() + 10)
+            ohlcv_data = self._fetch_ohlcv(symbol, interval=self.kline_interval, limit=required)
             if not ohlcv_data:
                 return
 
             current_price = ohlcv_data[-1]["close"]
 
-            # Generate signal
-            signal = self.strategy.generate_signal(symbol, ohlcv_data)
+            # Generate signal. Only the "edge" strategy family (EdgeStrategy,
+            # SmartEntryStrategy, CombinedEdgeStrategy, ...) implements the
+            # generate_signal(symbol, ohlcv_data) -> dict shortcut; every
+            # BaseStrategy subclass (CombinedStrategy, RSIStrategy,
+            # MACDStrategy, BollingerStrategy, ...) only implements the
+            # standard analyze(market_data, symbol) -> StrategyResult
+            # contract. Calling generate_signal() unconditionally meant
+            # every non-edge strategy (including "combined", the UI's
+            # default) raised AttributeError on every iteration, silently
+            # swallowed below, and never produced a signal.
+            if hasattr(self.strategy, "generate_signal"):
+                signal = self.strategy.generate_signal(symbol, ohlcv_data)
+            else:
+                result = self.strategy.analyze(ohlcv_data, symbol)
+                signal = {
+                    "action": result.signal.value,
+                    "confidence": result.confidence,
+                    "rejection_reason": (result.metadata or {}).get("rejection_reason"),
+                    "indicators": result.indicators,
+                    "metadata": result.metadata,
+                }
 
             action = signal.get("action", "HOLD")
             confidence = signal.get("confidence", 0)
