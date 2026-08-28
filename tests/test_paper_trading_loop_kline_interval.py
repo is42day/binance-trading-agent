@@ -26,6 +26,7 @@ def _build_bare_loop(kline_interval: str = "1h") -> PaperTradingLoop:
     loop.position_size_pct = 0.25
     loop.data_client = MagicMock()
     loop.strategy = MagicMock()
+    loop.strategy.requires_minimum_data.return_value = 1
     loop.paper_engine = MagicMock()
     loop.paper_engine.portfolio.open_positions = {}
     return loop
@@ -44,7 +45,7 @@ async def test_process_symbol_fetches_with_the_configured_kline_interval():
 
     await loop._process_symbol("BTCUSDT")
 
-    loop._fetch_ohlcv.assert_called_once_with("BTCUSDT", interval="5m")
+    loop._fetch_ohlcv.assert_called_once_with("BTCUSDT", interval="5m", limit=100)
 
 
 @pytest.mark.asyncio
@@ -55,4 +56,4 @@ async def test_process_symbol_defaults_to_1h_kline_interval():
 
     await loop._process_symbol("BTCUSDT")
 
-    loop._fetch_ohlcv.assert_called_once_with("BTCUSDT", interval="1h")
+    loop._fetch_ohlcv.assert_called_once_with("BTCUSDT", interval="1h", limit=100)
